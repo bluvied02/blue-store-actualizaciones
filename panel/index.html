@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Blue Store · en vivo</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Blue Store">
+<meta name="theme-color" content="#0b1220">
+<style>
+  /* EL PANEL DEL CELULAR
+     Se mira con una mano, de noche, en el mostrador o desde la cama: fondo
+     oscuro, numeros grandes y nada que haya que apretar para entender. */
+  :root {
+    --fondo: #0b1220; --panel: #121c30; --panel2: #18243c; --borde: #22314f;
+    --texto: #eaf0fb; --texto2: #9fb0cd; --texto3: #6b7d9e;
+    --verde: #34d399; --ambar: #fbbf24; --rojo: #f87171; --azul: #60a5fa;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--fondo); color: var(--texto); }
+  body {
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    padding: max(12px, env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
+    max-width: 780px; margin: 0 auto;
+  }
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
+  .estado { font-size: 12px; color: var(--texto3); }
+  .estado b { color: var(--verde); font-weight: 600; }
+  .estado.viejo b { color: var(--ambar); }
+
+  .total-dia {
+    background: linear-gradient(160deg, #15233c, #101a2d); border: 1px solid var(--borde);
+    border-radius: 16px; padding: 16px; margin-bottom: 12px;
+  }
+  .total-dia .r { font-size: 12px; color: var(--texto3); text-transform: uppercase; letter-spacing: .08em; }
+  .total-dia .v { font-family: var(--mono); font-size: 34px; font-weight: 700; margin: 4px 0 2px; }
+  .total-dia .d { font-size: 13px; color: var(--texto2); }
+
+  .local { background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+  .local h2 { font-size: 16px; margin: 0 0 2px; }
+  .local .sub { font-size: 12px; color: var(--texto3); margin-bottom: 12px; }
+  .grande { font-family: var(--mono); font-size: 27px; font-weight: 700; }
+  .fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 5px 0; }
+  .fila + .fila { border-top: 1px solid rgba(255,255,255,.04); }
+  .fila span { color: var(--texto2); font-size: 13.5px; }
+  .fila b { font-family: var(--mono); font-weight: 600; }
+  .cajas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+  .mini { background: var(--panel2); border-radius: 12px; padding: 10px 12px; }
+  .mini .r { font-size: 11px; color: var(--texto3); text-transform: uppercase; letter-spacing: .06em; }
+  .mini .v { font-family: var(--mono); font-size: 17px; font-weight: 700; margin-top: 2px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--borde); color: var(--texto2); }
+  .chip.ok { color: var(--verde); border-color: rgba(52,211,153,.4); }
+  .chip.mal { color: var(--rojo); border-color: rgba(248,113,113,.4); }
+  .chip.alerta { color: var(--ambar); border-color: rgba(251,191,36,.4); }
+  .titulito { font-size: 11px; color: var(--texto3); text-transform: uppercase; letter-spacing: .08em; margin: 12px 0 4px; }
+  .alertas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+  .entrar { max-width: 320px; margin: 18vh auto 0; text-align: center; }
+  .entrar h1 { margin-bottom: 6px; }
+  .entrar p { color: var(--texto2); font-size: 14px; }
+  input {
+    width: 100%; font: 600 26px var(--mono); text-align: center; letter-spacing: .3em;
+    background: var(--panel); color: var(--texto); border: 1px solid var(--borde);
+    border-radius: 12px; padding: 14px; margin: 14px 0;
+  }
+  button {
+    width: 100%; font: 600 16px inherit; background: var(--azul); color: #06101f;
+    border: 0; border-radius: 12px; padding: 14px; cursor: pointer;
+  }
+  .aviso { color: var(--rojo); font-size: 13.5px; min-height: 20px; }
+  .pie { text-align: center; color: var(--texto3); font-size: 12px; margin-top: 16px; }
+  .pie a { color: var(--texto3); }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --fondo: #f4f6fb; --panel: #fff; --panel2: #f0f4fb; --borde: #dde5f2;
+      --texto: #10192b; --texto2: #445271; --texto3: #7b8aa6;
+      --verde: #0b7a45; --ambar: #91590a; --rojo: #c81430; --azul: #2563eb;
+    }
+    :root:not([data-theme="dark"]) .total-dia { background: linear-gradient(160deg, #fff, #eef3fb); }
+    :root:not([data-theme="dark"]) button { color: #fff; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// La pagina es la misma para cualquier negocio: el proyecto viene en el link
+// (#p=abcd) y la clave publica se baja de ese proyecto (panel/config.json, que
+// sube la caja al "Publicar la pagina del celular"). Con RLS prendido, esa
+// clave sola no lee nada: todo pasa por la funcion pos_panel, que pide el codigo.
+const CONF = { url: '', anon: '' }
+async function cargarConf () {
+  const m = /[#&]p=([a-z0-9]+)/.exec(location.hash)
+  let ref = m ? m[1] : ''
+  try {
+    if (ref) localStorage.setItem('bs.proyecto', ref)
+    else ref = localStorage.getItem('bs.proyecto') || ''
+  } catch (e) { /* modo privado */ }
+  if (!ref) throw new Error('Abrí el link completo que te dio el programa de la caja.')
+  const base = 'https://' + ref + '.supabase.co'
+  const r = await fetch(base + '/storage/v1/object/public/panel/config.json', { cache: 'no-store' })
+  if (!r.ok) throw new Error('Falta publicar la página desde la caja (' + r.status + ').')
+  const c = await r.json()
+  CONF.url = base
+  CONF.anon = c.anon
+}
+const app = document.getElementById('app')
+const plata = (c) => (c / 100).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
+const unidades = (m) => (m / 1000).toLocaleString('es-AR', { maximumFractionDigits: 0 })
+const hora = (iso) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+const hace = (iso) => {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
+  return min < 1 ? 'ahora' : min === 1 ? 'hace 1 minuto' : min < 60 ? 'hace ' + min + ' minutos' : 'hace ' + Math.round(min / 60) + ' h'
+}
+const el = (tag, props, ...hijos) => {
+  const n = document.createElement(tag)
+  for (const k in (props || {})) {
+    if (k === 'clase') n.className = props[k]
+    else if (k === 'texto') n.textContent = props[k]
+    else if (k.startsWith('on')) n.addEventListener(k.slice(2), props[k])
+    else n.setAttribute(k, props[k])
+  }
+  for (const h of hijos.flat(3)) if (h != null && h !== false) n.append(h instanceof Node ? h : document.createTextNode(String(h)))
+  return n
+}
+
+let codigo = ''
+try { codigo = localStorage.getItem('bs.codigo') || '' } catch (e) { codigo = '' }
+let reloj = null
+
+async function traer () {
+  if (!CONF.anon) await cargarConf()
+  const r = await fetch(CONF.url + '/rest/v1/rpc/pos_panel', {
+    method: 'POST',
+    headers: { apikey: CONF.anon, Authorization: 'Bearer ' + CONF.anon, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ codigo })
+  })
+  if (!r.ok) throw new Error('No se pudo conectar (' + r.status + ')')
+  return r.json()
+}
+
+function pedirCodigo (mensaje) {
+  clearInterval(reloj)
+  app.replaceChildren()
+  const entrada = el('input', { type: 'tel', inputmode: 'numeric', placeholder: '····', maxlength: '8' })
+  const aviso = el('div', { clase: 'aviso', texto: mensaje || '' })
+  const entrar = async () => {
+    codigo = entrada.value.replace(/[^0-9]/g, '')
+    if (codigo.length < 4) { aviso.textContent = 'Poné el código de 4 números o más.'; return }
+    try { localStorage.setItem('bs.codigo', codigo) } catch (e) { /* modo privado */ }
+    arrancar()
+  }
+  entrada.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') entrar() })
+  app.append(el('div', { clase: 'entrar' },
+    el('h1', { texto: 'Blue Store' }),
+    el('p', { texto: 'Poné el código para ver las ventas en vivo.' }),
+    entrada, aviso,
+    el('button', { onclick: entrar, texto: 'Entrar' })))
+  entrada.focus()
+}
+
+function tarjetaLocal (fila) {
+  const d = fila.datos || {}
+  const c = d.caja || {}
+  const alertas = []
+  if (!c.abierta) alertas.push(el('span', { clase: 'chip mal', texto: 'Caja cerrada' }))
+  if (d.stock && d.stock.negativos) alertas.push(el('span', { clase: 'chip mal', texto: d.stock.negativos + ' en negativo' }))
+  if (d.stock && d.stock.bajoMinimo) alertas.push(el('span', { clase: 'chip alerta', texto: d.stock.bajoMinimo + ' bajo el mínimo' }))
+  if (d.vencimientos && d.vencimientos.vencidos) alertas.push(el('span', { clase: 'chip mal', texto: d.vencimientos.vencidos + ' vencidos' }))
+  if (d.vencimientos && d.vencimientos.urgentes) alertas.push(el('span', { clase: 'chip alerta', texto: d.vencimientos.urgentes + ' vencen esta semana' }))
+  if (d.suspendidas) alertas.push(el('span', { clase: 'chip', texto: d.suspendidas + ' en espera' }))
+  if (!alertas.length) alertas.push(el('span', { clase: 'chip ok', texto: 'Todo en orden' }))
+
+  return el('div', { clase: 'local' },
+    el('h2', { texto: fila.nombre }),
+    el('div', { clase: 'sub' }, c.abierta
+      ? 'Turno de ' + (c.usuario || '—') + ' desde las ' + hora(c.desde) + ' · caja ' + (c.terminal || '')
+      : 'Sin turno abierto'),
+    el('div', { clase: 'grande', texto: plata(d.total || 0) }),
+    el('div', { clase: 'sub' }, (d.ventas || 0) + (d.ventas === 1 ? ' venta' : ' ventas') +
+      ' · ticket ' + plata(d.ticketPromedio || 0) +
+      (d.ultimaVenta ? ' · última ' + hora(d.ultimaVenta) : '')),
+    el('div', { clase: 'cajas' },
+      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'Última hora' }), el('div', { clase: 'v', texto: plata(d.ultimaHora || 0) })),
+      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'En el cajón' }), el('div', { clase: 'v', texto: c.abierta ? plata(c.efectivoEsperado || 0) : '—' })),
+      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'Gastos del día' }), el('div', { clase: 'v', texto: plata(d.gastosDia || 0) })),
+      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'Te deben' }), el('div', { clase: 'v', texto: plata((d.deuda || {}).total || 0) }))),
+    (d.medios || []).length ? el('div', { clase: 'titulito', texto: 'Cómo pagaron' }) : null,
+    (d.medios || []).map((m) => el('div', { clase: 'fila' }, el('span', { texto: m.nombre }), el('b', { texto: plata(m.importe) }))),
+    (d.top || []).length ? el('div', { clase: 'titulito', texto: 'Lo más vendido de hoy' }) : null,
+    (d.top || []).map((p) => el('div', { clase: 'fila' },
+      el('span', { texto: p.descripcion }),
+      el('b', { texto: unidades(p.unidades) }))),
+    el('div', { clase: 'alertas' }, alertas))
+}
+
+function pintar (filas) {
+  app.replaceChildren()
+  const total = filas.reduce((s, f) => s + ((f.datos || {}).total || 0), 0)
+  const ventas = filas.reduce((s, f) => s + ((f.datos || {}).ventas || 0), 0)
+  const masViejo = filas.map((f) => f.actualizado).sort()[0]
+  const minutos = masViejo ? (Date.now() - new Date(masViejo).getTime()) / 60000 : 999
+
+  app.append(
+    el('header', {},
+      el('h1', { texto: 'Blue Store' }),
+      el('div', { clase: 'estado' + (minutos > 5 ? ' viejo' : '') },
+        el('b', { texto: minutos > 5 ? 'Datos atrasados' : 'En vivo' }),
+        masViejo ? ' · ' + hace(masViejo) : '')),
+    el('div', { clase: 'total-dia' },
+      el('div', { clase: 'r', texto: 'Vendido hoy · las dos sucursales' }),
+      el('div', { clase: 'v', texto: plata(total) }),
+      el('div', { clase: 'd', texto: ventas + (ventas === 1 ? ' venta' : ' ventas') + ' en total' })),
+    ...filas.map(tarjetaLocal),
+    el('div', { clase: 'pie' },
+      'Se actualiza solo cada minuto. ',
+      el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); try { localStorage.removeItem('bs.codigo') } catch (e) {} pedirCodigo('') } }, 'Salir')))
+}
+
+async function refrescar () {
+  try {
+    const filas = await traer()
+    if (!filas || !filas.length) return pedirCodigo('Ese código no es correcto, o todavía no subió ningún local.')
+    pintar(filas)
+  } catch (err) {
+    const aviso = el('div', { clase: 'entrar' },
+      el('h1', { texto: 'Sin señal' }),
+      el('p', { texto: err.message }),
+      el('button', { onclick: () => refrescar(), texto: 'Probar de nuevo' }))
+    app.replaceChildren(aviso)
+  }
+}
+
+function arrancar () {
+  refrescar()
+  clearInterval(reloj)
+  reloj = setInterval(refrescar, 60000)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refrescar() })
+}
+
+if (codigo) arrancar()
+else pedirCodigo('')
+</script>
+</body>
+</html>
