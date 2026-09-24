@@ -210,7 +210,7 @@ function pintar (filas) {
         el('b', { texto: minutos > 5 ? 'Datos atrasados' : 'En vivo' }),
         masViejo ? ' · ' + hace(masViejo) : '')),
     el('div', { clase: 'total-dia' },
-      el('div', { clase: 'r', texto: 'Vendido hoy · las dos sucursales' }),
+      el('div', { clase: 'r', texto: 'Vendido hoy · ' + (filas.length === 1 ? filas[0].nombre : filas.length === 2 ? 'las dos sucursales' : 'las ' + filas.length + ' sucursales') }),
       el('div', { clase: 'v', texto: plata(total) }),
       el('div', { clase: 'd', texto: ventas + (ventas === 1 ? ' venta' : ' ventas') + ' en total' })),
     ...filas.map(tarjetaLocal),
