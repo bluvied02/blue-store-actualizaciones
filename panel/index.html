@@ -161,6 +161,21 @@ function pedirCodigo (mensaje) {
   entrada.focus()
 }
 
+// Quien esta trabajando (con el color de como llego) y quien no llego.
+function personal (p) {
+  if (!p || (!(p.trabajando || []).length && !(p.faltan || []).length)) return null
+  const color = { verde: 'ok', amarillo: 'alerta', rojo: 'mal' }
+  return [
+    el('div', { clase: 'titulito', texto: 'Personal' }),
+    ...(p.trabajando || []).map((x) => el('div', { clase: 'fila' },
+      el('span', { texto: x.nombre + ' · desde ' + hora(x.desde) }),
+      el('span', { clase: 'chip ' + (color[x.color] || ''), texto: x.texto }))),
+    ...(p.faltan || []).map((x) => el('div', { clase: 'fila' },
+      el('span', { texto: x.nombre }),
+      el('span', { clase: 'chip ' + (color[x.color] || 'mal'), texto: x.texto })))
+  ]
+}
+
 function tarjetaLocal (fila) {
   const d = fila.datos || {}
   const c = d.caja || {}
@@ -189,6 +204,7 @@ function tarjetaLocal (fila) {
       el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'Te deben' }), el('div', { clase: 'v', texto: plata((d.deuda || {}).total || 0) }))),
     (d.medios || []).length ? el('div', { clase: 'titulito', texto: 'Cómo pagaron' }) : null,
     (d.medios || []).map((m) => el('div', { clase: 'fila' }, el('span', { texto: m.nombre }), el('b', { texto: plata(m.importe) }))),
+    personal(d.personal),
     (d.top || []).length ? el('div', { clase: 'titulito', texto: 'Lo más vendido de hoy' }) : null,
     (d.top || []).map((p) => el('div', { clase: 'fila' },
       el('span', { texto: p.descripcion }),
