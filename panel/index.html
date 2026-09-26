@@ -3,261 +3,170 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Blue Store · en vivo</title>
+<title>Panel del negocio</title>
+<meta name="description" content="Las sucursales en vivo: ventas, cierres, faltantes, pedidos, productos y promos.">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Blue Store">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Panel">
 <meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icono-192.png">
+<link rel="icon" href="icono-192.png">
 <style>
-  /* EL PANEL DEL CELULAR
-     Se mira con una mano, de noche, en el mostrador o desde la cama: fondo
-     oscuro, numeros grandes y nada que haya que apretar para entender. */
+  /* EL PANEL DEL NEGOCIO
+     Se usa con una mano en el celular (de noche, en el mostrador, desde la
+     cama) y con el mouse en la compu de la casa. Fondo oscuro por defecto,
+     numeros grandes, y cada cosa a dos toques. */
   :root {
-    --fondo: #0b1220; --panel: #121c30; --panel2: #18243c; --borde: #22314f;
-    --texto: #eaf0fb; --texto2: #9fb0cd; --texto3: #6b7d9e;
-    --verde: #34d399; --ambar: #fbbf24; --rojo: #f87171; --azul: #60a5fa;
-    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --fondo: #0b1220; --panel: #121c30; --panel2: #18243c; --borde: #22314f; --linea: rgba(255,255,255,.06);
+    --texto: #eaf0fb; --texto2: #a5b4cf; --texto3: #7385a6;
+    --verde: #34d399; --ambar: #fbbf24; --rojo: #f87171; --azul: #60a5fa; --azul-fondo: rgba(96,165,250,.14);
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --radio: 14px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --fondo: #f4f6fb; --panel: #fff; --panel2: #f0f4fb; --borde: #dde5f2; --linea: rgba(16,25,43,.07);
+      --texto: #10192b; --texto2: #445271; --texto3: #6b7a96;
+      --verde: #0b7a45; --ambar: #8a5508; --rojo: #c81430; --azul: #2563eb; --azul-fondo: rgba(37,99,235,.1);
+    }
+  }
+  :root[data-theme="dark"] {
+    --fondo: #0b1220; --panel: #121c30; --panel2: #18243c; --borde: #22314f; --linea: rgba(255,255,255,.06);
+    --texto: #eaf0fb; --texto2: #a5b4cf; --texto3: #7385a6;
+    --verde: #34d399; --ambar: #fbbf24; --rojo: #f87171; --azul: #60a5fa; --azul-fondo: rgba(96,165,250,.14);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { margin: 0; background: var(--fondo); color: var(--texto); }
-  body {
-    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    padding: max(12px, env(safe-area-inset-top)) 14px calc(24px + env(safe-area-inset-bottom));
-    max-width: 780px; margin: 0 auto;
-  }
-  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-  h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
-  .estado { font-size: 12px; color: var(--texto3); }
-  .estado b { color: var(--verde); font-weight: 600; }
-  .estado.viejo b { color: var(--ambar); }
+  body { font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; min-height: 100vh; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  a { color: var(--azul); }
 
-  .total-dia {
-    background: linear-gradient(160deg, #15233c, #101a2d); border: 1px solid var(--borde);
-    border-radius: 16px; padding: 16px; margin-bottom: 12px;
+  /* armazon: menu al costado en la compu, abajo en el celular */
+  .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  .lado { border-right: 1px solid var(--borde); padding: 18px 12px; position: sticky; top: 0; height: 100vh; overflow: auto; background: var(--panel); }
+  .lado .marca { font-weight: 800; font-size: 17px; padding: 4px 10px 16px; }
+  .lado button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; padding: 10px 12px; border-radius: 10px; cursor: pointer; color: var(--texto2); font-weight: 600; }
+  .lado button:hover { background: var(--panel2); color: var(--texto); }
+  .lado button.activo { background: var(--azul-fondo); color: var(--azul); }
+  .lado .insignia { margin-left: auto; }
+  .lado .pie-lado { margin-top: 18px; padding: 10px; font-size: 12px; color: var(--texto3); border-top: 1px solid var(--borde); }
+  main { padding: 20px 26px 40px; max-width: 1180px; width: 100%; }
+  .abajo { display: none; }
+  @media (max-width: 820px) {
+    .app { grid-template-columns: 1fr; }
+    .lado { display: none; }
+    main { padding: max(12px, env(safe-area-inset-top)) 14px calc(86px + env(safe-area-inset-bottom)); }
+    .abajo { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+      background: var(--panel); border-top: 1px solid var(--borde); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+    .abajo button { background: none; border: 0; color: var(--texto3); font-size: 11px; font-weight: 600; padding: 6px 2px; display: grid; justify-items: center; gap: 2px; cursor: pointer; position: relative; }
+    .abajo button .ic { font-size: 19px; line-height: 1; }
+    .abajo button.activo { color: var(--azul); }
+    .abajo .insignia { position: absolute; top: 2px; right: 22%; }
   }
-  .total-dia .r { font-size: 12px; color: var(--texto3); text-transform: uppercase; letter-spacing: .08em; }
-  .total-dia .v { font-family: var(--mono); font-size: 34px; font-weight: 700; margin: 4px 0 2px; }
-  .total-dia .d { font-size: 13px; color: var(--texto2); }
 
-  .local { background: var(--panel); border: 1px solid var(--borde); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
-  .local h2 { font-size: 16px; margin: 0 0 2px; }
-  .local .sub { font-size: 12px; color: var(--texto3); margin-bottom: 12px; }
-  .grande { font-family: var(--mono); font-size: 27px; font-weight: 700; }
-  .fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 5px 0; }
-  .fila + .fila { border-top: 1px solid rgba(255,255,255,.04); }
-  .fila span { color: var(--texto2); font-size: 13.5px; }
-  .fila b { font-family: var(--mono); font-weight: 600; }
-  .cajas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+  /* piezas */
+  .cabecera { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: -.01em; }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  h3 { font-size: 13px; margin: 14px 0 6px; color: var(--texto3); text-transform: uppercase; letter-spacing: .07em; font-weight: 700; }
+  .sub { font-size: 12.5px; color: var(--texto3); }
+  .tenue { color: var(--texto2); }
+  .chico { font-size: 12.5px; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .caja { background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio); padding: 14px; margin-bottom: 12px; }
+  .grilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .grilla > .caja { margin-bottom: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .tile { background: var(--panel); border: 1px solid var(--borde); border-radius: var(--radio); padding: 12px 14px; }
+  .tile .r { font-size: 11px; color: var(--texto3); text-transform: uppercase; letter-spacing: .07em; }
+  .tile .v { font-size: 24px; font-weight: 750; margin: 2px 0; }
+  .tile .d { font-size: 12.5px; color: var(--texto2); }
+  .tile.grande { background: linear-gradient(160deg, var(--panel2), var(--panel)); }
+  .tile.grande .v { font-size: 32px; }
+  .delta { font-size: 12.5px; font-weight: 700; }
+  .delta.sube { color: var(--verde); } .delta.baja { color: var(--rojo); } .delta.igual { color: var(--texto3); }
+  .fila { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; }
+  .fila + .fila { border-top: 1px solid var(--linea); }
+  .fila .izq { min-width: 0; }
+  .fila .izq b { display: block; overflow: hidden; text-overflow: ellipsis; }
+  .fila .der { text-align: right; white-space: nowrap; }
   .mini { background: var(--panel2); border-radius: 12px; padding: 10px 12px; }
   .mini .r { font-size: 11px; color: var(--texto3); text-transform: uppercase; letter-spacing: .06em; }
   .mini .v { font-family: var(--mono); font-size: 17px; font-weight: 700; margin-top: 2px; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--borde); color: var(--texto2); }
-  .chip.ok { color: var(--verde); border-color: rgba(52,211,153,.4); }
-  .chip.mal { color: var(--rojo); border-color: rgba(248,113,113,.4); }
-  .chip.alerta { color: var(--ambar); border-color: rgba(251,191,36,.4); }
-  .titulito { font-size: 11px; color: var(--texto3); text-transform: uppercase; letter-spacing: .08em; margin: 12px 0 4px; }
-  .alertas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .cuatro { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--borde); color: var(--texto2); white-space: nowrap; }
+  .chip.ok { color: var(--verde); border-color: color-mix(in srgb, var(--verde) 45%, transparent); }
+  .chip.mal { color: var(--rojo); border-color: color-mix(in srgb, var(--rojo) 45%, transparent); }
+  .chip.alerta { color: var(--ambar); border-color: color-mix(in srgb, var(--ambar) 45%, transparent); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .insignia { background: var(--rojo); color: #fff; border-radius: 999px; font-size: 10.5px; font-weight: 800; padding: 1px 6px; min-width: 18px; text-align: center; }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--borde); border-radius: 12px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+  .seg button { background: none; border: 0; padding: 7px 12px; border-radius: 9px; cursor: pointer; color: var(--texto2); font-weight: 600; font-size: 13.5px; }
+  .seg button.activo { background: var(--azul); color: #fff; }
+  :root:not([data-theme="dark"]) .seg button.activo { color: #fff; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--panel2); border: 1px solid var(--borde); border-radius: 11px; padding: 9px 14px; cursor: pointer; font-weight: 650; }
+  .btn:hover { border-color: var(--azul); }
+  .btn.primario { background: var(--azul); border-color: var(--azul); color: #fff; }
+  .btn.peligro { color: var(--rojo); }
+  .btn.chico { padding: 5px 10px; font-size: 13px; border-radius: 9px; }
+  .btn.ancho { width: 100%; }
+  .btn[disabled] { opacity: .5; cursor: default; }
+  input[type=text], input[type=search], input[type=email], input[type=password], input[type=number], select, textarea {
+    width: 100%; background: var(--panel2); border: 1px solid var(--borde); border-radius: 11px; padding: 10px 12px; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--azul); }
+  label.campo { display: grid; gap: 4px; margin-bottom: 10px; font-size: 13px; color: var(--texto2); }
+  .barra-busqueda { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+  .barra-busqueda input { flex: 1; min-width: 180px; }
+  .nada { text-align: center; color: var(--texto3); padding: 26px 10px; }
+  .cargando { opacity: .55; transition: opacity .2s; }
+  .aviso-caja { border: 1px solid var(--borde); background: var(--panel2); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; font-size: 13.5px; }
+  .aviso-caja.alerta { border-color: color-mix(in srgb, var(--ambar) 45%, transparent); }
+  .aviso-caja.mal { border-color: color-mix(in srgb, var(--rojo) 45%, transparent); }
 
-  .entrar { max-width: 320px; margin: 18vh auto 0; text-align: center; }
-  .entrar h1 { margin-bottom: 6px; }
-  .entrar p { color: var(--texto2); font-size: 14px; }
-  input {
-    width: 100%; font: 600 26px var(--mono); text-align: center; letter-spacing: .3em;
-    background: var(--panel); color: var(--texto); border: 1px solid var(--borde);
-    border-radius: 12px; padding: 14px; margin: 14px 0;
-  }
-  button {
-    width: 100%; font: 600 16px inherit; background: var(--azul); color: #06101f;
-    border: 0; border-radius: 12px; padding: 14px; cursor: pointer;
-  }
-  .aviso { color: var(--rojo); font-size: 13.5px; min-height: 20px; }
-  .pie { text-align: center; color: var(--texto3); font-size: 12px; margin-top: 16px; }
-  .pie a { color: var(--texto3); }
-  @media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]) {
-      --fondo: #f4f6fb; --panel: #fff; --panel2: #f0f4fb; --borde: #dde5f2;
-      --texto: #10192b; --texto2: #445271; --texto3: #7b8aa6;
-      --verde: #0b7a45; --ambar: #91590a; --rojo: #c81430; --azul: #2563eb;
-    }
-    :root:not([data-theme="dark"]) .total-dia { background: linear-gradient(160deg, #fff, #eef3fb); }
-    :root:not([data-theme="dark"]) button { color: #fff; }
-  }
+  /* barras (una sola serie, un solo color) */
+  .barras { display: flex; align-items: flex-end; gap: 2px; height: 120px; margin-top: 8px; }
+  .barras .b { flex: 1; background: var(--azul); border-radius: 3px 3px 0 0; min-height: 0; position: relative; cursor: default; }
+  .barras .b.vacia { background: transparent; }
+  .barras .b:hover { opacity: .8; }
+  .eje { display: flex; gap: 2px; font-size: 10.5px; color: var(--texto3); margin-top: 3px; }
+  .eje span { flex: 1; text-align: center; overflow: hidden; white-space: nowrap; }
+  .tooltip { position: fixed; z-index: 50; background: var(--texto); color: var(--fondo); font-size: 12.5px; font-weight: 600; padding: 5px 9px; border-radius: 8px; pointer-events: none; display: none; white-space: nowrap; }
+
+  /* tabla simple */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 11px; color: var(--texto3); text-transform: uppercase; letter-spacing: .06em; font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+  td { padding: 8px; border-bottom: 1px solid var(--linea); vertical-align: middle; }
+  th.num, td.num { text-align: right; }
+  .scroll-x { overflow-x: auto; }
+
+  /* hoja que sube (editar producto, promo...) */
+  .telon { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40; display: flex; align-items: flex-end; justify-content: center; }
+  .hoja { background: var(--panel); border: 1px solid var(--borde); border-radius: 18px 18px 0 0; width: min(560px, 100%); max-height: 92vh; overflow: auto; padding: 16px 16px calc(18px + env(safe-area-inset-bottom)); }
+  @media (min-width: 821px) { .telon { align-items: center; } .hoja { border-radius: 18px; } }
+  .hoja .titulo-hoja { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .hoja .titulo-hoja h2 { margin: 0; }
+  .hoja .cerrar { background: none; border: 0; font-size: 22px; color: var(--texto3); cursor: pointer; }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .acciones { display: flex; gap: 8px; margin-top: 12px; }
+  .acciones .btn { flex: 1; }
+
+  /* entrar */
+  .entrar { max-width: 360px; margin: 14vh auto 0; padding: 0 16px; }
+  .entrar h1 { font-size: 26px; margin-bottom: 4px; }
+  .entrar p { color: var(--texto2); margin: 0 0 18px; }
+  .error { color: var(--rojo); font-size: 13.5px; min-height: 20px; margin: 6px 0; }
+
+  .aviso-toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 60; background: var(--texto); color: var(--fondo); padding: 10px 16px; border-radius: 12px; font-weight: 600; font-size: 14px; max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  @media (min-width: 821px) { .aviso-toast { bottom: 26px; } }
+  .estado-orden { font-size: 12.5px; margin-top: 8px; }
 </style>
 </head>
 <body>
 <div id="app"></div>
-<script>
-// La pagina es la misma para cualquier negocio: el proyecto viene en el link
-// (#p=abcd) y la clave publica se baja de ese proyecto (panel/config.json, que
-// sube la caja al "Publicar la pagina del celular"). Con RLS prendido, esa
-// clave sola no lee nada: todo pasa por la funcion pos_panel, que pide el codigo.
-const CONF = { url: '', anon: '' }
-async function cargarConf () {
-  const m = /[#&]p=([a-z0-9]+)/.exec(location.hash)
-  let ref = m ? m[1] : ''
-  try {
-    if (ref) localStorage.setItem('bs.proyecto', ref)
-    else ref = localStorage.getItem('bs.proyecto') || ''
-  } catch (e) { /* modo privado */ }
-  if (!ref) throw new Error('Abrí el link completo que te dio el programa de la caja.')
-  const base = 'https://' + ref + '.supabase.co'
-  const r = await fetch(base + '/storage/v1/object/public/panel/config.json', { cache: 'no-store' })
-  if (!r.ok) throw new Error('Falta publicar la página desde la caja (' + r.status + ').')
-  const c = await r.json()
-  CONF.url = base
-  CONF.anon = c.anon
-}
-const app = document.getElementById('app')
-const plata = (c) => (c / 100).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
-const unidades = (m) => (m / 1000).toLocaleString('es-AR', { maximumFractionDigits: 0 })
-const hora = (iso) => new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-const hace = (iso) => {
-  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-  return min < 1 ? 'ahora' : min === 1 ? 'hace 1 minuto' : min < 60 ? 'hace ' + min + ' minutos' : 'hace ' + Math.round(min / 60) + ' h'
-}
-const el = (tag, props, ...hijos) => {
-  const n = document.createElement(tag)
-  for (const k in (props || {})) {
-    if (k === 'clase') n.className = props[k]
-    else if (k === 'texto') n.textContent = props[k]
-    else if (k.startsWith('on')) n.addEventListener(k.slice(2), props[k])
-    else n.setAttribute(k, props[k])
-  }
-  for (const h of hijos.flat(3)) if (h != null && h !== false) n.append(h instanceof Node ? h : document.createTextNode(String(h)))
-  return n
-}
-
-let codigo = ''
-try { codigo = localStorage.getItem('bs.codigo') || '' } catch (e) { codigo = '' }
-let reloj = null
-
-async function traer () {
-  if (!CONF.anon) await cargarConf()
-  const r = await fetch(CONF.url + '/rest/v1/rpc/pos_panel', {
-    method: 'POST',
-    headers: { apikey: CONF.anon, Authorization: 'Bearer ' + CONF.anon, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ codigo })
-  })
-  if (!r.ok) throw new Error('No se pudo conectar (' + r.status + ')')
-  return r.json()
-}
-
-function pedirCodigo (mensaje) {
-  clearInterval(reloj)
-  app.replaceChildren()
-  const entrada = el('input', { type: 'tel', inputmode: 'numeric', placeholder: '····', maxlength: '8' })
-  const aviso = el('div', { clase: 'aviso', texto: mensaje || '' })
-  const entrar = async () => {
-    codigo = entrada.value.replace(/[^0-9]/g, '')
-    if (codigo.length < 4) { aviso.textContent = 'Poné el código de 4 números o más.'; return }
-    try { localStorage.setItem('bs.codigo', codigo) } catch (e) { /* modo privado */ }
-    arrancar()
-  }
-  entrada.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') entrar() })
-  app.append(el('div', { clase: 'entrar' },
-    el('h1', { texto: 'Blue Store' }),
-    el('p', { texto: 'Poné el código para ver las ventas en vivo.' }),
-    entrada, aviso,
-    el('button', { onclick: entrar, texto: 'Entrar' })))
-  entrada.focus()
-}
-
-// Quien esta trabajando (con el color de como llego) y quien no llego.
-function personal (p) {
-  if (!p || (!(p.trabajando || []).length && !(p.faltan || []).length)) return null
-  const color = { verde: 'ok', amarillo: 'alerta', rojo: 'mal' }
-  return [
-    el('div', { clase: 'titulito', texto: 'Personal' }),
-    ...(p.trabajando || []).map((x) => el('div', { clase: 'fila' },
-      el('span', { texto: x.nombre + ' · desde ' + hora(x.desde) }),
-      el('span', { clase: 'chip ' + (color[x.color] || ''), texto: x.texto }))),
-    ...(p.faltan || []).map((x) => el('div', { clase: 'fila' },
-      el('span', { texto: x.nombre }),
-      el('span', { clase: 'chip ' + (color[x.color] || 'mal'), texto: x.texto })))
-  ]
-}
-
-function tarjetaLocal (fila) {
-  const d = fila.datos || {}
-  const c = d.caja || {}
-  const alertas = []
-  if (!c.abierta) alertas.push(el('span', { clase: 'chip mal', texto: 'Caja cerrada' }))
-  if (d.stock && d.stock.negativos) alertas.push(el('span', { clase: 'chip mal', texto: d.stock.negativos + ' en negativo' }))
-  if (d.stock && d.stock.bajoMinimo) alertas.push(el('span', { clase: 'chip alerta', texto: d.stock.bajoMinimo + ' bajo el mínimo' }))
-  if (d.vencimientos && d.vencimientos.vencidos) alertas.push(el('span', { clase: 'chip mal', texto: d.vencimientos.vencidos + ' vencidos' }))
-  if (d.vencimientos && d.vencimientos.urgentes) alertas.push(el('span', { clase: 'chip alerta', texto: d.vencimientos.urgentes + ' vencen esta semana' }))
-  if (d.suspendidas) alertas.push(el('span', { clase: 'chip', texto: d.suspendidas + ' en espera' }))
-  if (!alertas.length) alertas.push(el('span', { clase: 'chip ok', texto: 'Todo en orden' }))
-
-  return el('div', { clase: 'local' },
-    el('h2', { texto: fila.nombre }),
-    el('div', { clase: 'sub' }, c.abierta
-      ? 'Turno de ' + (c.usuario || '—') + ' desde las ' + hora(c.desde) + ' · caja ' + (c.terminal || '')
-      : 'Sin turno abierto'),
-    el('div', { clase: 'grande', texto: plata(d.total || 0) }),
-    el('div', { clase: 'sub' }, (d.ventas || 0) + (d.ventas === 1 ? ' venta' : ' ventas') +
-      ' · ticket ' + plata(d.ticketPromedio || 0) +
-      (d.ultimaVenta ? ' · última ' + hora(d.ultimaVenta) : '')),
-    el('div', { clase: 'cajas' },
-      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'Última hora' }), el('div', { clase: 'v', texto: plata(d.ultimaHora || 0) })),
-      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'En el cajón' }), el('div', { clase: 'v', texto: c.abierta ? plata(c.efectivoEsperado || 0) : '—' })),
-      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'Gastos del día' }), el('div', { clase: 'v', texto: plata(d.gastosDia || 0) })),
-      el('div', { clase: 'mini' }, el('div', { clase: 'r', texto: 'Te deben' }), el('div', { clase: 'v', texto: plata((d.deuda || {}).total || 0) }))),
-    (d.medios || []).length ? el('div', { clase: 'titulito', texto: 'Cómo pagaron' }) : null,
-    (d.medios || []).map((m) => el('div', { clase: 'fila' }, el('span', { texto: m.nombre }), el('b', { texto: plata(m.importe) }))),
-    personal(d.personal),
-    (d.top || []).length ? el('div', { clase: 'titulito', texto: 'Lo más vendido de hoy' }) : null,
-    (d.top || []).map((p) => el('div', { clase: 'fila' },
-      el('span', { texto: p.descripcion }),
-      el('b', { texto: unidades(p.unidades) }))),
-    el('div', { clase: 'alertas' }, alertas))
-}
-
-function pintar (filas) {
-  app.replaceChildren()
-  const total = filas.reduce((s, f) => s + ((f.datos || {}).total || 0), 0)
-  const ventas = filas.reduce((s, f) => s + ((f.datos || {}).ventas || 0), 0)
-  const masViejo = filas.map((f) => f.actualizado).sort()[0]
-  const minutos = masViejo ? (Date.now() - new Date(masViejo).getTime()) / 60000 : 999
-
-  app.append(
-    el('header', {},
-      el('h1', { texto: 'Blue Store' }),
-      el('div', { clase: 'estado' + (minutos > 5 ? ' viejo' : '') },
-        el('b', { texto: minutos > 5 ? 'Datos atrasados' : 'En vivo' }),
-        masViejo ? ' · ' + hace(masViejo) : '')),
-    el('div', { clase: 'total-dia' },
-      el('div', { clase: 'r', texto: 'Vendido hoy · ' + (filas.length === 1 ? filas[0].nombre : filas.length === 2 ? 'las dos sucursales' : 'las ' + filas.length + ' sucursales') }),
-      el('div', { clase: 'v', texto: plata(total) }),
-      el('div', { clase: 'd', texto: ventas + (ventas === 1 ? ' venta' : ' ventas') + ' en total' })),
-    ...filas.map(tarjetaLocal),
-    el('div', { clase: 'pie' },
-      'Se actualiza solo cada minuto. ',
-      el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); try { localStorage.removeItem('bs.codigo') } catch (e) {} pedirCodigo('') } }, 'Salir')))
-}
-
-async function refrescar () {
-  try {
-    const filas = await traer()
-    if (!filas || !filas.length) return pedirCodigo('Ese código no es correcto, o todavía no subió ningún local.')
-    pintar(filas)
-  } catch (err) {
-    const aviso = el('div', { clase: 'entrar' },
-      el('h1', { texto: 'Sin señal' }),
-      el('p', { texto: err.message }),
-      el('button', { onclick: () => refrescar(), texto: 'Probar de nuevo' }))
-    app.replaceChildren(aviso)
-  }
-}
-
-function arrancar () {
-  refrescar()
-  clearInterval(reloj)
-  reloj = setInterval(refrescar, 60000)
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) refrescar() })
-}
-
-if (codigo) arrancar()
-else pedirCodigo('')
-</script>
+<div class="tooltip" id="tooltip" role="tooltip"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

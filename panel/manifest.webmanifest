@@ -1,0 +1,15 @@
+{
+  "name": "Panel del negocio",
+  "short_name": "Panel",
+  "description": "Las sucursales en vivo: ventas, cierres, faltantes, pedidos, productos y promos.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
