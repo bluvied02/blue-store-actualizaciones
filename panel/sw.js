@@ -1,7 +1,42 @@
-// El que recibe los avisos aunque la pagina este cerrada. No guarda datos:
-// el panel siempre muestra lo ultimo que subieron las cajas.
-self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', (ev) => ev.waitUntil(self.clients.claim()))
+// El que trabaja por detras de la app:
+//   - Guarda la app (las pantallas, no los datos) para que abra sin internet.
+//     Primero pide la version nueva; si no hay conexion, usa la guardada.
+//   - Recibe las notificaciones aunque la app este cerrada.
+// Los datos del negocio los guarda la app misma (IndexedDB), no esto.
+
+const VERSION = 'bs-panel-v3'
+const APP = ['./', 'index.html', 'estilos.css', 'app.js', 'lector.js', 'productos.js', 'negocio.js', 'otros.js', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
+
+self.addEventListener('install', (ev) => {
+  ev.waitUntil(caches.open(VERSION).then((c) => Promise.all(APP.concat(LIBRERIAS).map((u) => c.add(u).catch(() => null)))).then(() => self.skipWaiting()))
+})
+
+self.addEventListener('activate', (ev) => {
+  ev.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()))
+})
+
+self.addEventListener('fetch', (ev) => {
+  const req = ev.request
+  if (req.method !== 'GET') return
+  const url = new URL(req.url)
+  // Las librerias (con version en la direccion): de lo guardado, y si no, de internet.
+  if (url.hostname === 'cdn.jsdelivr.net') {
+    ev.respondWith(caches.match(req).then((r) => r || fetch(req).then((resp) => {
+      if (resp.ok) { const copia = resp.clone(); caches.open(VERSION).then((c) => c.put(req, copia)) }
+      return resp
+    })))
+    return
+  }
+  // La app: primero la version nueva; sin internet, la guardada.
+  if (url.origin === self.location.origin) {
+    ev.respondWith(fetch(req).then((resp) => {
+      if (resp.ok && !url.pathname.endsWith('proyecto.json')) { const copia = resp.clone(); caches.open(VERSION).then((c) => c.put(req, copia)) }
+      return resp
+    }).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('index.html'))))
+  }
+  // Lo demas (la nube con los datos) pasa directo: los datos los guarda la app.
+})
 
 self.addEventListener('push', (ev) => {
   let d = {}
@@ -11,7 +46,7 @@ self.addEventListener('push', (ev) => {
     icon: 'icono-192.png',
     badge: 'icono-192.png',
     tag: d.tag || undefined,
-    data: { url: './#s=avisos' }
+    data: { url: './#/avisos' }
   }))
 })
 

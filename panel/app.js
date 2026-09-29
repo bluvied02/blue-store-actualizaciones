@@ -1,29 +1,46 @@
 'use strict'
-// EL PANEL DEL NEGOCIO
+// LA APP DEL NEGOCIO (celular y compu de la casa)
 //
-// Una sola pagina para el celular y para la compu de la casa. Se entra con
-// email y contraseña; solo los emails autorizados (pos_admins) ven algo.
+// Una sola pagina. Se entra con email y contraseña; solo los emails
+// autorizados (pos_admins) ven algo.
 //
 // Lee lo que suben las cajas cada minuto (pos_resumen, pos_datos,
 // pos_catalogo, pos_avisos) y, para cambiar algo, deja una ORDEN en
 // pos_ordenes: la caja de esa sucursal la toma en menos de un minuto, la
-// aplica con sus propias reglas y dice como le fue. Nada se escribe directo en
-// los datos de la caja.
+// aplica con sus propias reglas (un precio mal escrito se rechaza igual que en
+// el local) y dice como le fue. Nada se escribe directo en los datos de la
+// caja: la caja sigue siendo la dueña.
 //
-// El proyecto de la nube va en el link (#p=abcd) o en proyecto.json; la clave
-// publica se baja del proyecto (panel/config.json, la sube la caja).
+// Sin internet: se muestra lo ultimo que se bajo (queda guardado en el
+// celular) y los cambios quedan en una cola que se manda sola cuando vuelve la
+// conexion. Cada orden lleva su propio id, asi mandarla dos veces no la repite.
+//
+// Archivos: app.js (esto: datos, conexion, navegacion, inicio, buscador),
+// lector.js (la camara), productos.js (productos, stock, crear), negocio.js
+// (ventas, reportes, clientes, caja, gastos, proveedores, historial) y
+// otros.js (reponer, faltantes, promos, cierres, avisos, ajustes).
 
 const S = {
   sb: null,
   email: '',
   proyecto: '',
   negocio: '',
-  seccion: 'hoy',
+  seccion: 'inicio',
+  params: {},
   sucursal: '',
   sucursales: [],
   cache: {},
   reloj: null,
-  ordenesVivas: {}
+  enLinea: true,
+  datosViejos: null,
+  cola: [],
+  esperando: new Map(),
+  alTerminar: new Map(),
+  hojas: [],
+  ignorarPop: 0,
+  // Lo que se hace recien cuando termina un 'atras' del navegador (cerrar una
+  // hoja y abrir otra cosa enseguida, sin que el 'atras' se coma lo nuevo).
+  trasAtras: []
 }
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
@@ -42,65 +59,142 @@ function el (tag, props, ...hijos) {
     else if (k.startsWith('on')) n.addEventListener(k.slice(2), v)
     else n.setAttribute(k, v === true ? '' : v)
   }
-  for (const h of hijos.flat(4)) if (h != null && h !== false) n.append(h instanceof Node ? h : document.createTextNode(String(h)))
+  for (const h of hijos.flat(6)) if (h != null && h !== false) n.append(h instanceof Node ? h : document.createTextNode(String(h)))
   return n
 }
 const limpiar = (n) => { while (n.firstChild) n.removeChild(n.firstChild); return n }
 // Vacia y llena, salteando lo que no va (append nativo escribe 'null' como texto).
-const poner = (n, ...hijos) => { limpiar(n); for (const h of hijos.flat(4)) if (h != null && h !== false) n.append(h); return n }
-const plata = (c) => '$ ' + Math.round((c || 0) / 100).toLocaleString('es-AR')
-const plataExacta = (c) => (c / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const poner = (n, ...hijos) => { limpiar(n); for (const h of hijos.flat(6)) if (h != null && h !== false) n.append(h); return n }
+const plata = (c) => (c < 0 ? '−' : '') + '$ ' + Math.round(Math.abs(c || 0) / 100).toLocaleString('es-AR')
+const plataExacta = (c) => ((c || 0) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const unidades = (m) => (Math.round((m || 0) / 10) / 100).toLocaleString('es-AR', { maximumFractionDigits: 2 })
-const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '—')
+const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : '—')
 const pct = (basis) => (basis == null ? '—' : (Math.round(basis) / 100).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + '%')
 const DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
 function fechaCorta (dia) {
-  const [a, m, d] = dia.split('-').map(Number)
+  if (!dia) return '—'
+  const [a, m, d] = String(dia).slice(0, 10).split('-').map(Number)
   return DIAS[new Date(a, m - 1, d).getDay()] + ' ' + String(d).padStart(2, '0') + '/' + String(m).padStart(2, '0')
 }
+const fechaHora = (iso) => (iso ? fechaCorta(isoLocal(new Date(iso))) + ' ' + hora(iso) : '—')
 function hace (iso) {
   if (!iso) return ''
   const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-  return min < 1 ? 'ahora' : min === 1 ? 'hace 1 minuto' : min < 60 ? 'hace ' + min + ' minutos' : min < 1440 ? 'hace ' + Math.round(min / 60) + ' h' : 'hace ' + Math.round(min / 1440) + ' días'
+  return min < 1 ? 'recién' : min === 1 ? 'hace 1 min' : min < 60 ? 'hace ' + min + ' min' : min < 1440 ? 'hace ' + Math.round(min / 60) + ' h' : 'hace ' + Math.round(min / 1440) + ' días'
 }
-const hoyISO = () => { const f = new Date(); return f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0') }
+const isoLocal = (f) => f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0')
+const hoyISO = () => isoLocal(new Date())
 function sumarDias (dia, n) {
   const [a, m, d] = dia.split('-').map(Number)
-  const f = new Date(a, m - 1, d + n)
-  return f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0')
+  return isoLocal(new Date(a, m - 1, d + n))
 }
-const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+const sinTildes = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const coincide = (texto, q) => { const w = sinTildes(q).split(/\s+/).filter(Boolean); const t = sinTildes(texto); return w.every((x) => t.indexOf(x) >= 0) }
-const aCentavos = (txt) => { const n = Number(String(txt || '').replace(/\./g, '').replace(',', '.').replace(/[^0-9.-]/g, '')); return Number.isFinite(n) ? Math.round(n * 100) : NaN }
-const aMilesimas = (txt) => { const n = Number(String(txt || '').replace(',', '.')); return Number.isFinite(n) ? Math.round(n * 1000) : NaN }
+const aCentavos = (txt) => { const s = String(txt == null ? '' : txt).trim(); if (!s) return NaN; const n = Number(s.replace(/\$/g, '').replace(/\s/g, '').replace(/\.(?=\d{3}(\D|$))/g, '').replace(',', '.')); return Number.isFinite(n) ? Math.round(n * 100) : NaN }
+const aMilesimas = (txt) => { const s = String(txt == null ? '' : txt).trim(); if (!s) return NaN; const n = Number(s.replace(',', '.')); return Number.isFinite(n) ? Math.round(n * 1000) : NaN }
+const uuid = () => (crypto && crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16) }))
+const vibrar = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms || 40) } catch (e) {} }
+const guardarLocal = (k, v) => { try { localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v)) } catch (e) {} }
+const leerLocal = (k, def) => { try { const v = localStorage.getItem(k); if (v == null) return def; try { return JSON.parse(v) } catch (e) { return v } } catch (e) { return def } }
+const margenDe = (precio, costo) => (costo > 0 && precio > 0 ? Math.round((precio - costo) * 10000 / costo) : null)
+const NOMBRE_MEDIO = { efectivo: 'Efectivo', mercado_pago: 'Mercado Pago', debito: 'Débito', credito: 'Crédito', transferencia: 'Transferencia', qr: 'QR', cuenta_corriente: 'Cuenta corriente' }
 
-function toast (texto, segundos = 3.5) {
-  const t = el('div', { clase: 'aviso-toast', role: 'status' }, texto)
+// --- iconos (trazos simples, se tiñen con el color del texto) ----------------------
+
+const ICONOS = {
+  inicio: 'M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',
+  productos: 'M21 8 12 3 3 8v8l9 5 9-5z M3 8l9 5 9-5 M12 13v8',
+  escanear: 'M4 8V5a1 1 0 0 1 1-1h3 M16 4h3a1 1 0 0 1 1 1v3 M20 16v3a1 1 0 0 1-1 1h-3 M8 20H5a1 1 0 0 1-1-1v-3 M8 8v8 M11 8v8 M14 8v8 M17 8v8',
+  ventas: 'M6 3h12v18l-3-2-3 2-3-2-3 2z M9 8h6 M9 12h6 M9 16h3',
+  mas: 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z',
+  buscar: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M20 20l-4-4',
+  sumar: 'M12 5v14 M5 12h14',
+  restar: 'M5 12h14',
+  clientes: 'M16 20v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M22 20v-1a4 4 0 0 0-3-3.9 M16 3.1a4 4 0 0 1 0 7.8',
+  caja: 'M3 8h18v11H3z M3 12h18 M7 16h3 M7 8V5h10v3',
+  gastos: 'M12 2v20 M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
+  reportes: 'M5 20V11 M11 20V5 M17 20v-7 M3 20h18',
+  proveedores: 'M2 6h12v10H2z M14 10h4l3 3v3h-7 M6 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M17 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
+  apagar: 'M4 5h16v16H4z M4 10h16 M9 3v4 M15 3v4 M8 14h3',
+  stock: 'M4 7h10 M18 7h2 M4 17h4 M12 17h8 M16 5v4 M10 15v4',
+  reponer: 'M9 3h6v3H9z M7 4.5H5V21h14V4.5h-2 M9 12h6 M9 16h4',
+  faltantes: 'M12 3 2 20h20z M12 10v4 M12 17h.01',
+  promos: 'M3 12V4h8l10 10-8 8z M7.5 7.5h.01',
+  cierres: 'M5 11h14v10H5z M8 11V7a4 4 0 0 1 8 0v4',
+  historial: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7v5l3 2',
+  avisos: 'M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z M10 21h4',
+  ajustes: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.5-2.4 1a7.6 7.6 0 0 0-2.6-1.5L14 2.5h-4l-.4 2.5a7.6 7.6 0 0 0-2.6 1.5l-2.4-1-2 3.5 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.5 2.4-1a7.6 7.6 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 2.6-1.5l2.4 1 2-3.5z',
+  cerrar: 'M6 6l12 12 M18 6 6 18',
+  flecha: 'M9 6l6 6-6 6',
+  abajo: 'M6 9l6 6 6-6',
+  editar: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+  telefono: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A16 16 0 0 1 4 5a1 1 0 0 1 1-1z',
+  mensaje: 'M4 20l1.4-4A8 8 0 1 1 8.5 19z',
+  ok: 'M5 12l5 5L20 7',
+  linterna: 'M13 2 4 14h7l-1 8 9-12h-7z',
+  teclado: 'M3 6h18v12H3z M7 10h.01 M11 10h.01 M15 10h.01 M7 14h10',
+  refrescar: 'M20 11a8 8 0 1 0-2.3 5.7 M20 4v7h-7',
+  salir: 'M15 3h4v18h-4 M10 17l5-5-5-5 M15 12H3',
+  local: 'M3 9l1.5-5h15L21 9 M3 9h18v1.5a3 3 0 0 1-6 0 3 3 0 0 1-6 0 3 3 0 0 1-6 0z M5 13v8h14v-8',
+  nube: 'M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.6 1.5A3.3 3.3 0 0 0 7 18z',
+  basura: 'M4 7h16 M9 7V4h6v3 M6 7l1 14h10l1-14',
+  subir: 'M12 19V5 M5 12l7-7 7 7',
+  bajar: 'M12 5v14 M5 12l7 7 7-7'
+}
+function icono (nombre, clase) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('class', 'ic' + (clase ? ' ' + clase : ''))
+  svg.setAttribute('aria-hidden', 'true')
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  p.setAttribute('d', ICONOS[nombre] || ICONOS.mas)
+  svg.append(p)
+  return svg
+}
+
+function toast (texto, tipo, segundos) {
+  if (typeof tipo === 'number') { segundos = tipo; tipo = '' }
+  for (const t of document.querySelectorAll('.aviso-toast')) t.remove()
+  const t = el('div', { clase: 'aviso-toast ' + (tipo || ''), role: 'status' }, texto)
   document.body.append(t)
-  setTimeout(() => t.remove(), segundos * 1000)
+  setTimeout(() => t.remove(), (segundos || 3.5) * 1000)
 }
 
 // Cuanto cambio contra antes: flecha, porcentaje y palabra (nunca solo color).
-function delta (actual, antes, alReves) {
+function delta (actual, antes, texto, alReves) {
   if (antes == null || actual == null) return null
-  if (!antes) return actual ? el('span', { clase: 'delta igual' }, 'antes 0') : null
+  if (!antes) return actual ? el('span', { clase: 'delta igual' }, texto ? texto + ': $ 0' : 'antes 0') : null
   const dif = actual - antes
-  if (!dif) return el('span', { clase: 'delta igual' }, '= igual')
+  if (!dif) return el('span', { clase: 'delta igual' }, '= igual' + (texto ? ' que ' + texto : ''))
   const p = Math.round(dif * 1000 / Math.abs(antes)) / 10
   const bueno = alReves ? dif < 0 : dif > 0
-  return el('span', { clase: 'delta ' + (bueno ? 'sube' : 'baja') }, (dif > 0 ? '▲ +' : '▼ ') + p.toLocaleString('es-AR') + '% vs antes')
+  return el('span', { clase: 'delta ' + (bueno ? 'sube' : 'baja') }, (dif > 0 ? '▲ +' : '▼ ') + p.toLocaleString('es-AR') + '%' + (texto ? ' vs ' + texto : ''))
 }
 
-function tile (rotulo, valor, detalle, extra, grande) {
-  return el('div', { clase: 'tile' + (grande ? ' grande' : '') },
-    el('div', { clase: 'r' }, rotulo), el('div', { clase: 'v num' }, valor),
-    detalle ? el('div', { clase: 'd' }, detalle) : null, extra || null)
+function kpi (rotulo, valor, detalle, opciones = {}) {
+  return el(opciones.alTocar ? 'button' : 'div', { clase: 'kpi' + (opciones.clase ? ' ' + opciones.clase : ''), onclick: opciones.alTocar || null },
+    el('div', { clase: 'r' }, rotulo), el('div', { clase: 'v' }, valor),
+    detalle ? el('div', { clase: 'd' }, detalle) : null)
+}
+
+function vacio (texto, icon, boton) {
+  return el('div', { clase: 'nada' }, icon ? el('div', { clase: 'ico-grande' }, icono(icon)) : null, el('div', {}, texto), boton || null)
+}
+
+function esqueleto (filas) {
+  return el('div', {},
+    el('div', { clase: 'kpis' }, [0, 1, 2, 3].map(() => el('div', { clase: 'kpi' }, el('div', { clase: 'esqueleto', estilo: { height: '12px', width: '60%' } }), el('div', { clase: 'esqueleto', estilo: { height: '24px', width: '80%', marginTop: '8px' } })))),
+    el('div', { clase: 'tarjeta' }, Array.from({ length: filas || 6 }, () => el('div', { clase: 'esqueleto', estilo: { height: '18px', margin: '14px 0' } }))))
+}
+
+function cabecera (titulo, sub, ...derecha) {
+  return el('div', { clase: 'cabecera' }, el('div', { clase: 't' }, el('h1', {}, titulo), sub ? el('div', { clase: 'sub' }, sub) : null), derecha.flat().filter(Boolean).length ? el('div', { clase: 'acciones-cab' }, derecha) : null)
 }
 
 // Barras de una sola serie, con su dato al pasar el dedo o el mouse.
-function barras (items, textoDe, rotuloEje) {
+function barras (items, textoDe, rotuloEje, opciones = {}) {
   const max = Math.max(1, ...items.map((x) => x.v))
-  const cont = el('div', { clase: 'barras' })
+  const cont = el('div', { clase: 'barras', estilo: opciones.alto ? { height: opciones.alto + 'px' } : null })
   const eje = el('div', { clase: 'eje' })
   items.forEach((x, i) => {
     const mostrar = (ev) => {
@@ -108,84 +202,270 @@ function barras (items, textoDe, rotuloEje) {
       $tooltip.style.display = 'block'
       const pt = ev.touches ? ev.touches[0] : ev
       $tooltip.style.left = Math.min(window.innerWidth - $tooltip.offsetWidth - 8, Math.max(8, pt.clientX - $tooltip.offsetWidth / 2)) + 'px'
-      $tooltip.style.top = Math.max(8, pt.clientY - 42) + 'px'
+      $tooltip.style.top = Math.max(8, pt.clientY - 44) + 'px'
     }
     cont.append(el('div', {
-      clase: 'b' + (x.v ? '' : ' vacia'),
+      clase: 'b' + (x.v ? '' : ' vacia') + (x.tenue ? ' tenue' : ''),
       estilo: { height: (x.v ? Math.max(2, x.v / max * 100) : 0) + '%' },
       title: textoDe(x),
       onmousemove: mostrar,
       ontouchstart: mostrar,
       onmouseleave: () => { $tooltip.style.display = 'none' },
-      ontouchend: () => setTimeout(() => { $tooltip.style.display = 'none' }, 1200)
+      ontouchend: () => setTimeout(() => { $tooltip.style.display = 'none' }, 1400)
     }))
     eje.append(el('span', {}, rotuloEje(x, i)))
   })
   return el('div', {}, cont, eje)
 }
 
+// Una lista con su barra de proporcion (lo mas vendido, por forma de pago...).
+function ranking (items, opciones = {}) {
+  const max = Math.max(1, ...items.map((x) => x.v))
+  return el('div', { clase: 'ranking' }, items.map((x) => el('div', { clase: 'rank', onclick: x.alTocar || null, estilo: x.alTocar ? { cursor: 'pointer' } : null },
+    el('div', { clase: 'fila-r' }, el('span', { clase: 'n' }, x.n), el('b', { clase: 'num' }, x.texto)),
+    x.sub ? el('div', { clase: 'sub' }, x.sub) : null,
+    opciones.sinBarra ? null : el('div', { clase: 'pista' }, el('i', { estilo: { width: Math.max(1, x.v / max * 100) + '%' } })))))
+}
+
+// --- lo guardado en el celular (para cuando no hay internet) -------------------------
+
+const DB = {
+  _p: null,
+  abrir () {
+    if (this._p) return this._p
+    this._p = new Promise((ok) => {
+      try {
+        const r = indexedDB.open('bs-panel', 1)
+        r.onupgradeneeded = () => r.result.createObjectStore('kv')
+        r.onsuccess = () => ok(r.result)
+        r.onerror = () => ok(null)
+      } catch (e) { ok(null) }
+    })
+    return this._p
+  },
+  async get (k) {
+    const db = await this.abrir()
+    if (!db) return null
+    return new Promise((ok) => {
+      try { const t = db.transaction('kv').objectStore('kv').get(k); t.onsuccess = () => ok(t.result == null ? null : t.result); t.onerror = () => ok(null) } catch (e) { ok(null) }
+    })
+  },
+  async set (k, v) {
+    const db = await this.abrir()
+    if (!db) return
+    return new Promise((ok) => {
+      try { const t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = () => ok(); t.onerror = () => ok() } catch (e) { ok() }
+    })
+  }
+}
+
 // --- la nube ------------------------------------------------------------------
 
-async function leerDatos (clave) {
-  const k = 'datos:' + clave
+const esDeRed = (err) => !navigator.onLine || /fetch|network|load failed|networkerror|timeout|abort|conex/i.test(String(err && (err.message || err)))
+
+function red (ok, viejo) {
+  const antes = S.enLinea
+  S.enLinea = ok
+  if (ok) S.datosViejos = null
+  else if (viejo && (!S.datosViejos || viejo < S.datosViejos)) S.datosViejos = viejo
+  if (antes !== ok) {
+    pintarConexion()
+    if (ok) vaciarCola()
+  }
+}
+
+// Lee una clave de pos_datos de todas las sucursales: { sucursalId: fila }.
+async function leerDatos (clave, forzar) {
+  const k = 'd:' + clave
   const c = S.cache[k]
-  if (c && Date.now() - c.t < 45000) return c.v
-  const { data, error } = await S.sb.from('pos_datos').select('sucursal_id,nombre,actualizado,datos').eq('clave', clave)
-  if (error) throw error
-  const v = {}
-  for (const f of data || []) v[f.sucursal_id] = f
-  S.cache[k] = { t: Date.now(), v }
-  return v
+  if (!forzar && c && Date.now() - c.t < 45000) return c.v
+  try {
+    const { data, error } = await S.sb.from('pos_datos').select('sucursal_id,nombre,actualizado,datos').eq('clave', clave)
+    if (error) throw error
+    const v = {}
+    for (const f of data || []) v[f.sucursal_id] = f
+    S.cache[k] = { t: Date.now(), v }
+    DB.set(k, { t: Date.now(), v })
+    red(true)
+    return v
+  } catch (err) {
+    if (!esDeRed(err)) throw err
+    const g = await DB.get(k)
+    red(false, g && g.t)
+    if (g) { S.cache[k] = { t: Date.now() - 30000, v: g.v }; return g.v }
+    throw new Error('Sin conexión, y este dato todavía no estaba guardado en el celular.')
+  }
+}
+const datosDe = (v, suc) => ((v && v[suc || S.sucursal]) || {}).datos
+
+async function leerResumen (forzar) {
+  const c = S.cache.resumen
+  if (!forzar && c && Date.now() - c.t < 20000) return c.v
+  try {
+    const { data, error } = await S.sb.from('pos_resumen').select('*').order('nombre')
+    if (error) throw error
+    S.cache.resumen = { t: Date.now(), v: data || [] }
+    DB.set('resumen', { t: Date.now(), v: data || [] })
+    red(true)
+    return data || []
+  } catch (err) {
+    if (!esDeRed(err)) throw err
+    const g = await DB.get('resumen')
+    red(false, g && g.t)
+    if (g) return g.v
+    throw new Error('Sin conexión, y todavía no hay datos guardados en el celular.')
+  }
 }
 
 async function leerCatalogo (sucursalId, forzar) {
-  const k = 'catalogo:' + sucursalId
+  const k = 'c:' + sucursalId
   const c = S.cache[k]
   if (!forzar && c && Date.now() - c.t < 60000) return c.v
-  const filas = []
-  for (let desde = 0; desde < 20000; desde += 1000) {
-    const { data, error } = await S.sb.from('pos_catalogo').select('producto_id,datos').eq('sucursal_id', sucursalId).range(desde, desde + 999)
-    if (error) throw error
-    filas.push(...data)
-    if (data.length < 1000) break
-  }
-  const v = filas.map((f) => Object.assign({ id: f.producto_id }, f.datos))
-  S.cache[k] = { t: Date.now(), v }
-  return v
-}
-
-// Deja una orden para la caja y sigue su estado hasta que la aplique.
-async function mandarOrden (sucursalId, tipo, datos, alTerminar) {
-  const { data, error } = await S.sb.from('pos_ordenes').insert({ sucursal_id: sucursalId, tipo, datos }).select('id').single()
-  if (error) { toast('No se pudo mandar: ' + error.message, 6); return null }
-  toast('Enviado. La caja lo aplica en menos de un minuto.')
-  seguirOrden(data.id, alTerminar)
-  return data.id
-}
-
-function seguirOrden (id, alTerminar) {
-  let vueltas = 0
-  const mirar = async () => {
-    vueltas++
-    const { data } = await S.sb.from('pos_ordenes').select('estado,resultado').eq('id', id).single()
-    if (data && data.estado !== 'pendiente') {
-      if (data.estado === 'aplicada') toast('✓ La caja lo aplicó' + (data.resultado && data.resultado.mensaje ? ': ' + data.resultado.mensaje : ''), 5)
-      else toast('✗ La caja no lo pudo hacer: ' + ((data.resultado && data.resultado.error) || 'error'), 8)
-      S.cache = {}
-      if (alTerminar) alTerminar(data)
-      return
+  try {
+    const filas = []
+    for (let desde = 0; desde < 30000; desde += 1000) {
+      const { data, error } = await S.sb.from('pos_catalogo').select('producto_id,datos').eq('sucursal_id', sucursalId).range(desde, desde + 999)
+      if (error) throw error
+      filas.push(...data)
+      if (data.length < 1000) break
     }
-    if (vueltas < 40) setTimeout(mirar, 5000)
+    const v = filas.map((f) => Object.assign({ id: f.producto_id }, f.datos))
+    S.cache[k] = { t: Date.now(), v }
+    DB.set(k, { t: Date.now(), v })
+    red(true)
+    return v
+  } catch (err) {
+    if (!esDeRed(err)) throw err
+    const g = await DB.get(k)
+    red(false, g && g.t)
+    if (g) { S.cache[k] = { t: Date.now() - 30000, v: g.v }; return g.v }
+    throw new Error('Sin conexión, y el catálogo todavía no estaba guardado en el celular.')
   }
-  setTimeout(mirar, 4000)
+}
+
+// Busca un codigo de barras en el catalogo (tambien en otras sucursales).
+async function buscarCodigo (codigo, sucursalId) {
+  const cod = String(codigo || '').trim()
+  const lista = await leerCatalogo(sucursalId || S.sucursal)
+  const aca = lista.find((p) => (p.codigos || []).includes(cod))
+  if (aca) return { producto: aca, sucursalId: sucursalId || S.sucursal }
+  for (const x of S.sucursales) {
+    if (x.id === (sucursalId || S.sucursal)) continue
+    try {
+      const otra = (await leerCatalogo(x.id)).find((p) => (p.codigos || []).includes(cod))
+      if (otra) return { producto: null, enOtra: { producto: otra, sucursalId: x.id } }
+    } catch (e) { /* esa sucursal no se pudo leer */ }
+  }
+  return { producto: null }
+}
+
+// --- las ordenes (lo que se le pide a la caja) --------------------------------------
+
+const NOMBRE_ORDEN = {
+  producto: 'Cambio de producto', stock: 'Ajuste de stock', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
+  promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular',
+  cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto',
+  proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor'
+}
+
+async function cargarCola () {
+  S.cola = (await DB.get('cola')) || []
+  const esp = (await DB.get('esperando')) || []
+  for (const o of esp) if (Date.now() - new Date(o.creado).getTime() < 24 * 3600000) S.esperando.set(o.id, o)
+}
+const guardarCola = () => DB.set('cola', S.cola)
+const guardarEsperando = () => DB.set('esperando', [...S.esperando.values()])
+
+// Deja una orden. Primero queda guardada en el celular; si hay internet se
+// manda ya, si no, cuando vuelva. alTerminar(resultado) cuando la caja responde.
+async function mandarOrden (sucursalId, tipo, datos, opciones = {}) {
+  const o = { id: uuid(), sucursal_id: sucursalId, tipo, datos, texto: opciones.texto || NOMBRE_ORDEN[tipo] || tipo, creado: new Date().toISOString() }
+  S.cola.push(o)
+  await guardarCola()
+  if (opciones.alTerminar) S.alTerminar.set(o.id, opciones.alTerminar)
+  pintarConexion()
+  const ok = await vaciarCola()
+  if (!opciones.callado) {
+    toast(ok ? 'Enviado a ' + nombreSucursal(sucursalId) + '. La caja lo aplica en menos de un minuto.' : 'Sin conexión: quedó guardado y se manda solo cuando vuelva internet.', ok ? '' : 'mal', 4)
+  }
+  return o.id
+}
+
+async function vaciarCola () {
+  if (S.vaciando || !S.sb) return !S.cola.length
+  S.vaciando = true
+  try {
+    while (S.cola.length) {
+      const o = S.cola[0]
+      const { error } = await S.sb.from('pos_ordenes').insert({ id: o.id, sucursal_id: o.sucursal_id, tipo: o.tipo, datos: o.datos })
+      if (error && !/duplicate|23505/i.test(String(error.message) + ' ' + String(error.code))) {
+        if (esDeRed(error)) { red(false); return false }
+        // Un error de la nube (no de la conexion): no se reintenta para siempre.
+        S.cola.shift()
+        await guardarCola()
+        toast('No se pudo mandar "' + o.texto + '": ' + error.message, 'mal', 7)
+        continue
+      }
+      S.cola.shift()
+      await guardarCola()
+      S.esperando.set(o.id, o)
+      await guardarEsperando()
+      red(true)
+    }
+    return true
+  } catch (err) {
+    if (esDeRed(err)) red(false)
+    return false
+  } finally {
+    S.vaciando = false
+    pintarConexion()
+    seguirOrdenes()
+  }
+}
+
+// Mira cada pocos segundos como les fue a las ordenes que esperan a la caja.
+function seguirOrdenes () {
+  if (S.relojOrdenes || !S.esperando.size) return
+  S.relojOrdenes = setTimeout(async () => {
+    S.relojOrdenes = null
+    const ids = [...S.esperando.keys()]
+    if (!ids.length) return
+    try {
+      const { data, error } = await S.sb.from('pos_ordenes').select('id,estado,resultado').in('id', ids)
+      if (error) throw error
+      for (const r of data || []) {
+        if (r.estado === 'pendiente') continue
+        const o = S.esperando.get(r.id)
+        S.esperando.delete(r.id)
+        const res = r.resultado || {}
+        if (r.estado === 'aplicada') toast('✓ ' + (o ? o.texto : 'Listo') + (res.mensaje ? ': ' + res.mensaje : ''), 'ok', 4.5)
+        else toast('✗ ' + (o ? o.texto : 'La caja') + ' no se pudo: ' + (res.error || 'error'), 'mal', 8)
+        // La caja marca la orden y enseguida sube los datos nuevos: se espera
+        // unos segundos antes de volver a leer, asi no se ve el valor viejo.
+        const fn = S.alTerminar.get(r.id)
+        S.alTerminar.delete(r.id)
+        setTimeout(() => { S.cache = {}; if (fn) { try { fn(r) } catch (e) {} } }, 5000)
+      }
+      // Lo que ya no existe en la nube (o es muy viejo) se deja de seguir.
+      for (const id of ids) {
+        const o = S.esperando.get(id)
+        if (o && !(data || []).some((x) => x.id === id) && Date.now() - new Date(o.creado).getTime() > 3600000) S.esperando.delete(id)
+      }
+      await guardarEsperando()
+      red(true)
+    } catch (err) { if (esDeRed(err)) red(false) }
+    pintarConexion()
+    seguirOrdenes()
+  }, 4000)
 }
 
 // --- arranque --------------------------------------------------------------------
 
 async function proyectoRef () {
   const m = /[#&]p=([a-z0-9]+)/.exec(location.hash)
-  if (m) { try { localStorage.setItem('bs.proyecto', m[1]) } catch (e) {} return m[1] }
-  try { const x = localStorage.getItem('bs.proyecto'); if (x) return x } catch (e) {}
+  if (m) { guardarLocal('bs.proyecto', m[1]); history.replaceState(null, '', location.pathname + '#/inicio'); return m[1] }
+  const x = leerLocal('bs.proyecto', '')
+  if (x) return x
   // La app del celular (en la pantalla de inicio) no siempre trae el link.
   try { const r = await fetch('proyecto.json', { cache: 'no-store' }); if (r.ok) return (await r.json()).ref } catch (e) {}
   return ''
@@ -197,14 +477,19 @@ async function arrancar () {
   S.proyecto = await proyectoRef()
   if (!S.proyecto) return pantallaMensaje('Falta el link', 'Abrí el link completo que te dio el programa de la caja (Configuración → Ver desde el celular).')
   const base = 'https://' + S.proyecto + '.supabase.co'
-  let conf
+  let conf = leerLocal('bs.config', null)
   try {
     const r = await fetch(base + '/storage/v1/object/public/panel/config.json', { cache: 'no-store' })
     if (!r.ok) throw new Error('Falta publicar la página desde la caja (' + r.status + ').')
     conf = await r.json()
-  } catch (err) { return pantallaMensaje('Sin conexión', err.message, true) }
+    guardarLocal('bs.config', conf)
+  } catch (err) {
+    // Sin internet se arranca igual con lo guardado.
+    if (!conf) return pantallaMensaje('Sin conexión', 'Para entrar la primera vez hace falta internet. ' + (err.message || ''), true)
+    S.enLinea = false
+  }
   S.negocio = conf.nombre || conf.negocio || 'Mi negocio'
-  document.title = 'Panel · ' + S.negocio
+  document.title = S.negocio
   S.sb = window.supabase.createClient(base, conf.anon, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'bs-panel', detectSessionInUrl: true } })
   S.sb.auth.onAuthStateChange((evento) => { if (evento === 'PASSWORD_RECOVERY') pantallaNuevaClave() })
   const { data } = await S.sb.auth.getSession()
@@ -214,22 +499,28 @@ async function arrancar () {
 }
 
 function pantallaMensaje (titulo, texto, reintentar) {
-  poner($app, el('div', { clase: 'entrar' }, el('h1', {}, titulo), el('p', {}, texto),
-    reintentar ? el('button', { clase: 'btn primario ancho', onclick: () => location.reload() }, 'Probar de nuevo') : null))
+  poner($app, el('div', { clase: 'entrar' }, el('img', { clase: 'logo', src: 'icono-192.png', alt: '' }), el('h1', {}, titulo), el('p', {}, texto),
+    reintentar ? el('button', { clase: 'btn primario ancho grande', onclick: () => location.reload() }, 'Probar de nuevo') : null))
 }
 
 function pantallaEntrar (mensaje) {
   const email = el('input', { type: 'email', autocomplete: 'username', placeholder: 'tu@email.com', inputmode: 'email' })
   const clave = el('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Contraseña' })
   const error = el('div', { clase: 'error' }, mensaje || '')
-  try { email.value = localStorage.getItem('bs.email') || '' } catch (e) {}
+  email.value = leerLocal('bs.email', '') || ''
+  const boton = el('button', { clase: 'btn primario ancho grande' }, 'Entrar')
   const entrar = async () => {
     error.textContent = ''
+    boton.disabled = true
+    boton.textContent = 'Entrando…'
     const { data, error: err } = await S.sb.auth.signInWithPassword({ email: email.value.trim(), password: clave.value })
-    if (err) { error.textContent = /invalid/i.test(err.message) ? 'Email o contraseña incorrectos.' : err.message; return }
-    try { localStorage.setItem('bs.email', email.value.trim()) } catch (e) {}
+    boton.disabled = false
+    boton.textContent = 'Entrar'
+    if (err) { error.textContent = /invalid/i.test(err.message) ? 'Email o contraseña incorrectos.' : esDeRed(err) ? 'Sin conexión. Revisá internet y probá de nuevo.' : err.message; return }
+    guardarLocal('bs.email', email.value.trim())
     entrarAlPanel(data.session)
   }
+  boton.addEventListener('click', entrar)
   const olvide = async () => {
     if (!email.value.trim()) { error.textContent = 'Escribí tu email y tocá de nuevo.'; return }
     const { error: err } = await S.sb.auth.resetPasswordForEmail(email.value.trim(), { redirectTo: location.origin + location.pathname })
@@ -237,13 +528,13 @@ function pantallaEntrar (mensaje) {
   }
   clave.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') entrar() })
   poner($app, el('div', { clase: 'entrar' },
+    el('img', { clase: 'logo', src: 'icono-192.png', alt: '' }),
     el('h1', {}, S.negocio),
     el('p', {}, 'Entrá con tu email y tu contraseña.'),
     el('label', { clase: 'campo' }, 'Email', email),
     el('label', { clase: 'campo' }, 'Contraseña', clave),
-    error,
-    el('button', { clase: 'btn primario ancho', onclick: entrar }, 'Entrar'),
-    el('p', { estilo: { marginTop: '14px', textAlign: 'center' } }, el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); olvide() } }, 'Me olvidé la contraseña'))))
+    error, boton,
+    el('p', { estilo: { marginTop: '16px', textAlign: 'center' } }, el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); olvide() } }, 'Me olvidé la contraseña'))))
   ;(email.value ? clave : email).focus()
 }
 
@@ -254,744 +545,477 @@ function pantallaNuevaClave () {
     if (clave.value.length < 8) { error.textContent = 'Tiene que tener 8 o más caracteres.'; return }
     const { error: err } = await S.sb.auth.updateUser({ password: clave.value })
     if (err) { error.textContent = err.message; return }
-    history.replaceState(null, '', location.pathname)
-    toast('Contraseña cambiada')
+    history.replaceState(null, '', location.pathname + '#/inicio')
+    toast('Contraseña cambiada', 'ok')
     const { data } = await S.sb.auth.getSession()
     entrarAlPanel(data.session)
   }
   poner($app, el('div', { clase: 'entrar' },
-    el('h1', {}, 'Contraseña nueva'), el('p', {}, 'Elegí la contraseña con la que vas a entrar al panel.'),
+    el('h1', {}, 'Contraseña nueva'), el('p', {}, 'Elegí la contraseña con la que vas a entrar.'),
     el('label', { clase: 'campo' }, 'Contraseña nueva', clave), error,
-    el('button', { clase: 'btn primario ancho', onclick: guardar }, 'Guardar')))
+    el('button', { clase: 'btn primario ancho grande', onclick: guardar }, 'Guardar')))
   clave.focus()
 }
 
 async function entrarAlPanel (sesion) {
-  S.email = (sesion && sesion.user && sesion.user.email) || ''
-  const { data: admin } = await S.sb.from('pos_admins').select('email').limit(1)
-  if (!admin || !admin.length) {
-    return pantallaMensaje('Sin permiso', 'El usuario ' + S.email + ' no está autorizado para ver el panel. Pedile al dueño que lo agregue.')
+  S.email = (sesion && sesion.user && sesion.user.email) || leerLocal('bs.email', '') || ''
+  await cargarCola()
+  // Sin internet se entra con lo guardado; el permiso se revisa al volver.
+  try {
+    const { data: admin, error } = await S.sb.from('pos_admins').select('email').limit(1)
+    if (error) throw error
+    if (!admin || !admin.length) return pantallaMensaje('Sin permiso', 'El usuario ' + S.email + ' no está autorizado. Pedile al dueño que lo agregue.')
+    guardarLocal('bs.admin', S.email)
+  } catch (err) {
+    if (!esDeRed(err) || leerLocal('bs.admin', '') !== S.email) return pantallaMensaje('Sin conexión', 'No se pudo revisar tu usuario. Probá de nuevo con internet.', true)
+    S.enLinea = false
   }
-  const { data: filas } = await S.sb.from('pos_resumen').select('sucursal_id,nombre').order('nombre')
-  S.sucursales = (filas || []).map((f) => ({ id: f.sucursal_id, nombre: f.nombre }))
-  try { S.sucursal = localStorage.getItem('bs.sucursal') || '' } catch (e) {}
+  const filas = await leerResumen().catch(() => [])
+  S.sucursales = filas.map((f) => ({ id: f.sucursal_id, nombre: f.nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  S.sucursal = leerLocal('bs.sucursal', '') || ''
   if (!S.sucursales.some((x) => x.id === S.sucursal)) S.sucursal = S.sucursales[0] ? S.sucursales[0].id : ''
-  const m = /[#&]s=([a-z]+)/.exec(location.hash)
-  if (m && SECCIONES[m[1]]) S.seccion = m[1]
   pintarArmazon()
-  ir(S.seccion)
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && S.seccion === 'hoy') ir('hoy') })
+  const m = /^#\/(\w+)/.exec(location.hash)
+  ir(m && SECCIONES[m[1]] ? m[1] : 'inicio', {}, true)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { vaciarCola(); if (S.seccion === 'inicio' && !S.hojas.length) render() } })
+  window.addEventListener('online', () => vaciarCola())
+  window.addEventListener('offline', () => red(false))
+  setInterval(() => { if (S.cola.length) vaciarCola() }, 30000)
+  vaciarCola()
   contarAvisos()
 }
 
 // --- armazon y navegacion ------------------------------------------------------------
 
-const SECCIONES = {
-  hoy: { nombre: 'Hoy', ic: '●', fn: () => secHoy() },
-  ventas: { nombre: 'Ventas', ic: '▤', fn: () => secVentas() },
-  cierres: { nombre: 'Cierres de caja', corto: 'Cierres', ic: '☰', fn: () => secCierres() },
-  faltantes: { nombre: 'Faltantes', ic: '!', fn: () => secFaltantes() },
-  pedidos: { nombre: 'Pedidos', ic: '⇪', fn: () => secPedidos() },
-  productos: { nombre: 'Productos', ic: '▦', fn: () => secProductos() },
-  promos: { nombre: 'Promos', ic: '%', fn: () => secPromos() },
-  avisos: { nombre: 'Avisos', ic: '◉', fn: () => secAvisos() },
-  mas: { nombre: 'Más', ic: '⋯', fn: () => secMas(), soloCelular: true }
-}
-const ABAJO = ['hoy', 'ventas', 'pedidos', 'productos', 'mas']
+const SECCIONES = {}
+// Cada archivo registra sus secciones: { nombre, icono, grupo, fn(params) }.
+function seccion (id, def) { SECCIONES[id] = def }
+
+const GRUPOS = [['principal', ''], ['negocio', 'Negocio'], ['mercaderia', 'Mercadería'], ['control', 'Control']]
+const ABAJO = ['inicio', 'productos', 'escanear', 'ventas', 'mas']
 
 function pintarArmazon () {
-  const lado = el('nav', { clase: 'lado' },
-    el('div', { clase: 'marca' }, S.negocio),
-    Object.entries(SECCIONES).filter(([, s]) => !s.soloCelular).map(([id, s]) => el('button', { 'data-sec': id, onclick: () => ir(id) }, el('span', {}, s.ic), s.nombre, id === 'avisos' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null)),
-    el('div', { clase: 'pie-lado' }, S.email, el('br'), el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); salir() } }, 'Salir')))
-  const abajo = el('nav', { clase: 'abajo' }, ABAJO.map((id) => el('button', { 'data-sec': id, onclick: () => ir(id) },
-    el('span', { clase: 'ic' }, SECCIONES[id].ic), SECCIONES[id].corto || SECCIONES[id].nombre,
-    id === 'mas' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null)))
+  const lado = el('nav', { clase: 'lado', 'aria-label': 'Secciones' },
+    el('div', { clase: 'marca' }, el('img', { src: 'icono-192.png', alt: '' }), S.negocio),
+    el('button', { onclick: () => abrirBuscador() }, icono('buscar'), 'Buscar', el('span', { clase: 'sub', estilo: { marginLeft: 'auto' } }, '/')),
+    el('button', { onclick: () => escanearYAbrir() }, icono('escanear'), 'Escanear'),
+    GRUPOS.map(([g, t]) => [t ? el('div', { clase: 'grupo' }, t) : null,
+      Object.entries(SECCIONES).filter(([, s]) => s.grupo === g).map(([id, s]) => el('button', { 'data-sec': id, onclick: () => ir(id) },
+        icono(s.icono), s.nombre, id === 'avisos' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null))]))
+  const tabbar = el('nav', { clase: 'tabbar', 'aria-label': 'Secciones' }, ABAJO.map((id) => id === 'escanear'
+    ? el('button', { clase: 'escanear', onclick: () => escanearYAbrir(), 'aria-label': 'Escanear producto' }, el('span', { clase: 'bola' }, icono('escanear')), 'Escanear')
+    : el('button', { 'data-sec': id, onclick: () => ir(id) }, icono(SECCIONES[id].icono), SECCIONES[id].corto || SECCIONES[id].nombre,
+      id === 'mas' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null)))
+  S.arriba = el('header', { clase: 'arriba' })
   S.main = el('main', {})
-  poner($app, el('div', { clase: 'app' }, lado, S.main), abajo)
+  poner($app, el('div', { clase: 'app' }, lado, el('div', { estilo: { minWidth: 0 } }, el('div', { estilo: { maxWidth: '1200px', padding: '0 max(14px, min(28px, 3vw))' } }, S.arriba), S.main)), tabbar)
+  pintarArriba()
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === '/' && !/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '') && !S.hojas.length) { ev.preventDefault(); abrirBuscador() }
+  })
 }
 
-function ir (id) {
+function pintarArriba () {
+  if (!S.arriba) return
+  const suc = S.sucursales.find((x) => x.id === S.sucursal)
+  S.conexion = el('button', { clase: 'conexion', onclick: () => hojaConexion() })
+  poner(S.arriba,
+    el('div', { clase: 'quien' },
+      el('div', { clase: 'negocio' }, S.negocio),
+      el('button', { clase: 'donde', onclick: () => hojaSucursales() }, icono('local'), suc ? suc.nombre : 'Sin sucursales', S.sucursales.length > 1 ? icono('abajo') : null)),
+    S.conexion,
+    el('button', { clase: 'avatar', 'aria-label': 'Tu cuenta', onclick: () => ir('ajustes') }, (S.email || '?').slice(0, 1).toUpperCase()))
+  pintarConexion()
+}
+
+function pintarConexion () {
+  const b = S.conexion
+  if (!b) return
+  const pendientes = S.cola.length
+  const esperando = S.esperando.size
+  let clase = ''
+  let texto = 'Conectado'
+  if (!S.enLinea) { clase = 'off'; texto = 'Sin conexión' + (pendientes ? ' · ' + pendientes : '') }
+  else if (pendientes || esperando) { clase = 'sinc'; texto = pendientes ? 'Enviando ' + pendientes : 'Esperando la caja' + (esperando > 1 ? ' (' + esperando + ')' : '') }
+  b.className = 'conexion ' + clase
+  poner(b, el('span', { clase: 'punto' }), el('span', {}, texto))
+}
+
+function nombreSucursal (id) { return (S.sucursales.find((x) => x.id === id) || {}).nombre || 'la sucursal' }
+
+function cambiarSucursal (id) {
+  S.sucursal = id
+  guardarLocal('bs.sucursal', id)
+  pintarArriba()
+  render()
+}
+
+async function hojaSucursales () {
+  if (S.sucursales.length < 2) return hojaConexion()
+  const resumenes = await leerResumen().catch(() => [])
+  abrirHoja({
+    titulo: 'Elegí la sucursal',
+    cuerpo: el('div', { clase: 'lista' }, S.sucursales.map((x) => {
+      const r = resumenes.find((f) => f.sucursal_id === x.id) || {}
+      const d = r.datos || {}
+      return el('button', { clase: 'item', onclick: () => { cerrarHoja(); cambiarSucursal(x.id) } },
+        el('div', { clase: 'cuerpo' }, el('b', {}, x.nombre), el('div', { clase: 'sub' }, (d.caja && d.caja.abierta ? 'Caja abierta · ' : 'Caja cerrada · ') + 'hoy ' + plata(d.total) + ' · ' + hace(r.actualizado))),
+        x.id === S.sucursal ? el('span', { clase: 'chip info' }, icono('ok'), 'Esta') : icono('flecha'))
+    }))
+  })
+}
+
+// El estado de la conexion y de cada caja, y lo que esta esperando.
+async function hojaConexion () {
+  const resumenes = await leerResumen().catch(() => [])
+  const cola = S.cola.map((o) => el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', {}, o.texto), el('div', { clase: 'sub' }, nombreSucursal(o.sucursal_id) + ' · ' + hace(o.creado))), el('span', { clase: 'chip mal' }, 'Sin enviar')))
+  const esperan = [...S.esperando.values()].map((o) => el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', {}, o.texto), el('div', { clase: 'sub' }, nombreSucursal(o.sucursal_id) + ' · ' + hace(o.creado))), el('span', { clase: 'chip alerta' }, 'Esperando la caja')))
+  abrirHoja({
+    titulo: 'Conexión',
+    cuerpo: el('div', {},
+      el('div', { clase: 'aviso ' + (S.enLinea ? 'ok' : 'mal') }, el('b', {}, S.enLinea ? 'Conectado' : 'Sin conexión'),
+        S.enLinea ? 'Los datos se actualizan solos.' : 'Estás viendo lo último guardado en el celular' + (S.datosViejos ? ' (' + hace(new Date(S.datosViejos).toISOString()) + ')' : '') + '. Los cambios quedan en espera y se mandan solos cuando vuelva internet.'),
+      el('h3', {}, 'Cada caja'),
+      el('div', { clase: 'lista' }, resumenes.length ? resumenes.map((r) => {
+        const atraso = Date.now() - new Date(r.actualizado).getTime()
+        return el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', {}, r.nombre), el('div', { clase: 'sub' }, 'Subió datos ' + hace(r.actualizado))),
+          el('span', { clase: 'chip ' + (atraso > 10 * 60000 ? 'mal' : atraso > 3 * 60000 ? 'alerta' : 'ok') }, atraso > 10 * 60000 ? 'Sin conexión' : atraso > 3 * 60000 ? 'Atrasada' : 'En línea'))
+      }) : vacio('Todavía no se conectó ninguna caja.')),
+      cola.length || esperan.length ? [el('h3', {}, 'Cambios en camino'), el('div', { clase: 'lista' }, cola, esperan)] : null,
+      el('p', { clase: 'sub', estilo: { marginTop: '12px' } }, 'Lo que cambiás acá lo aplica la caja de esa sucursal: tiene que estar prendida, con el programa abierto e internet. Si no, queda esperando y entra cuando vuelve.')),
+    botones: [{ texto: 'Reintentar ahora', alTocar: async () => { S.cache = {}; await vaciarCola(); cerrarHoja(); render() } }]
+  })
+}
+
+// Corre fn ahora, o cuando termine el 'atras' que esta en camino.
+function luegoDeAtras (fn) { if (S.ignorarPop > 0) S.trasAtras.push(fn); else fn() }
+const esperarAtras = () => new Promise((ok) => luegoDeAtras(ok))
+
+function ir (id, params, reemplazar) {
+  if (!SECCIONES[id]) id = 'inicio'
+  // Si se esta cerrando una hoja, se espera a que el 'atras' termine.
+  if (S.ignorarPop > 0) { S.trasAtras.push(() => ir(id, params, reemplazar)); return }
   S.seccion = id
+  S.params = params || {}
+  const hash = '#/' + id
+  if (location.hash !== hash) history[reemplazar ? 'replaceState' : 'pushState']({ sec: id }, '', hash)
+  render()
+}
+
+window.addEventListener('popstate', () => {
+  if (S.ignorarPop > 0) {
+    S.ignorarPop--
+    if (!S.ignorarPop) { const lista = S.trasAtras.splice(0); for (const fn of lista) { try { fn() } catch (e) {} } }
+    return
+  }
+  if (S.cerrarLector) { S.cerrarLector(); return }
+  if (S.hojas.length) { quitarHoja(); return }
+  if (document.querySelector('.busqueda-global')) { document.querySelector('.busqueda-global').remove(); return }
+  const m = /^#\/(\w+)/.exec(location.hash)
+  S.seccion = m && SECCIONES[m[1]] ? m[1] : 'inicio'
+  S.params = {}
+  render()
+})
+
+function render () {
+  if (!S.main) return
   clearInterval(S.reloj)
+  const id = S.seccion
   for (const b of document.querySelectorAll('[data-sec]')) {
-    const activo = b.dataset.sec === id || (b.closest('.abajo') && id !== 'hoy' && !ABAJO.includes(id) && b.dataset.sec === 'mas')
+    const enAbajo = !!b.closest('.tabbar')
+    const activo = b.dataset.sec === id || (enAbajo && b.dataset.sec === 'mas' && !ABAJO.includes(id))
     b.classList.toggle('activo', !!activo)
   }
-  S.main.classList.add('cargando')
-  Promise.resolve(SECCIONES[id].fn()).catch((err) => {
-    poner(S.main, el('div', { clase: 'caja' }, el('div', { clase: 'nada' }, 'No se pudo cargar: ' + (err.message || err))))
-  }).finally(() => S.main.classList.remove('cargando'))
-  window.scrollTo(0, 0)
+  if (!S.main.firstChild) poner(S.main, esqueleto())
+  S.main.classList.add('cargando-main')
+  const pedido = (S.pedido = {})
+  Promise.resolve(SECCIONES[id].fn(S.params || {})).catch((err) => {
+    if (pedido !== S.pedido) return
+    poner(S.main, el('div', { clase: 'tarjeta' }, vacio('No se pudo cargar: ' + (err.message || err), 'nube',
+      el('button', { clase: 'btn', onclick: () => { S.cache = {}; render() } }, icono('refrescar'), 'Probar de nuevo'))))
+  }).finally(() => { S.main.classList.remove('cargando-main') })
+  if (!S.params || !S.params.mantenerScroll) window.scrollTo(0, 0)
 }
 
-async function salir () {
-  await S.sb.auth.signOut()
-  pantallaEntrar()
+// Pinta la seccion solo si el usuario no se fue a otra mientras cargaba.
+function pintarSeccion (id, ...hijos) {
+  if (S.seccion !== id) return false
+  poner(S.main, hijos)
+  return true
 }
 
-// Elegir sucursal (en las secciones de una sola).
-function elegirSucursal (alCambiar) {
-  if (S.sucursales.length < 2) return null
-  return el('div', { clase: 'seg' }, S.sucursales.map((x) => el('button', {
-    clase: S.sucursal === x.id ? 'activo' : '',
-    onclick: () => { S.sucursal = x.id; try { localStorage.setItem('bs.sucursal', x.id) } catch (e) {} alCambiar() }
-  }, x.nombre)))
+// --- la hoja (sube desde abajo en el celular, ventana en la compu) ------------------
+
+function abrirHoja (opciones) {
+  if (S.ignorarPop > 0) { S.trasAtras.push(() => abrirHoja(opciones)); return null }
+  const { titulo, cuerpo, botones, completa, alCerrar, sinCancelar } = opciones
+  const telon = el('div', { clase: 'telon', onclick: (ev) => { if (ev.target === telon) cerrarHoja() } })
+  const pie = (botones || []).length ? el('div', { clase: 'pie-hoja' },
+    sinCancelar ? null : el('button', { clase: 'btn', onclick: () => cerrarHoja() }, 'Cancelar'),
+    botones.map((b) => el('button', { clase: 'btn' + (b.primario ? ' primario' : '') + (b.peligro ? ' peligro' : ''), onclick: (ev) => b.alTocar(cerrarHoja, ev.currentTarget) }, b.texto))) : null
+  const hoja = el('div', { clase: 'hoja' + (completa ? ' completa' : ''), role: 'dialog', 'aria-label': titulo },
+    el('div', { clase: 'agarre' }),
+    el('div', { clase: 'cab-hoja' }, el('h2', {}, titulo), el('button', { clase: 'btn-ico', 'aria-label': 'Cerrar', onclick: () => cerrarHoja() }, icono('cerrar'))),
+    el('div', { clase: 'cuerpo-hoja' }, cuerpo),
+    pie)
+  telon.append(hoja)
+  document.body.append(telon)
+  S.hojas.push({ telon, alCerrar })
+  history.pushState({ hoja: S.hojas.length }, '', location.hash)
+  const tecla = (ev) => { if (ev.key === 'Escape' && S.hojas.length && S.hojas[S.hojas.length - 1].telon === telon) cerrarHoja() }
+  document.addEventListener('keydown', tecla)
+  S.hojas[S.hojas.length - 1].tecla = tecla
+  const primero = telon.querySelector('input:not([type=checkbox]), select, textarea')
+  if (primero && window.innerWidth > 860) primero.focus()
+  return { telon, hoja, cuerpo: hoja.querySelector('.cuerpo-hoja') }
 }
 
-function cabecera (titulo, sub, ...derecha) {
-  return el('div', { clase: 'cabecera' }, el('div', {}, el('h1', {}, titulo), sub ? el('div', { clase: 'sub' }, sub) : null), el('div', { clase: 'chips' }, derecha))
+function quitarHoja () {
+  const h = S.hojas.pop()
+  if (!h) return
+  h.telon.remove()
+  document.removeEventListener('keydown', h.tecla)
+  if (h.alCerrar) { try { h.alCerrar() } catch (e) {} }
 }
 
-function nombreSucursal (id) { return (S.sucursales.find((x) => x.id === id) || {}).nombre || 'Sucursal' }
-
-// --- HOY -----------------------------------------------------------------------------
-
-async function secHoy () {
-  const { data, error } = await S.sb.from('pos_resumen').select('*').order('nombre')
-  if (error) throw error
-  const filas = data || []
-  const total = filas.reduce((s, f) => s + ((f.datos || {}).total || 0), 0)
-  const ventas = filas.reduce((s, f) => s + ((f.datos || {}).ventas || 0), 0)
-  const masViejo = filas.map((f) => f.actualizado).sort()[0]
-  const atrasado = masViejo && Date.now() - new Date(masViejo).getTime() > 5 * 60000
-  const anul = await leerDatos('anulaciones').catch(() => ({}))
-  const pedidosAnular = Object.values(anul).reduce((s, x) => s + ((x.datos || []).length), 0)
-
-  poner(S.main, 
-    cabecera('Hoy', (atrasado ? '⚠ Datos atrasados · ' : 'En vivo · ') + (masViejo ? hace(masViejo) : 'sin datos'),
-      el('button', { clase: 'btn chico', onclick: () => ir('hoy') }, 'Actualizar')),
-    pedidosAnular ? el('div', { clase: 'aviso-caja alerta' }, el('b', {}, pedidosAnular + (pedidosAnular === 1 ? ' venta a cuenta para anular' : ' ventas a cuenta para anular')), ' · ',
-      el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); ir('avisos') } }, 'Ver')) : null,
-    el('div', { clase: 'tiles' }, tile('Vendido hoy · ' + (filas.length === 1 ? filas[0].nombre : 'todas'), plata(total), ventas + (ventas === 1 ? ' venta' : ' ventas'), null, true)),
-    el('div', { clase: 'grilla' }, filas.map(tarjetaLocal)))
-  if (!filas.length) S.main.append(el('div', { clase: 'caja' }, el('div', { clase: 'nada' }, 'Todavía no subió ninguna caja.')))
-  S.reloj = setInterval(() => { if (!document.hidden && S.seccion === 'hoy') ir('hoy') }, 60000)
+// Cierra la hoja de arriba, o las n de arriba (y saca sus pasos del historial
+// del navegador de una sola vez).
+function cerrarHoja (n) {
+  const cuantas = Math.min(Math.max(1, Number(n) || 1), S.hojas.length)
+  if (!cuantas) return
+  for (let i = 0; i < cuantas; i++) quitarHoja()
+  S.ignorarPop++
+  history.go(-cuantas)
 }
 
-function tarjetaLocal (fila) {
-  const d = fila.datos || {}
-  const c = d.caja || {}
-  const alertas = []
-  if (!c.abierta) alertas.push(el('span', { clase: 'chip mal' }, 'Caja cerrada'))
-  if (d.stock && d.stock.negativos) alertas.push(el('span', { clase: 'chip mal' }, d.stock.negativos + ' en negativo'))
-  if (d.stock && d.stock.bajoMinimo) alertas.push(el('span', { clase: 'chip alerta' }, d.stock.bajoMinimo + ' bajo el mínimo'))
-  if (d.vencimientos && d.vencimientos.vencidos) alertas.push(el('span', { clase: 'chip mal' }, d.vencimientos.vencidos + ' vencidos'))
-  if (d.suspendidas) alertas.push(el('span', { clase: 'chip' }, d.suspendidas + ' en espera'))
-  if (!alertas.length) alertas.push(el('span', { clase: 'chip ok' }, 'Todo en orden'))
-  const color = { verde: 'ok', amarillo: 'alerta', rojo: 'mal' }
-  const personal = d.personal || {}
-  const horas = (d.porHora || []).map((x, h) => ({ h, v: x[0], n: x[1] }))
-  const hasta = new Date().getHours()
-  return el('div', { clase: 'caja' },
-    el('h2', {}, fila.nombre),
-    el('div', { clase: 'sub' }, c.abierta ? 'Turno de ' + (c.usuario || '—') + ' desde las ' + hora(c.desde) + ' · caja ' + (c.terminal || '') : 'Sin turno abierto', ' · ', hace(fila.actualizado)),
-    el('div', { clase: 'num', estilo: { fontSize: '28px', fontWeight: '750', marginTop: '8px' } }, plata(d.total)),
-    el('div', { clase: 'sub' }, (d.ventas || 0) + ' ventas · ticket ' + plata(d.ticketPromedio) + (d.ultimaVenta ? ' · última ' + hora(d.ultimaVenta) : '')),
-    horas.length && d.total ? barras(horas.filter((x) => x.h <= hasta || x.v), (x) => String(x.h).padStart(2, '0') + ':00 · ' + plata(x.v) + ' · ' + x.n + ' ventas', (x) => (x.h % 3 === 0 ? String(x.h) : '')) : null,
-    el('div', { clase: 'cuatro' },
-      el('div', { clase: 'mini' }, el('div', { clase: 'r' }, 'Última hora'), el('div', { clase: 'v' }, plata(d.ultimaHora))),
-      el('div', { clase: 'mini' }, el('div', { clase: 'r' }, 'En el cajón'), el('div', { clase: 'v' }, c.abierta ? plata(c.efectivoEsperado) : '—')),
-      el('div', { clase: 'mini' }, el('div', { clase: 'r' }, 'Gastos del día'), el('div', { clase: 'v' }, plata(d.gastosDia))),
-      el('div', { clase: 'mini' }, el('div', { clase: 'r' }, 'Te deben'), el('div', { clase: 'v' }, plata((d.deuda || {}).total)))),
-    (personal.trabajando || []).length || (personal.faltan || []).length ? el('h3', {}, 'Personal') : null,
-    (personal.trabajando || []).map((x) => el('div', { clase: 'fila' }, el('span', { clase: 'izq' }, x.nombre + ' · desde ' + hora(x.desde)), el('span', { clase: 'chip ' + (color[x.color] || '') }, x.texto))),
-    (personal.faltan || []).map((x) => el('div', { clase: 'fila' }, el('span', { clase: 'izq' }, x.nombre), el('span', { clase: 'chip ' + (color[x.color] || 'mal') }, x.texto))),
-    (d.medios || []).length ? el('h3', {}, 'Cómo pagaron') : null,
-    (d.medios || []).map((m) => el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, m.nombre), el('b', { clase: 'num' }, plata(m.importe)))),
-    (d.top || []).length ? el('h3', {}, 'Lo más vendido') : null,
-    (d.top || []).map((p) => el('div', { clase: 'fila' }, el('span', { clase: 'izq tenue' }, p.descripcion), el('b', { clase: 'num' }, unidades(p.unidades)))),
-    el('div', { clase: 'chips', estilo: { marginTop: '10px' } }, alertas))
+// --- INICIO --------------------------------------------------------------------------
+
+const ACCESOS = {
+  escanear: { nombre: 'Escanear', icono: 'escanear', fn: () => escanearYAbrir() },
+  nuevoProducto: { nombre: 'Nuevo producto', icono: 'sumar', fn: () => hojaNuevoProducto({}) },
+  stock: { nombre: 'Arreglo de stock', icono: 'stock', fn: () => ir('stock') },
+  clientes: { nombre: 'Clientes', icono: 'clientes', fn: () => ir('clientes') },
+  caja: { nombre: 'Caja', icono: 'caja', fn: () => ir('caja') },
+  ventas: { nombre: 'Ventas', icono: 'ventas', fn: () => ir('ventas') },
+  reportes: { nombre: 'Reportes', icono: 'reportes', fn: () => ir('reportes') },
+  gastos: { nombre: 'Gastos', icono: 'gastos', fn: () => ir('gastos') },
+  productos: { nombre: 'Productos', icono: 'productos', fn: () => ir('productos') },
+  proveedores: { nombre: 'Proveedores', icono: 'proveedores', fn: () => ir('proveedores') },
+  apagar: { nombre: 'A pagar', icono: 'apagar', fn: () => ir('apagar') },
+  reponer: { nombre: 'Reponer', icono: 'reponer', fn: () => ir('reponer') },
+  faltantes: { nombre: 'Faltantes', icono: 'faltantes', fn: () => ir('faltantes') },
+  promos: { nombre: 'Promos', icono: 'promos', fn: () => ir('promos') },
+  historial: { nombre: 'Historial', icono: 'historial', fn: () => ir('historial') },
+  avisos: { nombre: 'Avisos', icono: 'avisos', fn: () => ir('avisos') }
 }
+const ACCESOS_DE_FABRICA = ['escanear', 'nuevoProducto', 'stock', 'clientes', 'caja', 'ventas', 'reportes', 'gastos']
+const accesosElegidos = () => (leerLocal('bs.accesos', null) || ACCESOS_DE_FABRICA).filter((k) => ACCESOS[k])
 
-// --- VENTAS (dias anteriores) -------------------------------------------------------------
+// El orden del dia operativo: de las 6 a las 5 del otro dia (un local 24 horas).
+const ordenHora = (h) => (h - 6 + 24) % 24
 
-const PERIODOS = [['ayer', 'Ayer'], ['7', '7 días'], ['30', '30 días'], ['mes', 'Este mes'], ['mesPasado', 'Mes pasado'], ['anio', 'Este año']]
-
-function rangoDe (p) {
-  const hoy = hoyISO()
-  if (p === 'ayer') return { desde: sumarDias(hoy, -1), hasta: sumarDias(hoy, -1) }
-  if (p === '7') return { desde: sumarDias(hoy, -6), hasta: hoy }
-  if (p === '30') return { desde: sumarDias(hoy, -29), hasta: hoy }
-  if (p === 'mes') return { desde: hoy.slice(0, 8) + '01', hasta: hoy }
-  if (p === 'mesPasado') {
-    const [a, m] = hoy.split('-').map(Number)
-    const f = new Date(a, m - 2, 1)
-    const ini = f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-01'
-    return { desde: ini, hasta: sumarDias(hoy.slice(0, 8) + '01', -1) }
-  }
-  return { desde: hoy.slice(0, 4) + '-01-01', hasta: hoy }
-}
-
-function largoDias (r) { let n = 0; for (let d = r.desde; d <= r.hasta && n < 800; d = sumarDias(d, 1)) n++; return n }
-
-async function secVentas () {
-  S.periodo = S.periodo || '7'
-  const hist = await leerDatos('historial')
-  const r = rangoDe(S.periodo)
-  const largo = largoDias(r)
-  const ant = { desde: sumarDias(r.desde, -largo), hasta: sumarDias(r.desde, -1) }
-  const anioAntes = (d) => (Number(d.slice(0, 4)) - 1) + d.slice(4)
-  const suc = Object.entries(hist)
-  const sumar = (dias, rango) => {
-    const x = { total: 0, ventas: 0, costo: 0, dias: 0, medios: {}, sinCosto: false }
-    for (const d of dias) {
-      if (d.dia < rango.desde || d.dia > rango.hasta) continue
-      x.total += d.total; x.ventas += d.ventas; x.costo += d.costo || 0; x.dias++
-      if (d.gc) x.sinCosto = true
-      for (const [m, v] of Object.entries(d.medios || {})) x.medios[m] = (x.medios[m] || 0) + v
-    }
-    return x
-  }
-  const porSuc = suc.map(([id, f]) => ({ id, nombre: f.nombre, act: sumar(f.datos, r), ant: sumar(f.datos, ant), pasado: sumar(f.datos, { desde: anioAntes(r.desde), hasta: anioAntes(r.hasta) }) }))
-  const tot = (k, campo) => porSuc.reduce((s, x) => s + x[k][campo], 0)
-  const total = tot('act', 'total')
-  const tickets = tot('act', 'ventas')
-  const ganancia = porSuc.some((x) => x.act.sinCosto) ? null : total - tot('act', 'costo')
-  const totalAnt = tot('ant', 'total')
-  const ticketsAnt = tot('ant', 'ventas')
-  const pasado = tot('pasado', 'total')
-
-  // Dia por dia, las sucursales sumadas.
-  const dias = {}
-  for (const [, f] of suc) for (const d of f.datos) if (d.dia >= r.desde && d.dia <= r.hasta) {
-    const x = dias[d.dia] || (dias[d.dia] = { dia: d.dia, v: 0, n: 0, suc: [] })
-    x.v += d.total; x.n += d.ventas; x.suc.push(f.nombre + ' ' + plata(d.total))
-  }
-  const lista = []
-  for (let d = r.desde, n = 0; d <= r.hasta && n < 400; d = sumarDias(d, 1), n++) lista.push(dias[d] || { dia: d, v: 0, n: 0, suc: [] })
-  const mejor = lista.reduce((a, b) => (b.v > (a ? a.v : 0) ? b : a), null)
-  const medios = {}
-  for (const x of porSuc) for (const [m, v] of Object.entries(x.act.medios)) medios[m] = (medios[m] || 0) + v
-  const NOMBRES = { efectivo: 'Efectivo', mercado_pago: 'Mercado Pago', debito: 'Débito', credito: 'Crédito', transferencia: 'Transferencia', qr: 'QR otras billeteras', cuenta_corriente: 'Cuenta corriente' }
-
-  poner(S.main, 
-    cabecera('Ventas', r.desde === r.hasta ? fechaCorta(r.desde) : fechaCorta(r.desde) + ' al ' + fechaCorta(r.hasta) + ' · contra los ' + largo + ' días anteriores'),
-    el('div', { clase: 'seg', estilo: { marginBottom: '12px' } }, PERIODOS.map(([id, t]) => el('button', { clase: S.periodo === id ? 'activo' : '', onclick: () => { S.periodo = id; ir('ventas') } }, t))),
-    el('div', { clase: 'tiles' },
-      tile('Vendido', plata(total), tickets + ' ventas', delta(total, totalAnt), true),
-      tile('Ticket promedio', plata(tickets ? total / tickets : 0), null, delta(tickets ? total / tickets : 0, ticketsAnt ? totalAnt / ticketsAnt : 0)),
-      tile('Ventas (tickets)', String(tickets), null, delta(tickets, ticketsAnt)),
-      ganancia != null ? tile('Ganancia bruta', plata(ganancia), total ? 'vendido menos lo que costaba' : null) : null,
-      pasado ? tile('El año pasado', plata(pasado), 'mismo período', delta(total, pasado)) : null),
-    lista.length > 1 ? el('div', { clase: 'caja' }, el('h2', {}, 'Día por día'),
-      barras(lista, (x) => fechaCorta(x.dia) + ' · ' + plata(x.v) + (x.suc.length > 1 ? ' (' + x.suc.join(' · ') + ')' : ''), (x, i) => (lista.length <= 10 || i % Math.ceil(lista.length / 8) === 0 ? x.dia.slice(8, 10) : '')),
-      mejor && mejor.v ? el('div', { clase: 'sub', estilo: { marginTop: '8px' } }, 'Mejor día: ' + fechaCorta(mejor.dia) + ' · ' + plata(mejor.v)) : null) : null,
-    el('div', { clase: 'grilla' },
-      el('div', { clase: 'caja' }, el('h2', {}, 'Por sucursal'),
-        el('div', { clase: 'scroll-x' }, el('table', {},
-          el('thead', {}, el('tr', {}, el('th', {}, 'Sucursal'), el('th', { clase: 'num' }, 'Vendido'), el('th', {}, ''), el('th', { clase: 'num' }, 'Tickets'), el('th', { clase: 'num' }, 'Ticket'))),
-          el('tbody', {}, porSuc.map((x) => el('tr', {},
-            el('td', {}, el('b', {}, x.nombre)), el('td', { clase: 'num' }, plata(x.act.total)), el('td', {}, delta(x.act.total, x.ant.total)),
-            el('td', { clase: 'num' }, String(x.act.ventas)), el('td', { clase: 'num' }, plata(x.act.ventas ? x.act.total / x.act.ventas : 0)))))))),
-      Object.keys(medios).length ? el('div', { clase: 'caja' }, el('h2', {}, 'Cómo pagaron'),
-        Object.entries(medios).sort((a, b) => b[1] - a[1]).map(([m, v]) => el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, NOMBRES[m] || m),
-          el('span', { clase: 'der' }, el('b', { clase: 'num' }, plata(v)), el('span', { clase: 'sub' }, '  ' + (total ? Math.round(v * 100 / total) : 0) + '%'))))) : null))
-}
-
-// --- CIERRES DE CAJA ----------------------------------------------------------------
-
-async function secCierres () {
-  const datos = await leerDatos('cierres')
-  S.filtroCierres = S.filtroCierres || ''
-  const todos = []
-  for (const [id, f] of Object.entries(datos)) for (const c of f.datos || []) todos.push(Object.assign({ sucursal: f.nombre, sucursalId: id }, c))
-  todos.sort((a, b) => String(b.cerradaEn).localeCompare(String(a.cerradaEn)))
-  const lista = todos.filter((c) => !S.filtroCierres || c.sucursalId === S.filtroCierres)
-  const conDif = lista.filter((c) => c.fueraDeTolerancia)
-  const faltante = lista.filter((c) => c.diferencia < 0).reduce((s, c) => s + c.diferencia, 0)
-  const chip = (c) => {
-    if (typeof c.diferencia !== 'number') return el('span', { clase: 'chip' }, 'sin contar')
-    if (!c.fueraDeTolerancia) return el('span', { clase: 'chip ok' }, '✓ Cerró bien' + (c.diferencia ? ' (' + (c.diferencia > 0 ? '+' : '−') + plata(Math.abs(c.diferencia)) + ')' : ''))
-    return el('span', { clase: 'chip ' + (c.diferencia < 0 ? 'mal' : 'alerta') }, (c.diferencia < 0 ? '▼ Faltaron ' : '▲ Sobraron ') + plata(Math.abs(c.diferencia)))
-  }
-  poner(S.main, 
-    cabecera('Cierres de caja', 'Cada turno cerrado: lo que tendría que haber y lo que contaron'),
-    S.sucursales.length > 1 ? el('div', { clase: 'seg', estilo: { marginBottom: '12px' } },
-      el('button', { clase: !S.filtroCierres ? 'activo' : '', onclick: () => { S.filtroCierres = ''; ir('cierres') } }, 'Todas'),
-      S.sucursales.map((x) => el('button', { clase: S.filtroCierres === x.id ? 'activo' : '', onclick: () => { S.filtroCierres = x.id; ir('cierres') } }, x.nombre))) : null,
-    el('div', { clase: 'tiles' },
-      tile('Cierres', String(lista.length), 'los últimos'),
-      tile('Con diferencia', String(conDif.length), conDif.length ? 'fuera de la tolerancia' : 'todos cerraron bien'),
-      tile('Faltantes sumados', plata(Math.abs(faltante)), faltante ? 'lo que faltó en total' : 'nada')),
-    lista.length ? el('div', { clase: 'caja' }, lista.map((c) => {
-      const detalle = el('div', { estilo: { display: 'none', marginTop: '8px' } },
-        el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Vendido en el turno'), el('b', { clase: 'num' }, plata(c.ventaTotal))),
-        el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Fondo + efectivo − gastos − retiros'), el('b', { clase: 'num' }, plata(c.esperado))),
-        el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Contaron'), el('b', { clase: 'num' }, c.contado == null ? '—' : plata(c.contado))),
-        c.gastos ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Gastos de caja'), el('b', { clase: 'num' }, plata(c.gastos))) : null,
-        c.retiros ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Retiros'), el('b', { clase: 'num' }, plata(c.retiros))) : null,
-        (c.porMedio || []).map((m) => el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, m.nombre), el('b', { clase: 'num' }, plata(m.importe)))))
-      return el('div', { clase: 'fila', estilo: { display: 'block', cursor: 'pointer' }, onclick: () => { detalle.style.display = detalle.style.display === 'none' ? 'block' : 'none' } },
-        el('div', { estilo: { display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' } },
-          el('div', { clase: 'izq' }, el('b', {}, fechaCorta(c.dia) + ' · ' + (c.usuario || '—')),
-            el('div', { clase: 'sub' }, (S.sucursales.length > 1 ? c.sucursal + ' · ' : '') + 'caja ' + (c.terminal || '') + ' · ' + hora(c.abiertaEn) + ' a ' + hora(c.cerradaEn) + ' · ' + c.tickets + ' ventas · ' + plata(c.ventaTotal))),
-          chip(c)),
-        detalle)
-    })) : el('div', { clase: 'caja' }, el('div', { clase: 'nada' }, 'Todavía no hay cierres subidos.')))
-}
-
-// --- FALTANTES ----------------------------------------------------------------------
-
-async function secFaltantes () {
-  const datos = await leerDatos('faltantes')
-  if (!S.sucursal) return
-  const lista = ((datos[S.sucursal] || {}).datos) || []
-  S.buscaFalt = S.buscaFalt || ''
-  const busca = el('input', { type: 'search', placeholder: 'Buscar…', valor: S.buscaFalt })
-  const zona = el('div', {})
-  const pintar = () => {
-    const filas = lista.filter((p) => coincide(p.descripcion + ' ' + p.codigo + ' ' + p.proveedor + ' ' + p.familia, S.buscaFalt))
-    poner(zona, filas.length
-      ? filas.map((p) => el('div', { clase: 'fila' },
-        el('div', { clase: 'izq' }, el('b', {}, p.descripcion), el('div', { clase: 'sub' }, [p.proveedor || 'sin proveedor', p.familia, p.vendido30 ? 'vendió ' + unidades(p.vendido30) + ' en 30 días' : ''].filter(Boolean).join(' · '))),
-        el('div', { clase: 'der' },
-          el('span', { clase: 'chip ' + (p.stock < 0 ? 'mal' : 'alerta') }, (p.stock < 0 ? '▼ ' : '') + 'hay ' + unidades(p.stock) + (p.minimo ? ' / mín ' + unidades(p.minimo) : '')),
-          el('div', {}, el('button', { clase: 'btn chico', estilo: { marginTop: '6px' }, onclick: () => hojaStock(S.sucursal, p) }, 'Corregir')))))
-      : el('div', { clase: 'nada' }, lista.length ? 'Nada coincide.' : 'No falta nada: nada en negativo ni bajo el mínimo.'))
-  }
-  busca.addEventListener('input', () => { S.buscaFalt = busca.value; pintar() })
-  pintar()
-  const negativos = lista.filter((p) => p.stock < 0).length
-  poner(S.main, 
-    cabecera('Faltantes', nombreSucursal(S.sucursal) + ' · ' + negativos + ' en negativo · ' + (lista.length - negativos) + ' bajo el mínimo', elegirSucursal(() => ir('faltantes'))),
-    el('div', { clase: 'caja' }, el('div', { clase: 'barra-busqueda' }, busca),
-      el('div', { clase: 'sub', estilo: { marginBottom: '6px' } }, 'Primero lo que está en negativo (se vendió más de lo que el sistema tenía), después lo que está bajo el mínimo.'), zona))
-}
-
-// Corregir el stock de un producto desde la casa.
-function hojaStock (sucursalId, p) {
-  const cant = el('input', { type: 'text', inputmode: 'decimal', valor: String(Math.max(0, p.stock / 1000)).replace('.', ',') })
-  const motivo = el('input', { type: 'text', placeholder: 'Ej: contaron en la góndola' })
-  abrirHoja('Stock de ' + p.descripcion, [
-    el('p', { clase: 'tenue' }, 'Ahora el sistema dice ' + unidades(p.stock) + ' en ' + nombreSucursal(sucursalId) + '. Poné cuántos hay de verdad.'),
-    el('label', { clase: 'campo' }, 'Cuántos hay', cant),
-    el('label', { clase: 'campo' }, 'Motivo (opcional)', motivo)
-  ], [{ texto: 'Guardar', primario: true, alTocar: async (cerrar) => {
-    const n = aMilesimas(cant.value)
-    if (!Number.isFinite(n)) return toast('Escribí un número')
-    cerrar()
-    await mandarOrden(sucursalId, 'stock', { productoId: p.id, cantidad: n, motivo: motivo.value.trim() }, () => { if (S.seccion === 'faltantes' || S.seccion === 'productos') ir(S.seccion) })
-  } }])
-}
-
-// --- PEDIDOS --------------------------------------------------------------------------
-
-async function secPedidos () {
-  S.vistaPedido = S.vistaPedido || 'pedido_hoy'
-  const datos = await leerDatos(S.vistaPedido)
-  if (!S.sucursal) return
-  const p = (datos[S.sucursal] || {}).datos
-  S.ajustesPedido = S.ajustesPedido || {}
-  S.buscaPedido = S.buscaPedido || ''
-  const busca = el('input', { type: 'search', placeholder: 'Buscar un producto en el pedido…', valor: S.buscaPedido })
-  const zona = el('div', {})
-  const clave = (f) => S.sucursal + '|' + S.vistaPedido + '|' + f.productoId
-  const cant = (f) => (S.ajustesPedido[clave(f)] != null ? S.ajustesPedido[clave(f)] : f.sugerido)
-  const pintar = () => {
-    limpiar(zona)
-    const grupos = (p && p.grupos) || []
-    let alguno = false
-    for (const g of grupos) {
-      const filas = g.filas.filter((f) => coincide(f.descripcion + ' ' + (f.codigo || ''), S.buscaPedido))
-      if (!filas.length) continue
-      alguno = true
-      const texto = () => 'Pedido ' + S.negocio + ' (' + nombreSucursal(S.sucursal) + '):\n' + g.filas.filter((f) => cant(f) > 0).map((f) => unidades(cant(f)) + ' x ' + f.descripcion).join('\n')
-      const tel = String(g.telefono || '').replace(/[^0-9]/g, '')
-      const wa = tel ? 'https://wa.me/' + (tel.length === 10 ? '549' + tel : tel.replace(/^0/, '549')) + '?text=' + encodeURIComponent(texto()) : 'https://wa.me/?text=' + encodeURIComponent(texto())
-      zona.append(el('div', { clase: 'caja' },
-        el('div', { clase: 'cabecera', estilo: { marginBottom: '6px' } },
-          el('div', {}, el('h2', { estilo: { margin: 0 } }, g.nombre), el('div', { clase: 'sub' }, g.filas.length + ' productos' + (g.telefono ? ' · ' + g.telefono : ' · sin teléfono cargado'))),
-          el('div', { clase: 'chips' },
-            el('a', { clase: 'btn primario chico', href: wa, target: '_blank', rel: 'noreferrer', onclick: (ev) => { ev.currentTarget.href = tel ? 'https://wa.me/' + (tel.length === 10 ? '549' + tel : tel.replace(/^0/, '549')) + '?text=' + encodeURIComponent(texto()) : 'https://wa.me/?text=' + encodeURIComponent(texto()) } }, 'WhatsApp'),
-            el('button', { clase: 'btn chico', onclick: async () => { try { await navigator.clipboard.writeText(texto()); toast('Pedido copiado') } catch (e) { toast('No se pudo copiar') } } }, 'Copiar'))),
-        filas.map((f) => {
-          const inp = el('input', { type: 'text', inputmode: 'decimal', valor: unidades(cant(f)), estilo: { width: '72px', textAlign: 'right' } })
-          inp.addEventListener('input', () => { const n = aMilesimas(inp.value); if (Number.isFinite(n)) S.ajustesPedido[clave(f)] = Math.max(0, n) })
-          return el('div', { clase: 'fila' },
-            el('div', { clase: 'izq' }, el('b', {}, f.descripcion), el('div', { clase: 'sub' }, 'hay ' + unidades(f.stock) + (f.vendido != null ? ' · vendido ' + unidades(f.vendido) : f.vendidas != null ? ' · vendido ' + unidades(f.vendidas) : '') + (f.estado === 'urgente' ? ' · urgente' : ''))),
-            el('div', { clase: 'der' }, inp))
-        })))
-    }
-    if (!alguno) zona.append(el('div', { clase: 'caja' }, el('div', { clase: 'nada' }, !grupos.length ? (S.vistaPedido === 'pedido_hoy' ? 'Todavía no se vendió nada hoy.' : 'Nada para pedir.') : 'Nada coincide.')))
-  }
-  busca.addEventListener('input', () => { S.buscaPedido = busca.value; pintar() })
-  pintar()
-  poner(S.main, 
-    cabecera('Pedidos', nombreSucursal(S.sucursal) + (p ? ' · ' + (p.productos || (p.grupos || []).reduce((s, g) => s + g.filas.length, 0)) + ' productos' : ''), elegirSucursal(() => ir('pedidos'))),
-    el('div', { clase: 'barra-busqueda' },
-      el('div', { clase: 'seg' }, [['pedido_hoy', 'Lo de hoy'], ['pedido_semana', 'La semana'], ['pedido_sugerido', 'Sugerido']].map(([id, t]) => el('button', { clase: S.vistaPedido === id ? 'activo' : '', onclick: () => { S.vistaPedido = id; ir('pedidos') } }, t))),
-      busca),
-    el('div', { clase: 'sub', estilo: { marginBottom: '10px' } }, S.vistaPedido === 'pedido_sugerido' ? 'Lo que conviene pedir para llegar a la próxima visita del proveedor.' : 'Se repone lo mismo que se vendió. Cambiá las cantidades y mandalo por WhatsApp.'),
-    zona)
-}
-
-// --- PRODUCTOS --------------------------------------------------------------------------
-
-async function secProductos () {
-  if (!S.sucursal) return
-  const [lista, provs, rubros] = await Promise.all([leerCatalogo(S.sucursal), leerDatos('proveedores'), leerDatos('rubros')])
-  const proveedores = ((provs[S.sucursal] || {}).datos) || []
-  const listaRubros = ((rubros[S.sucursal] || {}).datos) || []
-  S.buscaProd = S.buscaProd || ''
-  S.filtroProd = S.filtroProd || 'todos'
-  const busca = el('input', { type: 'search', placeholder: 'Buscar por nombre o código…', valor: S.buscaProd })
-  const zona = el('div', {})
-  const filtros = [['todos', 'Todos'], ['negativo', 'En negativo'], ['minimo', 'Bajo el mínimo'], ['sinProv', 'Sin proveedor'], ['sinCosto', 'Sin costo'], ['inactivos', 'Dados de baja']]
-  const pasa = (p) => {
-    if (S.filtroProd === 'inactivos') return !p.activo
-    if (!p.activo) return false
-    if (S.filtroProd === 'negativo') return p.stock < 0
-    if (S.filtroProd === 'minimo') return p.minimo > 0 && p.stock < p.minimo
-    if (S.filtroProd === 'sinProv') return !p.proveedorId
-    if (S.filtroProd === 'sinCosto') return !p.costo
-    return true
-  }
-  let limite = 60
-  const pintar = () => {
-    const filas = lista.filter((p) => pasa(p) && coincide(p.descripcion + ' ' + (p.codigos || []).join(' ') + ' ' + p.rubro + ' ' + p.proveedor, S.buscaProd))
-      .sort((a, b) => b.vendido30 - a.vendido30 || a.descripcion.localeCompare(b.descripcion, 'es'))
-    poner(zona, 
-      el('div', { clase: 'sub', estilo: { marginBottom: '6px' } }, filas.length + ' productos · los que más se venden primero'),
-      filas.slice(0, limite).map((p) => el('div', { clase: 'fila', estilo: { cursor: 'pointer' }, onclick: () => hojaProducto(S.sucursal, p, proveedores, listaRubros) },
-        el('div', { clase: 'izq' }, el('b', {}, p.descripcion), el('div', { clase: 'sub' }, [(p.codigos || [])[0] || 'sin código', p.proveedor || 'sin proveedor'].join(' · '))),
-        el('div', { clase: 'der' }, el('b', { clase: 'num' }, plata(p.precio)),
-          el('div', { clase: 'sub ' + (p.stock < 0 ? '' : '') }, el('span', { estilo: { color: p.stock < 0 ? 'var(--rojo)' : p.minimo && p.stock < p.minimo ? 'var(--ambar)' : '' } }, 'stock ' + unidades(p.stock)))))),
-      filas.length > limite ? el('button', { clase: 'btn ancho', estilo: { marginTop: '8px' }, onclick: () => { limite += 100; pintar() } }, 'Ver más') : null)
-  }
-  busca.addEventListener('input', () => { S.buscaProd = busca.value; limite = 60; pintar() })
-  pintar()
-  poner(S.main, 
-    cabecera('Productos', nombreSucursal(S.sucursal) + ' · tocá un producto para cambiarlo', elegirSucursal(() => ir('productos')),
-      el('button', { clase: 'btn chico', onclick: () => hojaAumento(S.sucursal, proveedores, listaRubros, lista) }, 'Aumentar precios')),
-    el('div', { clase: 'caja' },
-      el('div', { clase: 'barra-busqueda' }, busca),
-      el('div', { clase: 'chips', estilo: { marginBottom: '8px' } }, filtros.map(([id, t]) => el('button', { clase: 'btn chico' + (S.filtroProd === id ? ' primario' : ''), onclick: () => { S.filtroProd = id; ir('productos') } }, t))),
-      zona),
-    await panelOrdenes(S.sucursal))
-  if (S.buscaProd) busca.focus()
-}
-
-// Las ultimas ordenes mandadas a esta sucursal y como les fue.
-async function panelOrdenes (sucursalId) {
-  const { data } = await S.sb.from('pos_ordenes').select('id,tipo,datos,estado,resultado,creado').eq('sucursal_id', sucursalId).order('creado', { ascending: false }).limit(8)
-  if (!data || !data.length) return null
-  const nombre = { producto: 'Cambio de producto', stock: 'Corrección de stock', aumento: 'Aumento de precios', promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular' }
-  return el('div', { clase: 'caja' }, el('h2', {}, 'Lo último que mandaste'),
-    data.map((o) => el('div', { clase: 'fila' },
-      el('div', { clase: 'izq' }, el('b', {}, nombre[o.tipo] || o.tipo), el('div', { clase: 'sub' }, hace(o.creado) + (o.resultado ? ' · ' + (o.resultado.mensaje || o.resultado.error || '') : ''))),
-      el('span', { clase: 'chip ' + (o.estado === 'aplicada' ? 'ok' : o.estado === 'error' ? 'mal' : 'alerta') }, o.estado === 'aplicada' ? '✓ Aplicado' : o.estado === 'error' ? '✗ No se pudo' : '… Esperando la caja'))))
-}
-
-function hojaProducto (sucursalId, p, proveedores, rubros) {
-  const nombre = el('input', { type: 'text', valor: p.descripcion })
-  const precio = el('input', { type: 'text', inputmode: 'decimal', valor: plataExacta(p.precio) })
-  const costo = el('input', { type: 'text', inputmode: 'decimal', valor: p.costo ? plataExacta(p.costo) : '' })
-  const minimo = el('input', { type: 'text', inputmode: 'decimal', valor: p.minimo ? unidades(p.minimo) : '' })
-  const stock = el('input', { type: 'text', inputmode: 'decimal', valor: unidades(p.stock) })
-  const prov = el('select', {}, el('option', { valor: '' }, 'Sin proveedor'), proveedores.map((x) => el('option', { valor: x.id, selected: x.id === p.proveedorId }, x.nombre)))
-  const activo = el('input', { type: 'checkbox' })
-  activo.checked = p.activo
-  const margen = el('div', { clase: 'sub' })
-  const pintarMargen = () => {
-    const pr = aCentavos(precio.value)
-    const co = aCentavos(costo.value)
-    margen.textContent = co > 0 && pr > 0 ? 'Ganancia ' + plata(pr - co) + ' por unidad · ' + pct((pr - co) * 10000 / co) + ' sobre el costo' : ''
-  }
-  precio.addEventListener('input', pintarMargen)
-  costo.addEventListener('input', pintarMargen)
-  pintarMargen()
-  abrirHoja(p.descripcion, [
-    el('div', { clase: 'sub', estilo: { marginBottom: '10px' } }, (p.codigos || []).join(' · ') + (p.rubro ? ' · ' + p.rubro : '') + ' · vendió ' + unidades(p.vendido30) + ' en 30 días'),
-    el('label', { clase: 'campo' }, 'Nombre', nombre),
-    el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Precio ($)', precio), el('label', { clase: 'campo' }, 'Costo ($)', costo)),
-    margen,
-    el('div', { clase: 'dos', estilo: { marginTop: '10px' } }, el('label', { clase: 'campo' }, 'Stock (lo que hay)', stock), el('label', { clase: 'campo' }, 'Stock mínimo', minimo)),
-    el('label', { clase: 'campo' }, 'Proveedor', prov),
-    el('label', { clase: 'campo', estilo: { display: 'flex', gap: '8px', alignItems: 'center' } }, activo, 'Se vende (desactivalo para darlo de baja)'),
-    el('div', { clase: 'sub' }, 'Los cambios los aplica la caja de ' + nombreSucursal(sucursalId) + ' en menos de un minuto.')
-  ], [{ texto: 'Guardar', primario: true, alTocar: async (cerrar) => {
-    const cambios = {}
-    if (nombre.value.trim() && nombre.value.trim() !== p.descripcion) cambios.descripcion = nombre.value.trim()
-    const pr = aCentavos(precio.value)
-    if (!Number.isFinite(pr) || pr < 0) return toast('El precio no es válido')
-    if (pr !== p.precio) cambios.precio = pr
-    const co = costo.value.trim() ? aCentavos(costo.value) : 0
-    if (!Number.isFinite(co) || co < 0) return toast('El costo no es válido')
-    if (co !== (p.costo || 0)) cambios.costo = co
-    const mi = minimo.value.trim() ? aMilesimas(minimo.value) : 0
-    if (Number.isFinite(mi) && mi !== (p.minimo || 0)) cambios.minimo = mi
-    if ((prov.value || null) !== (p.proveedorId || null)) cambios.proveedorId = prov.value || null
-    if (activo.checked !== p.activo) cambios.activo = activo.checked
-    const st = aMilesimas(stock.value)
-    const cambiaStock = Number.isFinite(st) && st !== p.stock
-    if (!Object.keys(cambios).length && !cambiaStock) { cerrar(); return }
-    cerrar()
-    const recargar = () => { if (S.seccion === 'productos') ir('productos') }
-    if (Object.keys(cambios).length) await mandarOrden(sucursalId, 'producto', { productoId: p.id, cambios }, recargar)
-    if (cambiaStock) await mandarOrden(sucursalId, 'stock', { productoId: p.id, cantidad: st, motivo: 'corregido desde el panel' }, recargar)
-    if (S.seccion === 'productos') setTimeout(() => ir('productos'), 600)
-  } }])
-}
-
-function hojaAumento (sucursalId, proveedores, rubros, lista) {
-  const porcentaje = el('input', { type: 'text', inputmode: 'decimal', placeholder: 'Ej: 8' })
-  const prov = el('select', {}, el('option', { valor: '' }, 'Todos los proveedores'), proveedores.map((x) => el('option', { valor: x.id }, x.nombre)))
-  const familias = rubros.filter((r) => !r.padreId).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
-  const rub = el('select', {}, el('option', { valor: '' }, 'Todas las familias'), familias.map((x) => el('option', { valor: x.id }, x.nombre)))
-  let redondeo = 'cien'
-  const seg = el('div', { clase: 'seg' })
-  const pintarSeg = () => { poner(seg, [['ninguno', 'Sin redondear'], ['decena', 'a $10'], ['cincuenta', 'a $50'], ['cien', 'a $100']].map(([id, t]) => el('button', { clase: redondeo === id ? 'activo' : '', onclick: () => { redondeo = id; pintarSeg() } }, t))) }
-  pintarSeg()
-  const cuantos = el('div', { clase: 'sub', estilo: { margin: '8px 0' } })
-  const hijos = {}
-  for (const r of rubros) if (r.padreId) (hijos[r.padreId] = hijos[r.padreId] || []).push(r.id)
-  const rama = (id) => { const s = new Set([id]); const pend = [id]; while (pend.length) for (const h of hijos[pend.pop()] || []) if (!s.has(h)) { s.add(h); pend.push(h) } return s }
-  const contar = () => {
-    const r = rub.value ? rama(rub.value) : null
-    const n = lista.filter((p) => p.activo && (!prov.value || p.proveedorId === prov.value) && (!r || r.has(p.rubroId))).length
-    cuantos.textContent = n + ' productos van a cambiar de precio.'
-  }
-  prov.addEventListener('change', contar)
-  rub.addEventListener('change', contar)
-  contar()
-  abrirHoja('Aumentar precios en ' + nombreSucursal(sucursalId), [
-    el('label', { clase: 'campo' }, 'Cuánto (%)', porcentaje),
-    el('label', { clase: 'campo' }, 'De qué proveedor', prov),
-    el('label', { clase: 'campo' }, 'De qué familia', rub),
-    el('div', { clase: 'campo' }, el('span', { clase: 'chico tenue' }, 'Redondeo'), seg),
-    cuantos,
-    el('div', { clase: 'sub' }, 'Queda anotado en la caja y se puede volver atrás desde Productos → Historial de aumentos.')
-  ], [{ texto: 'Aumentar', primario: true, alTocar: async (cerrar) => {
-    const n = Number(String(porcentaje.value).replace(',', '.'))
-    if (!Number.isFinite(n) || n === 0 || n < -50 || n > 200) return toast('Poné un porcentaje (por ejemplo 8)')
-    cerrar()
-    await mandarOrden(sucursalId, 'aumento', { porcentajeBasis: Math.round(n * 100), redondeo, proveedorId: prov.value || undefined, rubroId: rub.value || undefined, alcance: 'Desde el panel: ' + n + '%' + (prov.value ? ' · ' + prov.selectedOptions[0].textContent : '') + (rub.value ? ' · ' + rub.selectedOptions[0].textContent : '') }, () => { if (S.seccion === 'productos') ir('productos') })
-  } }])
-}
-
-// --- PROMOS -----------------------------------------------------------------------------
-
-async function secPromos () {
-  if (!S.sucursal) return
-  const datos = await leerDatos('promos')
-  const lista = ((datos[S.sucursal] || {}).datos) || []
-  const estado = (p) => (!p.activa ? el('span', { clase: 'chip' }, 'Pausada') : p.vencida ? el('span', { clase: 'chip' }, 'Vencida') : p.vigenteAhora ? el('span', { clase: 'chip ok' }, '● Aplicándose') : el('span', { clase: 'chip alerta' }, 'Programada'))
-  poner(S.main, 
-    cabecera('Promos', nombreSucursal(S.sucursal), elegirSucursal(() => ir('promos')), el('button', { clase: 'btn primario chico', onclick: () => hojaPromo(S.sucursal) }, 'Nueva promo')),
-    el('div', { clase: 'caja' }, lista.length ? lista.map((p) => el('div', { clase: 'fila' },
-      el('div', { clase: 'izq' }, el('b', {}, p.nombre), el('div', { clase: 'sub' }, [p.etiqueta, p.tipo === 'combo' ? p.textoComponentes : p.textoAlcance, p.textoDisparador ? 'llevando ' + p.textoDisparador : '', p.textoVigencia].filter(Boolean).join(' · '))),
-      el('div', { clase: 'der' }, estado(p), el('div', { clase: 'chips', estilo: { marginTop: '6px', justifyContent: 'flex-end' } },
-        el('button', { clase: 'btn chico', onclick: () => mandarOrden(S.sucursal, 'promo_estado', { promoId: p.id, activa: !p.activa }, () => ir('promos')) }, p.activa ? 'Pausar' : 'Activar'),
-        el('button', { clase: 'btn chico peligro', onclick: () => { if (confirm('¿Borrar "' + p.nombre + '"? Las ventas que ya la usaron no cambian.')) mandarOrden(S.sucursal, 'promo_borrar', { promoId: p.id }, () => ir('promos')) } }, 'Borrar')))))
-      : el('div', { clase: 'nada' }, 'No hay promociones en esta sucursal.')),
-    await panelOrdenes(S.sucursal))
-}
-
-async function hojaPromo (sucursalId) {
-  const [lista, rubrosD] = await Promise.all([leerCatalogo(sucursalId), leerDatos('rubros')])
-  const rubros = ((rubrosD[sucursalId] || {}).datos) || []
-  const ruta = (id) => { const x = []; let r = rubros.find((y) => y.id === id); while (r) { x.unshift(r.nombre); r = rubros.find((y) => y.id === r.padreId) } return x.join(' › ') }
-  const nombre = el('input', { type: 'text', placeholder: 'Ej: Finde bebidas 10%', maxlength: '60' })
-  let tipo = 'porcentaje'
-  let alcance = 'productos'
-  const elegidos = []
-  const rubrosElegidos = []
-  const valor = el('input', { type: 'text', inputmode: 'decimal' })
-  const lleva = el('input', { type: 'number', valor: '3', min: '2' })
-  const paga = el('input', { type: 'number', valor: '2', min: '1' })
-  const zonaValor = el('div', {})
-  const segTipo = el('div', { clase: 'seg' })
-  const pintarTipo = () => {
-    poner(segTipo, [['porcentaje', '% off'], ['descuento', '$ menos'], ['precio', 'Precio fijo'], ['nxm', 'Lleva N paga M']].map(([id, t]) => el('button', { clase: tipo === id ? 'activo' : '', onclick: () => { tipo = id; pintarTipo() } }, t)))
-    poner(zonaValor, tipo === 'nxm'
-      ? el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Lleva', lleva), el('label', { clase: 'campo' }, 'Paga', paga))
-      : el('label', { clase: 'campo' }, tipo === 'porcentaje' ? 'Descuento (%)' : tipo === 'precio' ? 'Precio fijo por unidad ($)' : 'Pesos menos por unidad ($)', valor))
-  }
-  pintarTipo()
-  const busca = el('input', { type: 'search', placeholder: 'Buscar producto…' })
-  const resultados = el('div', {})
-  const chips = el('div', { clase: 'chips', estilo: { margin: '6px 0' } })
-  const selRubro = el('select', {}, el('option', { valor: '' }, 'Elegí un rubro…'), rubros.map((r) => el('option', { valor: r.id }, ruta(r.id))).sort((a, b) => a.textContent.localeCompare(b.textContent, 'es')))
-  const zonaAlcance = el('div', {})
-  const segAlcance = el('div', { clase: 'seg' })
-  const pintarChips = () => {
-    poner(chips, (alcance === 'productos' ? elegidos.map((p) => [p.id, p.descripcion]) : rubrosElegidos.map((id) => [id, ruta(id)])).map(([id, t]) =>
-      el('span', { clase: 'chip' }, t, el('button', { estilo: { background: 'none', border: 0, cursor: 'pointer', color: 'inherit' }, onclick: () => {
-        const arr = alcance === 'productos' ? elegidos : rubrosElegidos
-        const i = arr.findIndex((x) => (x.id || x) === id); if (i >= 0) arr.splice(i, 1); pintarChips()
-      } }, '×'))))
-  }
-  const pintarAlcance = () => {
-    poner(segAlcance, [['productos', 'Productos'], ['rubros', 'Rubros']].map(([id, t]) => el('button', { clase: alcance === id ? 'activo' : '', onclick: () => { alcance = id; pintarAlcance() } }, t)))
-    poner(zonaAlcance, alcance === 'productos' ? [busca, resultados] : [selRubro])
-    pintarChips()
-  }
-  busca.addEventListener('input', () => {
-    limpiar(resultados)
-    if (busca.value.trim().length < 2) return
-    for (const p of lista.filter((x) => x.activo && coincide(x.descripcion + ' ' + (x.codigos || []).join(' '), busca.value)).slice(0, 8)) {
-      resultados.append(el('div', { clase: 'fila', estilo: { cursor: 'pointer' }, onclick: () => { if (!elegidos.some((x) => x.id === p.id)) elegidos.push(p); busca.value = ''; limpiar(resultados); pintarChips() } },
-        el('span', { clase: 'izq' }, p.descripcion), el('span', { clase: 'num sub' }, plata(p.precio))))
-    }
-  })
-  selRubro.addEventListener('change', () => { if (selRubro.value && !rubrosElegidos.includes(selRubro.value)) rubrosElegidos.push(selRubro.value); selRubro.value = ''; pintarChips() })
-  pintarAlcance()
-  const dias = new Set([0, 1, 2, 3, 4, 5, 6])
-  const segDias = el('div', { clase: 'chips' })
-  const pintarDias = () => { poner(segDias, [1, 2, 3, 4, 5, 6, 0].map((d) => el('button', { clase: 'btn chico' + (dias.has(d) ? ' primario' : ''), onclick: () => { if (dias.has(d) && dias.size > 1) dias.delete(d); else dias.add(d); pintarDias() } }, DIAS[d]))) }
-  pintarDias()
-  abrirHoja('Promo nueva en ' + nombreSucursal(sucursalId), [
-    el('label', { clase: 'campo' }, 'Nombre (sale en el ticket)', nombre),
-    el('div', { clase: 'campo' }, el('span', { clase: 'chico tenue' }, 'Qué descuento'), segTipo), zonaValor,
-    el('div', { clase: 'campo' }, el('span', { clase: 'chico tenue' }, 'A qué productos'), segAlcance), zonaAlcance, chips,
-    el('div', { clase: 'campo' }, el('span', { clase: 'chico tenue' }, 'Qué días'), segDias),
-    el('div', { clase: 'sub' }, 'Para combos y "llevando uno, descuento en otro", usá la pantalla Promos de la caja.')
-  ], [{ texto: 'Crear promo', primario: true, alTocar: async (cerrar) => {
-    const promo = { nombre: nombre.value.trim(), tipo, alcance, productoIds: elegidos.map((p) => p.id), rubroIds: rubrosElegidos.slice(), dias: dias.size === 7 ? [] : [...dias], activa: true }
-    if (!promo.nombre) return toast('Ponele un nombre')
-    if (tipo === 'nxm') { promo.lleva = Number(lleva.value); promo.paga = Number(paga.value) }
-    else if (tipo === 'porcentaje') promo.valor = Math.round(Number(String(valor.value).replace(',', '.')) * 100)
-    else promo.valor = aCentavos(valor.value)
-    if (tipo !== 'nxm' && !(promo.valor > 0)) return toast('Completá el valor del descuento')
-    if (alcance === 'productos' ? !promo.productoIds.length : !promo.rubroIds.length) return toast('Elegí a qué productos se aplica')
-    cerrar()
-    await mandarOrden(sucursalId, 'promo_guardar', { promo }, () => { if (S.seccion === 'promos') ir('promos') })
-  } }])
-}
-
-// --- AVISOS ---------------------------------------------------------------------------------
-
-async function contarAvisos () {
-  try {
-    let visto = ''
-    try { visto = localStorage.getItem('bs.avisosVistos') || '' } catch (e) {}
-    const { count } = await S.sb.from('pos_avisos').select('id', { count: 'exact', head: true }).gt('creado', visto || '1970-01-01')
-    for (const i of document.querySelectorAll('[data-insignia]')) { i.textContent = count > 99 ? '99+' : String(count || ''); i.style.display = count ? '' : 'none' }
-  } catch (e) { /* sin avisos */ }
-}
-
-async function secAvisos () {
-  const [{ data }, anul] = await Promise.all([
-    S.sb.from('pos_avisos').select('*').order('creado', { ascending: false }).limit(120),
-    leerDatos('anulaciones').catch(() => ({}))
+async function secInicio () {
+  const todas = !!leerLocal('bs.inicioTodas', false) && S.sucursales.length > 1
+  const [resumenes, reps, hists, anul, deudas] = await Promise.all([
+    leerResumen(true),
+    leerDatos('reportes').catch(() => ({})),
+    leerDatos('historial').catch(() => ({})),
+    leerDatos('anulaciones').catch(() => ({})),
+    leerDatos('deudas').catch(() => ({}))
   ])
-  try { localStorage.setItem('bs.avisosVistos', new Date().toISOString()) } catch (e) {}
-  contarAvisos()
-  const tono = { cierre: 'mal', anulacion: 'alerta', pedido_anulacion: 'alerta', personal: 'mal', caja: 'mal' }
-  const icono = { cierre: '$', anulacion: '↺', pedido_anulacion: '?', personal: '☺', caja: '⏻' }
-  const pedidos = []
-  for (const [id, f] of Object.entries(anul)) for (const p of f.datos || []) pedidos.push(Object.assign({ sucursalId: id, sucursal: f.nombre }, p))
-  let dia = ''
-  const filas = []
-  for (const a of data || []) {
-    const d = a.creado.slice(0, 10)
-    if (d !== dia) { dia = d; filas.push(el('h3', {}, fechaCorta(d))) }
-    filas.push(el('div', { clase: 'fila' },
-      el('div', { clase: 'izq' }, el('b', {}, el('span', { clase: 'chip ' + (tono[a.tipo] || '') }, icono[a.tipo] || '•'), ' ', a.titulo), el('div', { clase: 'sub' }, (a.nombre || '') + ' · ' + hora(a.creado) + (a.texto ? ' · ' + a.texto : '')))))
+  const ids = todas ? S.sucursales.map((x) => x.id) : [S.sucursal]
+  const filas = resumenes.filter((r) => ids.includes(r.sucursal_id))
+  const hoy = hoyISO()
+  const suma = (fn) => filas.reduce((a, f) => a + (fn(f.datos || {}, f.sucursal_id) || 0), 0)
+  const total = suma((d) => d.total)
+  const ventas = suma((d) => d.ventas)
+  const unid = suma((d) => d.unidades)
+  const ahora = ordenHora(new Date().getHours())
+  // Ayer hasta esta misma hora: si hoy vendio menos, es contra lo comparable.
+  const ayerAEstaHora = ids.reduce((a, id) => {
+    const r = datosDe(reps, id)
+    return a + (r && r.ayer ? r.ayer.horas.reduce((s, x, h) => s + (ordenHora(h) <= ahora ? x[0] : 0), 0) : 0)
+  }, 0)
+  const ayerTicket = ids.reduce((a, id) => { const r = datosDe(reps, id); return a + (r && r.ayer ? r.ayer.total : 0) }, 0)
+  const ayerVentas = ids.reduce((a, id) => { const r = datosDe(reps, id); return a + (r && r.ayer ? r.ayer.ventas : 0) }, 0)
+  // El mes contra el mes pasado hasta el mismo dia.
+  const mesIni = hoy.slice(0, 8) + '01'
+  const [a, m] = hoy.split('-').map(Number)
+  const antIni = isoLocal(new Date(a, m - 2, 1))
+  const antFin = isoLocal(new Date(a, m - 2, Math.min(Number(hoy.slice(8)), new Date(a, m - 1, 0).getDate())))
+  let mes = 0
+  let mesAnt = 0
+  for (const id of ids) for (const d of datosDe(hists, id) || []) {
+    if (d.dia >= mesIni && d.dia <= hoy) mes += d.total
+    if (d.dia >= antIni && d.dia <= antFin) mesAnt += d.total
   }
-  poner(S.main, 
-    cabecera('Avisos', 'Lo que pasó en los locales y te conviene saber'),
-    await panelNotificaciones(),
-    pedidos.length ? el('div', { clase: 'caja' }, el('h2', {}, 'Ventas a cuenta para anular'),
-      pedidos.map((p) => el('div', { clase: 'fila', estilo: { display: 'block' } },
-        el('div', { estilo: { display: 'flex', justifyContent: 'space-between', gap: '8px' } },
-          el('div', { clase: 'izq' }, el('b', {}, (p.cliente || 'Sin cliente') + ' · ' + plata(p.total)), el('div', { clase: 'sub' }, p.sucursal + ' · ' + p.numero + ' · pidió ' + p.usuario + ': ' + p.motivo)),
-          el('div', { clase: 'chips' },
-            el('button', { clase: 'btn chico peligro', onclick: () => { const m = prompt('Motivo de la anulación', p.motivo || ''); if (m) mandarOrden(p.sucursalId, 'anular_venta', { ventaId: p.ventaId, motivo: m }, () => ir('avisos')) } }, 'Anular'),
-            el('button', { clase: 'btn chico', onclick: () => mandarOrden(p.sucursalId, 'anulacion_rechazar', { ventaId: p.ventaId }, () => ir('avisos')) }, 'No anular'))),
-        el('div', { clase: 'sub' }, (p.items || []).map((it) => unidades(it.cantidad) + ' × ' + it.descripcion).join(' · '))))) : null,
-    el('div', { clase: 'caja' }, filas.length ? filas : el('div', { clase: 'nada' }, 'Todavía no hubo avisos.')))
+  const gananciaMes = ids.reduce((s, id) => { const r = datosDe(reps, id); return s + (r && r.mes ? r.mes.ganancia : 0) }, 0)
+  const sinCostoMes = ids.some((id) => { const r = datosDe(reps, id); return r && r.mes && r.mes.sinCosto })
+  const stockBajo = suma((d) => (d.stock ? (d.stock.negativos || 0) + (d.stock.bajoMinimo || 0) : 0))
+  const negativos = suma((d) => (d.stock ? d.stock.negativos || 0 : 0))
+  const porCobrar = suma((d) => (d.deuda ? d.deuda.total : 0))
+  const cajas = filas.map((f) => ({ nombre: f.nombre, caja: (f.datos || {}).caja || {} }))
+  const enCaja = cajas.reduce((s, x) => s + (x.caja.abierta ? x.caja.efectivoEsperado || 0 : 0), 0)
+  const cajasAbiertas = cajas.filter((x) => x.caja.abierta)
+
+  // Lo que conviene mirar ahora.
+  const alertas = []
+  const pedAnular = Object.values(anul).reduce((s, x) => s + ((x.datos || []).length), 0)
+  if (pedAnular) alertas.push(['alerta', 'ventas', pedAnular + (pedAnular === 1 ? ' venta a cuenta para anular' : ' ventas a cuenta para anular'), 'La pidieron desde la caja', () => ir('avisos')])
+  for (const id of ids) {
+    const dd = datosDe(deudas, id)
+    if (dd && (dd.vencido || dd.venceHoy)) alertas.push([dd.vencido ? 'mal' : 'alerta', 'apagar', (dd.vencido ? 'Pagos a proveedores vencidos: ' + plata(dd.vencido) : 'Hoy vence: ' + plata(dd.venceHoy)), nombreSucursal(id) + ' · A pagar', () => { cambiarSucursalSinPintar(id); ir('apagar') }])
+  }
+  for (const f of filas) {
+    const d = f.datos || {}
+    const atraso = Date.now() - new Date(f.actualizado).getTime()
+    if (atraso > 10 * 60000) alertas.push(['mal', 'nube', 'La caja de ' + f.nombre + ' no se conecta', 'Última vez ' + hace(f.actualizado) + '. Los números pueden estar atrasados.', () => hojaConexion()])
+    else if (d.caja && !d.caja.abierta) alertas.push(['alerta', 'caja', 'La caja de ' + f.nombre + ' está cerrada', 'Nadie abrió turno', () => { cambiarSucursalSinPintar(f.sucursal_id); ir('caja') }])
+  }
+  if (negativos) alertas.push(['alerta', 'faltantes', negativos + (negativos === 1 ? ' producto en negativo' : ' productos en negativo'), 'Se vendió más de lo que el sistema tenía', () => ir('faltantes')])
+  const esperando = S.cola.length + S.esperando.size
+  if (esperando) alertas.push(['info', 'nube', esperando + (esperando === 1 ? ' cambio en camino' : ' cambios en camino'), S.cola.length ? 'Se mandan cuando vuelva internet' : 'Esperando que la caja lo aplique', () => hojaConexion()])
+
+  const accesos = el('div', { clase: 'accesos' }, accesosElegidos().map((k) => el('button', { clase: 'acceso', onclick: ACCESOS[k].fn }, el('span', { clase: 'ico' }, icono(ACCESOS[k].icono)), ACCESOS[k].nombre)))
+
+  const masViejo = filas.map((f) => f.actualizado).sort()[0]
+  pintarSeccion('inicio',
+    el('button', { clase: 'buscar-falso', onclick: () => abrirBuscador() }, icono('buscar'), 'Buscar productos, clientes, ventas…',
+      el('span', { clase: 'fin' }, el('span', { clase: 'btn-ico', estilo: { width: '30px', height: '30px', border: '0', background: 'none' }, onclick: (ev) => { ev.stopPropagation(); escanearYAbrir() } }, icono('escanear')))),
+    S.sucursales.length > 1 ? el('div', { clase: 'seg', estilo: { marginBottom: '12px' } },
+      el('button', { clase: todas ? '' : 'activo', onclick: () => { guardarLocal('bs.inicioTodas', false); render() } }, nombreSucursal(S.sucursal)),
+      el('button', { clase: todas ? 'activo' : '', onclick: () => { guardarLocal('bs.inicioTodas', true); render() } }, 'Todas')) : null,
+    el('div', { clase: 'kpis' },
+      kpi('Ventas de hoy', plata(total), [ventas + (ventas === 1 ? ' venta · ' : ' ventas · '), delta(total, ayerAEstaHora || null, 'ayer a esta hora')], { clase: 'principal', alTocar: () => ir('ventas') }),
+      kpi('Ventas del mes', plata(mes), delta(mes, mesAnt || null, 'mes pasado'), { alTocar: () => ir('reportes', { periodo: 'mes' }) }),
+      kpi('Ganancia del mes', plata(gananciaMes), sinCostoMes ? 'estimada · hay días sin costo' : 'estimada, sobre el costo', { alTocar: () => ir('reportes', { periodo: 'mes' }) }),
+      kpi('Productos vendidos', unidades(unid), 'unidades hoy', { alTocar: () => ir('reportes', { periodo: 'hoy' }) }),
+      kpi('Ticket promedio', plata(ventas ? total / ventas : 0), delta(ventas ? total / ventas : 0, ayerVentas ? ayerTicket / ayerVentas : null, 'ayer'), { alTocar: () => ir('reportes', { periodo: 'hoy' }) }),
+      kpi('Stock bajo', String(stockBajo), negativos ? negativos + ' en negativo' : 'bajo el mínimo', { clase: negativos ? 'mal' : stockBajo ? 'alerta' : '', alTocar: () => ir('faltantes') }),
+      kpi('Por cobrar', plata(porCobrar), 'cuentas corrientes', { alTocar: () => ir('clientes') }),
+      kpi('En la caja', cajasAbiertas.length ? plata(enCaja) : 'Cerrada', cajasAbiertas.length ? 'efectivo · turno de ' + cajasAbiertas.map((x) => x.caja.usuario).join(', ') : 'sin turno abierto', { clase: cajasAbiertas.length ? '' : 'alerta', alTocar: () => ir('caja') }),
+      kpi('Gastos de hoy', plata(suma((d) => d.gastosDia)), 'pagados hoy', { alTocar: () => ir('gastos') })),
+    alertas.length ? el('div', { clase: 'alertas' }, alertas.slice(0, 5).map(([tono, ic, titulo, sub, fn]) => el('div', { clase: 'alerta-fila ' + tono, onclick: fn },
+      el('span', { clase: 'ico' }, icono(ic)), el('div', { clase: 'txt' }, el('b', {}, titulo), el('span', { clase: 'sub' }, sub)), icono('flecha')))) : null,
+    el('div', { clase: 'tarjeta-cab' }, el('h3', { estilo: { margin: '4px 0' } }, 'Accesos rápidos'), el('button', { clase: 'btn chico', estilo: { border: 0, background: 'none', color: 'var(--acento)' }, onclick: () => hojaAccesos() }, 'Editar')),
+    accesos,
+    filas.length ? el('h3', {}, 'Hoy, hora por hora') : null,
+    filas.map((f) => {
+      const d = f.datos || {}
+      const horas = (d.porHora || []).map((x, h) => ({ h, v: x[0], n: x[1] })).sort((a, b) => ordenHora(a.h) - ordenHora(b.h)).filter((x) => ordenHora(x.h) <= ahora)
+      return el('div', { clase: 'tarjeta' },
+        el('div', { clase: 'tarjeta-cab' }, el('h2', {}, f.nombre), el('span', { clase: 'sub' }, hace(f.actualizado))),
+        horas.length && d.total ? barras(horas, (x) => String(x.h).padStart(2, '0') + ':00 · ' + plata(x.v) + ' · ' + x.n + ' ventas', (x) => (x.h % 3 === 0 ? String(x.h) : '')) : el('div', { clase: 'sub' }, 'Todavía no hay ventas hoy.'),
+        (d.top || []).length ? el('div', { estilo: { marginTop: '12px' } }, el('div', { clase: 'sub', estilo: { marginBottom: '6px' } }, 'Lo más vendido hoy'),
+          ranking(d.top.map((p) => ({ n: p.descripcion, texto: unidades(p.unidades) + ' u', v: p.unidades })))) : null)
+    }),
+    !filas.length ? el('div', { clase: 'tarjeta' }, vacio('Todavía no subió datos ninguna caja. En la caja: Configuración → Ver desde el celular.', 'nube')) : null,
+    el('p', { clase: 'sub', estilo: { textAlign: 'center', marginTop: '14px' } }, masViejo ? 'Actualizado ' + hace(masViejo) : ''))
+  S.reloj = setInterval(() => { if (!document.hidden && S.seccion === 'inicio' && !S.hojas.length) render() }, 60000)
 }
 
-function urlBase64AUint8 (b64) {
-  const relleno = '='.repeat((4 - b64.length % 4) % 4)
-  const bin = atob((b64 + relleno).replace(/-/g, '+').replace(/_/g, '/'))
-  return Uint8Array.from([...bin].map((c) => c.charCodeAt(0)))
-}
+function cambiarSucursalSinPintar (id) { S.sucursal = id; guardarLocal('bs.sucursal', id); pintarArriba() }
 
-async function panelNotificaciones () {
-  const caja = el('div', { clase: 'caja' }, el('h2', {}, 'Avisos en este celular'))
-  const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
-  const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    caja.append(el('p', { clase: 'tenue' }, esIOS && !instalada
-      ? 'En el iPhone, primero agregá esta página a la pantalla de inicio: tocá Compartir y "Agregar a inicio". Después abrila desde el ícono y volvé acá.'
-      : 'Este navegador no puede recibir avisos.'))
-    return caja
+function hojaAccesos () {
+  let elegidos = accesosElegidos()
+  const zona = el('div', { clase: 'lista' })
+  const pintar = () => {
+    const todos = elegidos.concat(Object.keys(ACCESOS).filter((k) => !elegidos.includes(k)))
+    poner(zona, todos.map((k) => {
+      const esta = elegidos.includes(k)
+      const i = elegidos.indexOf(k)
+      return el('div', { clase: 'item' + (esta ? ' sel' : '') },
+        el('button', { clase: 'marca-sel', estilo: { cursor: 'pointer', background: esta ? '' : 'none' }, 'aria-label': esta ? 'Sacar' : 'Agregar', onclick: () => { elegidos = esta ? elegidos.filter((x) => x !== k) : elegidos.concat([k]); pintar() } }, esta ? icono('ok') : null),
+        el('span', { clase: 'ico', estilo: { color: 'var(--acento)' } }, icono(ACCESOS[k].icono)),
+        el('div', { clase: 'cuerpo' }, el('b', {}, ACCESOS[k].nombre)),
+        esta ? el('div', { clase: 'rapidas' },
+          el('button', { clase: 'btn-ico', disabled: i === 0, 'aria-label': 'Subir', onclick: () => { if (i > 0) { elegidos.splice(i - 1, 0, elegidos.splice(i, 1)[0]); pintar() } } }, icono('subir')),
+          el('button', { clase: 'btn-ico', 'aria-label': 'Bajar', onclick: () => { if (i < elegidos.length - 1) { elegidos.splice(i + 1, 0, elegidos.splice(i, 1)[0]); pintar() } } }, icono('bajar'))) : null)
+    }))
   }
-  // Si el que recibe los avisos no se pudo instalar, no se espera para siempre.
-  const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((r) => setTimeout(() => r(null), 4000))])
-  if (!reg) { caja.append(el('p', { clase: 'tenue' }, 'Los avisos no están disponibles en este navegador ahora. Probá recargar la página.')); return caja }
-  const actual = await reg.pushManager.getSubscription()
-  const estado = el('p', { clase: 'tenue' })
-  const boton = el('button', { clase: 'btn primario' })
-  const pintar = (sub) => {
-    estado.textContent = sub ? '✓ Este ' + (esIOS || /android/i.test(navigator.userAgent) ? 'celular' : 'navegador') + ' recibe los avisos: faltante al cerrar la caja, venta anulada, empleado que no llegó, caja cerrada, pedidos de anulación.' : 'Activalos para que te llegue una notificación cuando pasa algo importante, aunque no tengas la página abierta.'
-    boton.textContent = sub ? 'Desactivar avisos' : 'Activar avisos'
-    boton.className = 'btn' + (sub ? '' : ' primario')
-  }
-  pintar(actual)
-  boton.addEventListener('click', async () => {
-    const sub = await reg.pushManager.getSubscription()
-    if (sub) {
-      await S.sb.from('pos_suscripciones').delete().eq('endpoint', sub.endpoint)
-      await sub.unsubscribe()
-      pintar(null)
-      return
-    }
-    const { data } = await S.sb.from('pos_datos').select('datos').eq('sucursal_id', '_').eq('clave', 'vapid_publica').maybeSingle()
-    if (!data) return toast('Todavía no está listo: la caja tiene que conectarse una vez con la versión nueva.', 6)
-    const permiso = await Notification.requestPermission()
-    if (permiso !== 'granted') return toast('Sin permiso para avisos. Se habilita en los ajustes del celular.', 6)
-    try {
-      const nueva = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64AUint8(data.datos.publica) })
-      const { error } = await S.sb.from('pos_suscripciones').upsert({ endpoint: nueva.endpoint, datos: nueva.toJSON(), email: S.email.toLowerCase() })
-      if (error) throw error
-      pintar(nueva)
-      toast('Listo: los avisos llegan a este ' + (esIOS ? 'celular' : 'dispositivo'))
-    } catch (err) { toast('No se pudo activar: ' + err.message, 6) }
+  pintar()
+  abrirHoja({
+    titulo: 'Accesos rápidos',
+    cuerpo: el('div', {}, el('p', { clase: 'sub' }, 'Elegí cuáles ver en el inicio y en qué orden.'), zona),
+    botones: [
+      { texto: 'Volver a los de fábrica', alTocar: () => { elegidos = ACCESOS_DE_FABRICA.slice(); pintar() } },
+      { texto: 'Guardar', primario: true, alTocar: () => { guardarLocal('bs.accesos', elegidos); cerrarHoja(); if (S.seccion === 'inicio') render() } }
+    ]
   })
-  caja.append(estado, boton)
-  if (esIOS && !instalada) caja.append(el('p', { clase: 'sub', estilo: { marginTop: '10px' } }, 'En iPhone los avisos funcionan con la página agregada a la pantalla de inicio (Compartir → Agregar a inicio).'))
-  return caja
 }
 
-// --- MAS (celular) ---------------------------------------------------------------------------
+// --- BUSCADOR GLOBAL ------------------------------------------------------------------
+//
+// Productos, clientes, proveedores y ventas en un solo lugar. Adivina que se
+// busca: un codigo de barras va directo al producto; "C1-000812" a la venta.
 
-function secMas () {
-  poner(S.main, 
-    cabecera('Más', S.email),
-    el('div', { clase: 'caja' }, ['cierres', 'faltantes', 'promos', 'avisos'].map((id) => el('div', { clase: 'fila', estilo: { cursor: 'pointer' }, onclick: () => ir(id) },
-      el('b', {}, SECCIONES[id].ic + '  ' + SECCIONES[id].nombre), id === 'avisos' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : el('span', { clase: 'sub' }, '›')))),
-    el('div', { clase: 'caja' },
-      el('div', { clase: 'fila' }, el('span', {}, 'Tema'), el('div', { clase: 'seg' }, [['auto', 'Automático'], ['dark', 'Oscuro'], ['light', 'Claro']].map(([id, t]) => el('button', { clase: (localStorage.getItem('bs.tema') || 'auto') === id ? 'activo' : '', onclick: () => { try { localStorage.setItem('bs.tema', id) } catch (e) {} aplicarTema(); secMas() } }, t)))),
-      el('div', { clase: 'fila', estilo: { cursor: 'pointer' }, onclick: salir }, el('span', { estilo: { color: 'var(--rojo)' } }, 'Salir'), el('span', { clase: 'sub' }, '›'))))
-  contarAvisos()
+async function abrirBuscador (inicial) {
+  if (document.querySelector('.busqueda-global')) return
+  const input = el('input', { type: 'search', placeholder: 'Producto, código, cliente, proveedor o ticket…', autocomplete: 'off', enterkeyhint: 'search' })
+  const res = el('div', { clase: 'res' })
+  const cerrar = () => { caja.remove(); if (history.state && history.state.buscar) { S.ignorarPop++; history.back() } }
+  const caja = el('div', { clase: 'busqueda-global', role: 'dialog', 'aria-label': 'Buscar' },
+    el('div', { clase: 'cab' },
+      el('div', { clase: 'buscador', estilo: { flex: '1', margin: 0 } }, icono('buscar'), input),
+      el('button', { clase: 'btn-ico', 'aria-label': 'Escanear', onclick: () => { cerrar(); escanearYAbrir() } }, icono('escanear')),
+      el('button', { clase: 'btn chico', estilo: { border: 0 }, onclick: cerrar }, 'Cerrar')),
+    res)
+  document.body.append(caja)
+  history.pushState({ buscar: true }, '', location.hash)
+  input.focus()
+  input.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') cerrar() })
+  poner(res, el('p', { clase: 'sub', estilo: { padding: '10px 2px' } }, 'Escribí para buscar en ' + nombreSucursal(S.sucursal) + '. Un código de barras te lleva directo al producto.'))
+  let datos = null
+  const cargar = async () => {
+    if (datos) return datos
+    const [cat, cli, prov, vh, va] = await Promise.all([
+      leerCatalogo(S.sucursal).catch(() => []), leerDatos('clientes').catch(() => ({})), leerDatos('proveedores').catch(() => ({})),
+      leerDatos('ventas_hoy').catch(() => ({})), leerDatos('ventas_ayer').catch(() => ({}))
+    ])
+    datos = { cat, cli: datosDe(cli) || [], prov: datosDe(prov) || [], ventas: (datosDe(vh) || []).concat(datosDe(va) || []) }
+    return datos
+  }
+  let espera = null
+  const buscar = async () => {
+    const q = input.value.trim()
+    if (!q) return
+    const d = await cargar()
+    const grupos = []
+    const esCodigo = /^\d{6,14}$/.test(q)
+    const esTicket = /^[a-z]{1,3}\d*-?\d{2,}$/i.test(q)
+    if (esCodigo) {
+      const p = d.cat.find((x) => (x.codigos || []).includes(q))
+      if (p) grupos.push(['Producto con ese código', [itemProducto(p, () => { cerrar(); hojaProducto(p) })]])
+      else grupos.push(['Ese código no está cargado', [el('button', { clase: 'item', onclick: () => { cerrar(); hojaNuevoProducto({ codigo: q }) } }, el('span', { clase: 'ico', estilo: { color: 'var(--acento)' } }, icono('sumar')), el('div', { clase: 'cuerpo' }, el('b', {}, 'Crear producto con el código ' + q)))]])
+    }
+    const ventas = d.ventas.filter((v) => esTicket ? sinTildes(v.n).indexOf(sinTildes(q)) >= 0 : coincide(v.n + ' ' + v.c, q)).slice(0, 5)
+    if (ventas.length && esTicket) grupos.push(['Ventas', ventas.map((v) => itemVenta(v, () => { cerrar(); hojaVenta(v, S.sucursal) }))])
+    const prods = d.cat.filter((p) => p.activo && coincide(p.descripcion + ' ' + (p.codigos || []).join(' ') + ' ' + p.proveedor + ' ' + p.rubro, q))
+      .sort((a, b) => b.vendido30 - a.vendido30).slice(0, 8)
+    if (prods.length && !esCodigo) grupos.push(['Productos', prods.map((p) => itemProducto(p, () => { cerrar(); hojaProducto(p) }))])
+    const clis = d.cli.filter((c) => coincide(c.nombre + ' ' + c.telefono + ' ' + c.documento, q)).slice(0, 5)
+    if (clis.length) grupos.push(['Clientes', clis.map((c) => itemCliente(c, () => { cerrar(); hojaCliente(c) }))])
+    const provs = d.prov.filter((p) => coincide(p.nombre + ' ' + (p.telefono || '') + ' ' + (p.cuit || ''), q)).slice(0, 4)
+    if (provs.length) grupos.push(['Proveedores', provs.map((p) => el('button', { clase: 'item', onclick: () => { cerrar(); hojaProveedor(p) } },
+      el('div', { clase: 'cuerpo' }, el('b', {}, p.nombre), el('div', { clase: 'sub' }, (p.productos || 0) + ' productos' + (p.deuda ? ' · le debés ' + plata(p.deuda) : ''))), icono('flecha')))])
+    if (ventas.length && !esTicket) grupos.push(['Ventas', ventas.map((v) => itemVenta(v, () => { cerrar(); hojaVenta(v, S.sucursal) }))])
+    poner(res, grupos.length
+      ? grupos.map(([t, items]) => [el('h3', {}, t), el('div', { clase: 'tarjeta sin-relleno' }, el('div', { clase: 'lista' }, items))])
+      : vacio('No encontré nada con "' + q + '".', 'buscar',
+        el('button', { clase: 'btn', onclick: () => { cerrar(); hojaNuevoProducto({ descripcion: q }) } }, icono('sumar'), 'Crear producto "' + q + '"')))
+  }
+  input.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(buscar, 120) })
+  if (inicial) { input.value = inicial; buscar() }
 }
+
+// --- tema -------------------------------------------------------------------------
 
 function aplicarTema () {
-  let t = 'auto'
-  try { t = localStorage.getItem('bs.tema') || 'auto' } catch (e) {}
+  const t = leerLocal('bs.tema', 'auto')
   if (t === 'auto') document.documentElement.removeAttribute('data-theme')
   else document.documentElement.setAttribute('data-theme', t)
 }
 
-// --- la hoja (ventana que sube desde abajo) ------------------------------------------------
+seccion('inicio', { nombre: 'Inicio', icono: 'inicio', grupo: 'principal', fn: secInicio })
 
-function abrirHoja (titulo, cuerpo, botones) {
-  const cerrar = () => { telon.remove(); document.removeEventListener('keydown', tecla) }
-  const tecla = (ev) => { if (ev.key === 'Escape') cerrar() }
-  const telon = el('div', { clase: 'telon', onclick: (ev) => { if (ev.target === telon) cerrar() } },
-    el('div', { clase: 'hoja', role: 'dialog', 'aria-label': titulo },
-      el('div', { clase: 'titulo-hoja' }, el('h2', {}, titulo), el('button', { clase: 'cerrar', 'aria-label': 'Cerrar', onclick: cerrar }, '×')),
-      cuerpo,
-      el('div', { clase: 'acciones' }, el('button', { clase: 'btn', onclick: cerrar }, 'Cancelar'),
-        (botones || []).map((b) => el('button', { clase: 'btn' + (b.primario ? ' primario' : ''), onclick: () => b.alTocar(cerrar) }, b.texto)))))
-  document.addEventListener('keydown', tecla)
-  document.body.append(telon)
-  const primero = telon.querySelector('input, select')
-  if (primero && window.innerWidth > 820) primero.focus()
-}
-
-arrancar()
+document.addEventListener('DOMContentLoaded', arrancar)
