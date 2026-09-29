@@ -42,6 +42,10 @@ const S = {
   // hoja y abrir otra cosa enseguida, sin que el 'atras' se coma lo nuevo).
   trasAtras: []
 }
+// La version de la app. Al abrirla (o al volver a ella) se fija si hay una
+// nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
+// abierta en memoria y si no, seguiria la vieja por dias.
+const VERSION_APP = '11.2'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -471,8 +475,23 @@ async function proyectoRef () {
   return ''
 }
 
+async function buscarVersionNueva () {
+  try {
+    const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })
+    if (!r.ok) return
+    const { version } = await r.json()
+    if (!version || version === VERSION_APP) return
+    // No se recarga en medio de algo (una ventana abierta, la camara).
+    if (S.hojas.length || S.cerrarLector || document.querySelector('.busqueda-global')) return
+    if (leerLocal('bs.recargadaA', '') === version) return
+    guardarLocal('bs.recargadaA', version)
+    location.reload()
+  } catch (e) { /* sin internet: sigue la que hay */ }
+}
+
 async function arrancar () {
   aplicarTema()
+  buscarVersionNueva()
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {})
   S.proyecto = await proyectoRef()
   if (!S.proyecto) return pantallaMensaje('Falta el link', 'Abrí el link completo que te dio el programa de la caja (Configuración → Ver desde el celular).')
@@ -577,7 +596,7 @@ async function entrarAlPanel (sesion) {
   pintarArmazon()
   const m = /^#\/(\w+)/.exec(location.hash)
   ir(m && SECCIONES[m[1]] ? m[1] : 'inicio', {}, true)
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { vaciarCola(); if (S.seccion === 'inicio' && !S.hojas.length) render() } })
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { buscarVersionNueva(); vaciarCola(); if (S.seccion === 'inicio' && !S.hojas.length) render() } })
   window.addEventListener('online', () => vaciarCola())
   window.addEventListener('offline', () => red(false))
   setInterval(() => { if (S.cola.length) vaciarCola() }, 30000)

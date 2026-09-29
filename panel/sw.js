@@ -4,8 +4,8 @@
 //   - Recibe las notificaciones aunque la app este cerrada.
 // Los datos del negocio los guarda la app misma (IndexedDB), no esto.
 
-const VERSION = 'bs-panel-v4'
-const APP = ['./', 'index.html', 'estilos.css', 'app.js', 'lector.js', 'productos.js', 'negocio.js', 'otros.js', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const VERSION = 'bs-panel-v5'
+const APP = ['./', 'index.html', 'estilos.css?v=11.2', 'app.js?v=11.2', 'lector.js?v=11.2', 'productos.js?v=11.2', 'negocio.js?v=11.2', 'otros.js?v=11.2', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {
@@ -30,7 +30,7 @@ self.addEventListener('fetch', (ev) => {
   }
   // La app: primero la version nueva; sin internet, la guardada.
   if (url.origin === self.location.origin) {
-    ev.respondWith(fetch(req).then((resp) => {
+    ev.respondWith(fetch(req, { cache: 'no-cache' }).then((resp) => {
       if (resp.ok && !url.pathname.endsWith('proyecto.json')) { const copia = resp.clone(); caches.open(VERSION).then((c) => c.put(req, copia)) }
       return resp
     }).catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('index.html'))))
