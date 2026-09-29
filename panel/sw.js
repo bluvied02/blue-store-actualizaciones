@@ -4,7 +4,7 @@
 //   - Recibe las notificaciones aunque la app este cerrada.
 // Los datos del negocio los guarda la app misma (IndexedDB), no esto.
 
-const VERSION = 'bs-panel-v3'
+const VERSION = 'bs-panel-v4'
 const APP = ['./', 'index.html', 'estilos.css', 'app.js', 'lector.js', 'productos.js', 'negocio.js', 'otros.js', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
