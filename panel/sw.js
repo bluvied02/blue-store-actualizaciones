@@ -4,8 +4,8 @@
 //   - Recibe las notificaciones aunque la app este cerrada.
 // Los datos del negocio los guarda la app misma (IndexedDB), no esto.
 
-const VERSION = 'bs-panel-v11-5'
-const APP = ['./', 'index.html', 'estilos.css?v=11.5', 'app.js?v=11.5', 'lector.js?v=11.5', 'productos.js?v=11.5', 'negocio.js?v=11.5', 'local.js?v=11.5', 'otros.js?v=11.5', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const VERSION = 'bs-panel-v11-6'
+const APP = ['./', 'index.html', 'estilos.css?v=11.6', 'app.js?v=11.6', 'lector.js?v=11.6', 'productos.js?v=11.6', 'negocio.js?v=11.6', 'local.js?v=11.6', 'otros.js?v=11.6', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {
