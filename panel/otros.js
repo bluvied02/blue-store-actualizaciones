@@ -315,7 +315,7 @@ function secAjustes () {
 // --- MAS (celular) ---------------------------------------------------------------------------
 
 function secMas () {
-  const ids = ['reportes', 'clientes', 'caja', 'gastos', 'stock', 'proveedores', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'historial', 'avisos', 'ajustes']
+  const ids = ['reportes', 'clientes', 'caja', 'gastos', 'stock', 'pasar', 'proveedores', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'historial', 'avisos', 'ajustes']
   pintarSeccion('mas',
     cabecera('Más', S.negocio),
     el('div', { clase: 'mas-grilla' }, ids.filter((id) => SECCIONES[id]).map((id) => el('button', { clase: 'acceso', onclick: () => ir(id) },

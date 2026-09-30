@@ -5,7 +5,7 @@
 // Los datos del negocio los guarda la app misma (IndexedDB), no esto.
 
 const VERSION = 'bs-panel-v11-3'
-const APP = ['./', 'index.html', 'estilos.css?v=11.3', 'app.js?v=11.3', 'lector.js?v=11.3', 'productos.js?v=11.3', 'negocio.js?v=11.3', 'otros.js?v=11.3', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const APP = ['./', 'index.html', 'estilos.css?v=11.4', 'app.js?v=11.4', 'lector.js?v=11.4', 'productos.js?v=11.4', 'negocio.js?v=11.4', 'otros.js?v=11.4', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {

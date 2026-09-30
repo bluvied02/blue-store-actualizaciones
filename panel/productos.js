@@ -595,5 +595,117 @@ async function secStock () {
     el('div', { clase: 'tarjeta sin-relleno' }, ajustes.length ? el('div', { clase: 'lista' }, ajustes.map(itemAuditoria)) : vacio('Todavía no hay ajustes registrados.', 'historial')))
 }
 
+// --- PASAR A OTRA SUCURSAL ------------------------------------------------------------
+//
+// Sale del stock de la sucursal elegida arriba y entra en la otra cuando esa
+// caja se conecta. La lista que se esta armando queda guardada en el celular
+// hasta que se manda.
+
+async function secPasar () {
+  const otras = S.sucursales.filter((x) => x.id !== S.sucursal)
+  if (!S.sucursal || !otras.length) {
+    return pintarSeccion('pasar', cabecera('Pasar a otra sucursal'),
+      el('div', { clase: 'tarjeta' }, vacio('Hacen falta dos sucursales conectadas a la nube.', 'pasar')))
+  }
+  const [lista, tr] = await Promise.all([leerCatalogo(S.sucursal), leerDatos('transferencias').catch(() => ({}))])
+  const clave = 'bs.pasar.' + S.sucursal
+  const P = S.pasar && S.pasar.suc === S.sucursal ? S.pasar : (S.pasar = { suc: S.sucursal, lineas: leerLocal(clave, []), destino: otras[0].id })
+  if (!otras.some((x) => x.id === P.destino)) P.destino = otras[0].id
+  const guardar = () => guardarLocal(clave, P.lineas)
+
+  const destino = el('select', {}, otras.map((x) => el('option', { valor: x.id, selected: x.id === P.destino }, x.nombre)))
+  destino.addEventListener('change', () => { P.destino = destino.value })
+  const nota = el('input', { type: 'text', maxlength: '120', placeholder: 'Opcional: quién lo lleva…' })
+  const zona = el('div', { clase: 'lista' })
+  const resumen = el('div', { clase: 'sub', estilo: { margin: '6px 2px' } })
+  const busca = el('input', { type: 'search', placeholder: 'Buscar producto para agregar…', enterkeyhint: 'search' })
+  const resultados = el('div', { clase: 'lista' })
+  const tarjetaResultados = el('div', { clase: 'tarjeta sin-relleno', estilo: { display: 'none' } }, resultados)
+
+  const agregar = (p) => {
+    const ya = P.lineas.find((l) => l.productoId === p.id)
+    if (ya) ya.cantidad += 1000
+    else P.lineas.unshift({ productoId: p.id, descripcion: p.descripcion, codigo: (p.codigos || [])[0] || '', stock: p.stock || 0, cantidad: 1000 })
+    guardar()
+    busca.value = ''
+    poner(resultados)
+    tarjetaResultados.style.display = 'none'
+    pintar()
+    toast(p.descripcion + ' agregado', 'ok', 1.5)
+  }
+  const pintar = () => {
+    poner(zona, P.lineas.length ? P.lineas.map((l, i) => {
+      const cant = el('b', { clase: 'num' }, unidades(l.cantidad))
+      const mover = (d) => { l.cantidad = Math.max(1000, l.cantidad + d); guardar(); pintar() }
+      return el('div', { clase: 'item' },
+        el('div', { clase: 'cuerpo' },
+          el('b', {}, l.descripcion),
+          el('div', { clase: 'sub' }, (l.codigo || 'sin código') + ' · hay ' + unidades(l.stock)),
+          l.cantidad > l.stock ? el('div', { clase: 'sub ambar' }, 'Mandás más de lo que dice el sistema') : null),
+        el('div', { clase: 'fin fila' },
+          el('button', { clase: 'btn-ico', 'aria-label': 'Uno menos', onclick: () => l.cantidad <= 1000 ? (P.lineas.splice(i, 1), guardar(), pintar()) : mover(-1000) }, icono(l.cantidad <= 1000 ? 'basura' : 'restar')),
+          cant,
+          el('button', { clase: 'btn-ico', 'aria-label': 'Uno más', onclick: () => mover(1000) }, icono('sumar'))))
+    }) : vacio('Escaneá o buscá lo que va a la otra sucursal.', 'pasar'))
+    const u = P.lineas.reduce((a, l) => a + l.cantidad, 0)
+    resumen.textContent = P.lineas.length ? P.lineas.length + (P.lineas.length === 1 ? ' producto · ' : ' productos · ') + unidades(u) + ' unidades' : ''
+  }
+  busca.addEventListener('input', () => {
+    const q = busca.value.trim()
+    tarjetaResultados.style.display = q.length < 2 ? 'none' : ''
+    if (q.length < 2) return poner(resultados)
+    const filas = lista.filter((p) => p.activo !== false && coincide(p.descripcion + ' ' + (p.codigos || []).join(' '), q)).slice(0, 12)
+    poner(resultados, filas.length ? filas.map((p) => itemProducto(p, () => agregar(p))) : vacio('Nada coincide.', 'buscar'))
+  })
+  pintar()
+
+  const mandar = async () => {
+    if (!P.lineas.length) return toast('Agregá al menos un producto', 'mal')
+    const nombre = nombreSucursal(destino.value)
+    if (!confirm('¿Mandar ' + P.lineas.length + (P.lineas.length === 1 ? ' producto' : ' productos') + ' de ' + nombreSucursal(S.sucursal) + ' a ' + nombre + '?\n\nSale del stock de ' + nombreSucursal(S.sucursal) + ' y entra en ' + nombre + ' cuando esa caja se conecte.')) return
+    await mandarOrden(S.sucursal, 'transferencia_salida', {
+      destinoId: destino.value,
+      destinoNombre: nombre,
+      items: P.lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })),
+      nota: nota.value.trim()
+    }, { texto: 'A ' + nombre, alTerminar: () => refrescarSeccion() })
+    P.lineas = []
+    guardar()
+    pintar()
+  }
+
+  const envios = datosDe(tr) || []
+  pintarSeccion('pasar',
+    cabecera('Pasar a otra sucursal', 'De ' + nombreSucursal(S.sucursal) + ' a otra: sale de acá, entra allá'),
+    el('div', { clase: 'tarjeta' },
+      el('label', { clase: 'campo' }, 'A qué sucursal va', destino),
+      el('label', { clase: 'campo' }, 'Nota', nota)),
+    el('button', { clase: 'btn primario ancho grande', estilo: { marginBottom: '10px' }, onclick: async () => {
+      const c = await leerCodigo({ titulo: 'Producto que va' })
+      if (!c) return
+      const r = await buscarCodigo(c).catch(() => ({}))
+      if (r.producto) agregar(r.producto)
+      else toast('Ese código no está en ' + nombreSucursal(S.sucursal), 'mal')
+    } }, icono('escanear'), 'Escanear producto'),
+    el('div', { clase: 'buscador' }, icono('buscar'), busca),
+    tarjetaResultados,
+    el('h3', {}, 'Lo que va'),
+    el('div', { clase: 'tarjeta sin-relleno' }, zona),
+    resumen,
+    el('button', { clase: 'btn primario ancho grande', onclick: mandar }, icono('pasar'), 'Mandar'),
+    el('h3', {}, 'Últimos envíos'),
+    el('div', { clase: 'tarjeta sin-relleno' }, envios.length
+      ? el('div', { clase: 'lista' }, envios.slice(0, 15).map((t) => el('div', { clase: 'item' },
+        el('span', { clase: 'ico', estilo: { color: 'var(--texto3)' } }, icono('pasar')),
+        el('div', { clase: 'cuerpo' },
+          el('b', {}, (t.tipo === 'enviada' ? 'A ' : 'De ') + t.otra),
+          el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, t.items.slice(0, 4).map((it) => unidades(it.cantidad) + ' ' + it.descripcion).join(' · ') + (t.items.length > 4 ? ' y ' + (t.items.length - 4) + ' más' : '')),
+          el('div', { clase: 'sub' }, fechaHora(t.fecha) + (t.nota ? ' · ' + t.nota : ''))),
+        el('span', { clase: 'chip ' + (t.tipo === 'recibida' || t.estado === 'recibida' ? 'ok' : t.estado === 'error' ? 'mal' : 'alerta'), title: t.error || '' }, t.tipo === 'recibida' ? 'Entró' : t.estado === 'recibida' ? 'Llegó' : t.estado === 'error' ? 'No entró' : 'En camino'))))
+      : vacio('Todavía no hay envíos.', 'historial')))
+}
+
+
 seccion('productos', { nombre: 'Productos', icono: 'productos', grupo: 'principal', fn: secProductos })
 seccion('stock', { nombre: 'Arreglo de stock', icono: 'stock', grupo: 'mercaderia', fn: secStock })
+seccion('pasar', { nombre: 'Pasar a otra sucursal', icono: 'pasar', grupo: 'mercaderia', fn: secPasar })

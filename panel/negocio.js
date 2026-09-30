@@ -682,12 +682,13 @@ function itemAuditoria (x) {
   else if (x.tipo === 'aumento') detalle = pct(x.porcentajeBasis) + ' · ' + x.productos + ' productos' + (x.motivo ? ' · ' + x.motivo : '')
   else if (x.tipo === 'producto_nuevo') detalle = plata(x.despues)
   const desdeCel = x.origen && /celular/.test(x.origen)
+  const desdeSuc = x.origen && /^sucursal:/.test(x.origen) ? x.origen.slice(9).trim() : ''
   return el('div', { clase: 'item' },
     el('span', { clase: 'ico', estilo: { color: 'var(--texto3)' } }, icono(ic)),
     el('div', { clase: 'cuerpo' },
       el('b', {}, (x.descripcion ? x.descripcion + ' · ' : '') + nombre),
       el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, detalle),
-      el('div', { clase: 'sub' }, (x.usuario || '—') + ' · ' + fechaHora(x.ts) + (desdeCel ? ' · desde el celular' : ''))))
+      el('div', { clase: 'sub' }, (x.usuario || '—') + ' · ' + fechaHora(x.ts) + (desdeCel ? ' · desde el celular' : '') + (desdeSuc ? ' · desde ' + desdeSuc : ''))))
 }
 
 async function secHistorial () {

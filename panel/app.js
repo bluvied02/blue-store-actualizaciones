@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '11.3'
+const VERSION_APP = '11.4'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -143,7 +143,8 @@ const ICONOS = {
   nube: 'M7 18h10a4 4 0 0 0 .5-8 6 6 0 0 0-11.6 1.5A3.3 3.3 0 0 0 7 18z',
   basura: 'M4 7h16 M9 7V4h6v3 M6 7l1 14h10l1-14',
   subir: 'M12 19V5 M5 12l7-7 7 7',
-  bajar: 'M12 5v14 M5 12l7 7 7-7'
+  bajar: 'M12 5v14 M5 12l7 7 7-7',
+  pasar: 'M4 8h13 M13 4l4 4-4 4 M20 16H7 M11 12l-4 4 4 4'
 }
 function icono (nombre, clase) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -369,7 +370,8 @@ const NOMBRE_ORDEN = {
   producto: 'Cambio de producto', stock: 'Ajuste de stock', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
   promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular',
   cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto',
-  proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor'
+  proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor',
+  transferencia_salida: 'Pasar a otra sucursal'
 }
 
 async function cargarCola () {
