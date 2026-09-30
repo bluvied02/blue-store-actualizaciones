@@ -213,8 +213,8 @@ async function secAvisos () {
   const anul = await leerDatos('anulaciones').catch(() => ({}))
   guardarLocal('bs.avisosVistos', new Date().toISOString())
   contarAvisos()
-  const tono = { cierre: 'mal', anulacion: 'alerta', pedido_anulacion: 'alerta', personal: 'mal', caja: 'mal', pago: 'alerta' }
-  const ico = { cierre: 'caja', anulacion: 'ventas', pedido_anulacion: 'ventas', personal: 'clientes', caja: 'caja', pago: 'apagar' }
+  const tono = { cierre: 'mal', anulacion: 'alerta', pedido_anulacion: 'alerta', personal: 'mal', caja: 'mal', pago: 'alerta', resumen: 'info' }
+  const ico = { cierre: 'caja', anulacion: 'ventas', pedido_anulacion: 'ventas', personal: 'clientes', caja: 'caja', pago: 'apagar', resumen: 'reportes' }
   const pedidos = []
   for (const [id, f] of Object.entries(anul)) for (const p of f.datos || []) pedidos.push(Object.assign({ sucursalId: id, sucursal: f.nombre }, p))
   const bloques = []
@@ -263,7 +263,7 @@ async function panelNotificaciones () {
   const estado = el('p', { clase: 'tenue' })
   const boton = el('button', { clase: 'btn primario' })
   const pintar = (sub) => {
-    estado.textContent = sub ? '✓ Te llegan: faltante al cerrar la caja, venta anulada, empleado que no llegó, caja cerrada, pedidos de anulación y pagos a proveedores del día.' : 'Activalas para enterarte cuando pasa algo importante, aunque no tengas la app abierta.'
+    estado.textContent = sub ? '✓ Te llegan: el resumen de ayer cada mañana, faltante al cerrar la caja, ventas anuladas (y si alguien anula muchas), empleado que no llegó, caja cerrada o sin conexión, pedidos de anulación y pagos a proveedores del día.' : 'Activalas para enterarte cuando pasa algo importante, aunque no tengas la app abierta.'
     boton.textContent = sub ? 'Desactivar' : 'Activar notificaciones'
     boton.className = 'btn' + (sub ? '' : ' primario')
   }
