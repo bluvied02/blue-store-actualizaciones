@@ -15,15 +15,16 @@ function colorStock (p) {
 }
 
 function itemProducto (p, alTocar, opciones = {}) {
-  const m = margenDe(p.precio, p.costo)
+  const m = puede('verCostos') ? margenDe(p.precio, p.costo) : null
   return el('div', { clase: 'item tocable' + (p.activo === false ? ' inactivo' : '') + (opciones.sel ? ' sel' : ''), onclick: alTocar },
     opciones.seleccionando ? el('span', { clase: 'marca-sel' }, opciones.sel ? icono('ok') : null) : null,
+    p.foto ? el('img', { clase: 'mini-foto', src: p.foto, alt: '', loading: 'lazy' }) : null,
     el('div', { clase: 'cuerpo' },
       el('b', {}, p.descripcion),
       el('div', { clase: 'sub' }, [(p.codigos || [])[0] || 'sin código', p.familia || p.proveedor || ''].filter(Boolean).join(' · '),
         p._pendiente ? el('span', { clase: 'chip alerta', estilo: { marginLeft: '6px' } }, 'enviando') : null)),
     el('div', { clase: 'fin' + (opciones.rapido ? ' pila' : '') },
-      opciones.rapido
+      opciones.rapido && puede('editarPrecios')
         ? el('button', { clase: 'btn chico rapida', 'aria-label': 'Cambiar precio', onclick: (ev) => { ev.stopPropagation(); hojaPrecio(p) } }, el('b', { clase: 'num' }, plata(p.precio)))
         : el('b', { clase: 'num' }, plata(p.precio)),
       opciones.rapido
@@ -110,7 +111,8 @@ async function secProductos (params) {
   selFamilia.value = E.familia
   const selProv = el('select', {}, el('option', { valor: '' }, 'Todos los proveedores'), proveedores.map((x) => el('option', { valor: x.id }, x.nombre)))
   selProv.value = E.proveedor
-  const selOrden = el('select', {}, ORDENES_PRODUCTO.map(([id, t]) => el('option', { valor: id }, t)))
+  const selOrden = el('select', {}, ORDENES_PRODUCTO.filter(([id]) => !/^margen/.test(id) || puede('verCostos')).map(([id, t]) => el('option', { valor: id }, t)))
+  if (!puede('verCostos') && /^margen/.test(E.orden)) E.orden = 'vendidos'
   selOrden.value = E.orden
 
   const filtrados = () => {
@@ -121,7 +123,7 @@ async function secProductos (params) {
       .sort((ORDENES_PRODUCTO.find((x) => x[0] === E.orden) || ORDENES_PRODUCTO[0])[2])
   }
   const pintarFiltros = () => {
-    poner(filtrosZona, FILTROS_PRODUCTO.map(([id, t, fn]) => el('button', { clase: 'filtro' + (E.filtro === id ? ' activo' : ''), onclick: () => { E.filtro = id; limite = 60; pintarFiltros(); pintar() } },
+    poner(filtrosZona, FILTROS_PRODUCTO.filter(([id]) => id !== 'sinCosto' || puede('verCostos')).map(([id, t, fn]) => el('button', { clase: 'filtro' + (E.filtro === id ? ' activo' : ''), onclick: () => { E.filtro = id; limite = 60; pintarFiltros(); pintar() } },
       t, id !== 'todos' ? el('span', { clase: 'n' }, String(lista.filter(fn).length)) : null)))
   }
   const pintarSel = () => {
@@ -169,14 +171,61 @@ async function secProductos (params) {
     el('details', { clase: 'detalles' }, el('summary', {}, 'Ordenar, familia, proveedor y aumentos'),
       el('div', { clase: 'campo' }, 'Ordenar', selOrden),
       el('div', { clase: 'dos' }, el('div', { clase: 'campo' }, 'Familia', selFamilia), el('div', { clase: 'campo' }, 'Proveedor', selProv)),
-      el('button', { clase: 'btn ancho', estilo: { marginBottom: '12px' }, onclick: () => hojaAumento(S.sucursal, proveedores, rubros, lista) }, 'Aumentar precios por proveedor o familia')),
+      puede('editarPrecios') ? el('button', { clase: 'btn ancho', estilo: { marginBottom: '12px' }, onclick: () => hojaAumento(S.sucursal, proveedores, rubros, lista) }, 'Aumentar precios por proveedor o familia') : null),
     el('div', { clase: 'tarjeta-cab' }, cuenta,
       el('div', { clase: 'chips' },
         botonRapido,
-        el('button', { clase: 'btn chico', onclick: () => { E.sel = E.sel ? null : new Set(); pintarSel(); pintar() } }, 'Seleccionar'))),
+        puede('editarPrecios') ? el('button', { clase: 'btn chico', onclick: () => { E.sel = E.sel ? null : new Set(); pintarSel(); pintar() } }, 'Seleccionar') : null)),
     barraSel,
     el('div', { clase: 'tarjeta sin-relleno' }, zona))
   if (E.busca && window.innerWidth > 860) busca.focus()
+}
+
+// --- la foto del producto -------------------------------------------------------
+//
+// Se saca con la camara, se achica aca (480 px, JPG: unos 40 KB) y viaja como
+// una orden mas; la caja la sube a la nube y le pone el link al producto.
+
+function achicarFoto (archivo, lado = 480) {
+  return new Promise((resolver, rechazar) => {
+    const img = new Image()
+    img.onload = () => {
+      const escala = Math.min(1, lado / Math.max(img.width, img.height))
+      const lienzo = document.createElement('canvas')
+      lienzo.width = Math.round(img.width * escala)
+      lienzo.height = Math.round(img.height * escala)
+      lienzo.getContext('2d').drawImage(img, 0, 0, lienzo.width, lienzo.height)
+      URL.revokeObjectURL(img.src)
+      resolver(lienzo.toDataURL('image/jpeg', 0.74))
+    }
+    img.onerror = () => rechazar(new Error('No se pudo abrir la foto'))
+    img.src = URL.createObjectURL(archivo)
+  })
+}
+
+function sacarFoto (p, sucursalId) {
+  const suc = sucursalId || S.sucursal
+  const entrada = el('input', { type: 'file', accept: 'image/*', capture: 'environment', estilo: { display: 'none' } })
+  document.body.append(entrada)
+  entrada.addEventListener('change', async () => {
+    const archivo = entrada.files && entrada.files[0]
+    entrada.remove()
+    if (!archivo) return
+    let url
+    try { url = await achicarFoto(archivo) } catch (err) { return toast(err.message, 'mal') }
+    const vista = el('img', { src: url, alt: '', clase: 'foto-producto' })
+    abrirHoja({
+      titulo: 'Foto de ' + p.descripcion,
+      cuerpo: el('div', {}, vista, el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Se ve en la lista de productos del celular, en las dos sucursales.')),
+      botones: [{ texto: 'Guardar la foto', primario: true, alTocar: async () => {
+        cerrarHoja()
+        await mandarOrden(suc, 'producto_foto', { productoId: p.id, imagen: url.split(',')[1] }, { texto: 'Foto de ' + p.descripcion })
+        marcarPendiente(suc, p.id, { foto: url })
+        refrescarSeccion()
+      } }]
+    })
+  })
+  entrada.click()
 }
 
 // --- la ficha del producto ------------------------------------------------------
@@ -184,6 +233,8 @@ async function secProductos (params) {
 async function hojaProducto (p, sucursalId) {
   const suc = sucursalId || S.sucursal
   const m = margenDe(p.precio, p.costo)
+  const costos = puede('verCostos')
+  const precios = puede('editarPrecios')
   const extra = el('div', {}, el('div', { clase: 'esqueleto', estilo: { height: '60px', marginTop: '10px' } }))
   abrirHoja({
     titulo: p.descripcion,
@@ -196,15 +247,17 @@ async function hojaProducto (p, sucursalId) {
       el('div', { clase: 'sub' }, [p.rubro || 'Sin familia', p.proveedor || 'Sin proveedor', nombreSucursal(suc)].join(' · ')),
       el('div', { clase: 'dato-grande' },
         el('div', {}, el('div', { clase: 'r' }, 'Precio'), el('div', { clase: 'v' }, plata(p.precio))),
-        el('div', {}, el('div', { clase: 'r' }, 'Costo'), el('div', { clase: 'v' }, p.costo ? plata(p.costo) : '—')),
-        el('div', {}, el('div', { clase: 'r' }, 'Margen'), el('div', { clase: 'v ' + (m != null && m < 15 * 100 ? 'ambar' : '') }, m == null ? '—' : pct(m))),
+        costos ? el('div', {}, el('div', { clase: 'r' }, 'Costo'), el('div', { clase: 'v' }, p.costo ? plata(p.costo) : '—')) : null,
+        costos ? el('div', {}, el('div', { clase: 'r' }, 'Margen'), el('div', { clase: 'v ' + (m != null && m < 15 * 100 ? 'ambar' : '') }, m == null ? '—' : pct(m))) : null,
         el('div', {}, el('div', { clase: 'r' }, 'Stock'), el('div', { clase: 'v ' + colorStock(p) }, unidades(p.stock))),
         el('div', {}, el('div', { clase: 'r' }, 'Mínimo'), el('div', { clase: 'v' }, p.minimo ? unidades(p.minimo) : '—')),
         el('div', {}, el('div', { clase: 'r' }, 'Vendió 30 días'), el('div', { clase: 'v' }, unidades(p.vendido30)))),
+      p.foto ? el('img', { clase: 'foto-producto', src: p.foto, alt: p.descripcion }) : null,
       el('div', { clase: 'acciones-grandes' },
-        el('button', { clase: 'btn primario grande', onclick: () => hojaPrecio(p, suc) }, icono('gastos'), 'Cambiar precio'),
+        precios ? el('button', { clase: 'btn primario grande', onclick: () => hojaPrecio(p, suc) }, icono('gastos'), 'Cambiar precio') : null,
         el('button', { clase: 'btn primario grande', onclick: () => hojaAjusteStock(p, suc) }, icono('stock'), 'Ajustar stock'),
-        el('button', { clase: 'btn grande', onclick: () => hojaEditarProducto(p, suc) }, icono('editar'), 'Editar todo'),
+        el('button', { clase: 'btn grande', onclick: () => sacarFoto(p, suc) }, icono('foto'), p.foto ? 'Cambiar la foto' : 'Sacarle una foto'),
+        precios ? el('button', { clase: 'btn grande', onclick: () => hojaEditarProducto(p, suc) }, icono('editar'), 'Editar todo') : null,
         el('button', { clase: 'btn grande', onclick: () => { const x = extra.querySelector('[data-hist]'); if (x) x.scrollIntoView({ behavior: 'smooth' }) } }, icono('historial'), 'Historial')),
       extra)
   })
@@ -221,7 +274,7 @@ async function hojaProducto (p, sucursalId) {
         el('div', {}, el('div', { clase: 'r' }, 'Hoy'), el('div', { clase: 'v' }, unidades(unidHoy))),
         el('div', {}, el('div', { clase: 'r' }, '7 días'), el('div', { clase: 'v' }, unidades(p.vendido7 || 0))),
         el('div', {}, el('div', { clase: 'r' }, 'Última venta'), el('div', { clase: 'v', estilo: { fontSize: '14px' } }, p.ultimaVenta ? hace(p.ultimaVenta) : '—'))),
-      tickets.length ? el('div', { clase: 'lista' }, tickets.slice(0, 8).map((v) => itemVenta(v, () => hojaVenta(v, suc), p.id))) : null,
+      tickets.length && seccionPermitida('ventas') ? el('div', { clase: 'lista' }, tickets.slice(0, 8).map((v) => itemVenta(v, () => hojaVenta(v, suc), p.id))) : null,
       el('h3', { 'data-hist': '' }, 'Cambios y movimientos'),
       cambios.length ? el('div', { clase: 'lista' }, cambios.map(itemAuditoria)) : el('p', { clase: 'sub' }, 'Sin cambios registrados todavía (se anotan desde la versión 0.11 de la caja).'))
   } catch (e) { limpiar(extra) }
@@ -470,7 +523,7 @@ async function hojaNuevoProducto (previo) {
           el('button', { clase: 'btn-ico', estilo: { width: '46px', height: '46px' }, 'aria-label': 'Escanear', onclick: async () => { const c = await leerCodigo({ titulo: 'Código del producto nuevo' }); if (c) { codigo.value = c; revisarCodigo() } } }, icono('escanear')))),
       avisoCodigo,
       el('label', { clase: 'campo' }, 'Nombre', nombre),
-      el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Precio de venta ($)', precio), el('label', { clase: 'campo' }, 'Costo ($)', costo)),
+      el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Precio de venta ($)', precio), puede('verCostos') ? el('label', { clase: 'campo' }, 'Costo ($)', costo) : null),
       info,
       el('label', { clase: 'campo' }, 'Stock que hay ahora', stock),
       el('details', { clase: 'detalles' }, el('summary', {}, 'Más datos (opcional): familia, proveedor, mínimo, unidad, IVA'),

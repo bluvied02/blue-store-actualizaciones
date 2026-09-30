@@ -109,6 +109,8 @@ async function leerFoto (archivo) {
 }
 
 // Abre la camara y devuelve el codigo leido, o null si se cierra.
+// Con opciones.alLeer(codigo) queda abierta leyendo uno tras otro (contar,
+// recibir): cada codigo se pasa a alLeer, que devuelve el texto a mostrar.
 async function leerCodigo (opciones = {}) {
   prepararPitido()
   await esperarAtras()
@@ -116,6 +118,11 @@ async function leerCodigo (opciones = {}) {
     let terminado = false
     let stream = null
     let reloj = null
+    const continuo = typeof opciones.alLeer === 'function'
+    // Cada vuelta de lectura lleva su numero: al pausar se corta la que corria.
+    let ciclo = 0
+    let seguir = null
+    let ultimo = { c: '', t: 0 }
     const video = document.createElement('video')
     video.muted = true
     video.autoplay = true
@@ -140,17 +147,35 @@ async function leerCodigo (opciones = {}) {
       if (!porAtras) { S.ignorarPop++; history.back() }
       resolver(codigo || null)
     }
-    const leido = (codigo) => {
+    const leido = (codigo, aMano) => {
       if (terminado) return
       const c = String(codigo || '').trim()
       if (!c) return
+      if (continuo) {
+        ciclo++
+        clearTimeout(reloj)
+        const ahora = Date.now()
+        // El mismo codigo que recien se leyo (sigue adelante de la camara): no suma de nuevo.
+        if (!aMano && c === ultimo.c && ahora - ultimo.t < 1600) { setTimeout(() => { if (seguir && !terminado) seguir() }, 250); return }
+        ultimo = { c, t: ahora }
+        vibrar(70)
+        pitido()
+        marco.classList.add('ok')
+        manual.value = ''
+        Promise.resolve().then(() => opciones.alLeer(c)).catch((err) => err.message || 'No se pudo').then((msg) => {
+          if (terminado) return
+          poner(texto, el('span', { clase: 'codigo-leido' }, msg || c))
+          setTimeout(() => { marco.classList.remove('ok'); if (seguir && !terminado) seguir() }, 650)
+        })
+        return
+      }
       vibrar(70)
       pitido()
       marco.classList.add('ok')
       poner(texto, el('span', { clase: 'codigo-leido' }, c))
       setTimeout(() => terminar(c), 260)
     }
-    const buscarManual = () => { if (manual.value.trim()) leido(manual.value.trim()) }
+    const buscarManual = () => { if (manual.value.trim()) leido(manual.value.trim(), true) }
     manual.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); buscarManual() } })
     foto.addEventListener('change', async () => {
       const archivo = foto.files && foto.files[0]
@@ -172,7 +197,8 @@ async function leerCodigo (opciones = {}) {
         el('div', { estilo: { display: 'flex', gap: '8px', alignItems: 'center' } }, botonZoom, linterna)),
       texto,
       el('div', { clase: 'abajo-lector' },
-        el('div', { estilo: { display: 'flex', gap: '8px' } }, manual, el('button', { clase: 'btn primario', onclick: buscarManual }, 'Buscar')),
+        el('div', { estilo: { display: 'flex', gap: '8px' } }, manual, el('button', { clase: 'btn primario', onclick: buscarManual }, continuo ? 'Sumar' : 'Buscar')),
+        continuo ? el('button', { clase: 'btn primario grande', onclick: () => terminar(null) }, icono('ok'), opciones.textoListo || 'Listo') : null,
         el('button', { clase: 'btn', estilo: { background: 'rgba(255,255,255,.14)', color: '#fff', borderColor: 'rgba(255,255,255,.3)' }, onclick: () => foto.click() }, icono('escanear'), 'No lee: sacar una foto del código'),
         foto))
     document.body.append(caja)
@@ -227,18 +253,20 @@ async function leerCodigo (opciones = {}) {
         } catch (e) { detector = null }
       }
       if (detector) {
-        const mirar = async () => {
-          if (terminado) return
+        const mirar = async (g) => {
+          if (terminado || g !== ciclo) return
           try {
             if (video.readyState >= 2) {
               const encontrados = await detector.detect(video)
+              if (g !== ciclo) return
               const c = encontrados.find((x) => x.rawValue)
               if (c) return leido(c.rawValue)
             }
           } catch (e) { /* cuadro sin codigo */ }
-          reloj = setTimeout(mirar, 110)
+          reloj = setTimeout(() => mirar(g), 110)
         }
-        mirar()
+        seguir = () => mirar(++ciclo)
+        seguir()
         return
       }
 
@@ -247,8 +275,8 @@ async function leerCodigo (opciones = {}) {
       try { leer = await lectorZXing() } catch (err) { poner(texto, (err.message || 'No se pudo usar el lector.') + ' Usá "sacar una foto del código".'); return }
       const lienzo = document.createElement('canvas')
       let vuelta = 0
-      const probar = () => {
-        if (terminado) return
+      const probar = (g) => {
+        if (terminado || g !== ciclo) return
         const w = video.videoWidth
         const h = video.videoHeight
         if (w && h && video.readyState >= 2) {
@@ -263,9 +291,10 @@ async function leerCodigo (opciones = {}) {
           }
           if (c) return leido(c)
         }
-        reloj = setTimeout(probar, 70)
+        reloj = setTimeout(() => probar(g), 70)
       }
-      probar()
+      seguir = () => probar(++ciclo)
+      seguir()
     })()
   })
 }

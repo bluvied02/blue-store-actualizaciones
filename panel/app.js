@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '11.4'
+const VERSION_APP = '11.5'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -144,7 +144,11 @@ const ICONOS = {
   basura: 'M4 7h16 M9 7V4h6v3 M6 7l1 14h10l1-14',
   subir: 'M12 19V5 M5 12l7-7 7 7',
   bajar: 'M12 5v14 M5 12l7 7 7-7',
-  pasar: 'M4 8h13 M13 4l4 4-4 4 M20 16H7 M11 12l-4 4 4 4'
+  pasar: 'M4 8h13 M13 4l4 4-4 4 M20 16H7 M11 12l-4 4 4 4',
+  contar: 'M9 4h6v3H9z M7 5.5H5V21h14V5.5h-2 M8.5 12.5l2 2 4-4 M8.5 17.5h7',
+  recibir: 'M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10 M8 13.5l4 2 4-2',
+  pedidos: 'M6 3h12v18H6z M9 7h6 M9 11h6 M9 15h3 M15 15l1.5 1.5L19 13',
+  foto: 'M4 7h3l2-3h6l2 3h3v12H4z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'
 }
 function icono (nombre, clase) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -371,7 +375,8 @@ const NOMBRE_ORDEN = {
   promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular',
   cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto',
   proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor',
-  transferencia_salida: 'Pasar a otra sucursal'
+  transferencia_salida: 'Pasar a otra sucursal', conteo: 'Conteo de stock', recepcion: 'Mercadería recibida',
+  producto_foto: 'Foto del producto', encargo_guardar: 'Encargo', encargo_estado: 'Encargo'
 }
 
 async function cargarCola () {
@@ -580,6 +585,11 @@ function pantallaNuevaClave () {
 
 async function entrarAlPanel (sesion) {
   S.email = (sesion && sesion.user && sesion.user.email) || leerLocal('bs.email', '') || ''
+  // El rol lo pone la caja en la cuenta: el usuario no lo puede cambiar.
+  if (sesion && sesion.user) {
+    S.rol = ((sesion.user.app_metadata || {}).rol === 'encargado') ? 'encargado' : 'duenio'
+    guardarLocal('bs.rol', S.rol)
+  } else S.rol = leerLocal('bs.rol', 'duenio') === 'encargado' ? 'encargado' : 'duenio'
   await cargarCola()
   // Sin internet se entra con lo guardado; el permiso se revisa al volver.
   try {
@@ -612,8 +622,17 @@ const SECCIONES = {}
 // Cada archivo registra sus secciones: { nombre, icono, grupo, fn(params) }.
 function seccion (id, def) { SECCIONES[id] = def }
 
+// Dueño o encargado. El encargado ve lo del local; la plata, los costos y los
+// precios son del dueño. (La caja revisa lo mismo antes de aplicar cada orden.)
+const SOLO_DUENIO = ['reportes', 'caja', 'gastos', 'apagar', 'proveedores', 'promos', 'cierres', 'historial', 'ventas']
+const PERMISOS_ENCARGADO = ['verStock', 'ajustarStock', 'contar', 'recibir', 'pasar', 'clientes', 'productoNuevo', 'fotos', 'pedidosClientes']
+const esEncargado = () => S.rol === 'encargado'
+function puede (permiso) { return !esEncargado() || PERMISOS_ENCARGADO.includes(permiso) }
+const seccionPermitida = (id) => !esEncargado() || !SOLO_DUENIO.includes(id)
+
 const GRUPOS = [['principal', ''], ['negocio', 'Negocio'], ['mercaderia', 'Mercadería'], ['control', 'Control']]
 const ABAJO = ['inicio', 'productos', 'escanear', 'ventas', 'mas']
+const abajo = () => esEncargado() ? ['inicio', 'productos', 'escanear', 'contar', 'mas'] : ABAJO
 
 function pintarArmazon () {
   const lado = el('nav', { clase: 'lado', 'aria-label': 'Secciones' },
@@ -621,9 +640,9 @@ function pintarArmazon () {
     el('button', { onclick: () => abrirBuscador() }, icono('buscar'), 'Buscar', el('span', { clase: 'sub', estilo: { marginLeft: 'auto' } }, '/')),
     el('button', { onclick: () => escanearYAbrir() }, icono('escanear'), 'Escanear'),
     GRUPOS.map(([g, t]) => [t ? el('div', { clase: 'grupo' }, t) : null,
-      Object.entries(SECCIONES).filter(([, s]) => s.grupo === g).map(([id, s]) => el('button', { 'data-sec': id, onclick: () => ir(id) },
+      Object.entries(SECCIONES).filter(([id, s]) => s.grupo === g && seccionPermitida(id)).map(([id, s]) => el('button', { 'data-sec': id, onclick: () => ir(id) },
         icono(s.icono), s.nombre, id === 'avisos' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null))]))
-  const tabbar = el('nav', { clase: 'tabbar', 'aria-label': 'Secciones' }, ABAJO.map((id) => id === 'escanear'
+  const tabbar = el('nav', { clase: 'tabbar', 'aria-label': 'Secciones' }, abajo().map((id) => id === 'escanear'
     ? el('button', { clase: 'escanear', onclick: () => escanearYAbrir(), 'aria-label': 'Escanear producto' }, el('span', { clase: 'bola' }, icono('escanear')), 'Escanear')
     : el('button', { 'data-sec': id, onclick: () => ir(id) }, icono(SECCIONES[id].icono), SECCIONES[id].corto || SECCIONES[id].nombre,
       id === 'mas' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null)))
@@ -713,7 +732,7 @@ function luegoDeAtras (fn) { if (S.ignorarPop > 0) S.trasAtras.push(fn); else fn
 const esperarAtras = () => new Promise((ok) => luegoDeAtras(ok))
 
 function ir (id, params, reemplazar) {
-  if (!SECCIONES[id]) id = 'inicio'
+  if (!SECCIONES[id] || !seccionPermitida(id)) id = 'inicio'
   // Si se esta cerrando una hoja, se espera a que el 'atras' termine.
   if (S.ignorarPop > 0) { S.trasAtras.push(() => ir(id, params, reemplazar)); return }
   S.seccion = id
@@ -741,10 +760,12 @@ window.addEventListener('popstate', () => {
 function render () {
   if (!S.main) return
   clearInterval(S.reloj)
+  // Cualquier camino (atras, un link, el hash escrito a mano) pasa por aca.
+  if (!SECCIONES[S.seccion] || !seccionPermitida(S.seccion)) S.seccion = 'inicio'
   const id = S.seccion
   for (const b of document.querySelectorAll('[data-sec]')) {
     const enAbajo = !!b.closest('.tabbar')
-    const activo = b.dataset.sec === id || (enAbajo && b.dataset.sec === 'mas' && !ABAJO.includes(id))
+    const activo = b.dataset.sec === id || (enAbajo && b.dataset.sec === 'mas' && !abajo().includes(id))
     b.classList.toggle('activo', !!activo)
   }
   if (!S.main.firstChild) poner(S.main, esqueleto())
@@ -830,12 +851,40 @@ const ACCESOS = {
   avisos: { nombre: 'Avisos', icono: 'avisos', fn: () => ir('avisos') }
 }
 const ACCESOS_DE_FABRICA = ['escanear', 'nuevoProducto', 'stock', 'clientes', 'caja', 'ventas', 'reportes', 'gastos']
-const accesosElegidos = () => (leerLocal('bs.accesos', null) || ACCESOS_DE_FABRICA).filter((k) => ACCESOS[k])
+const accesosElegidos = () => (leerLocal('bs.accesos', null) || ACCESOS_DE_FABRICA).filter((k) => ACCESOS[k] && seccionPermitida(k))
 
 // El orden del dia operativo: de las 6 a las 5 del otro dia (un local 24 horas).
 const ordenHora = (h) => (h - 6 + 24) % 24
 
+// El inicio del encargado: lo del local, sin plata.
+async function secInicioEncargado () {
+  const lista = S.sucursal ? await leerCatalogo(S.sucursal).catch(() => []) : []
+  const activos = lista.filter((p) => p.activo !== false)
+  const negativos = activos.filter((p) => p.stock < 0).length
+  const bajos = activos.filter((p) => p.minimo > 0 && p.stock >= 0 && p.stock < p.minimo).length
+  const tareas = [
+    ['escanear', 'Consultar un producto', 'escanear', () => escanearYAbrir()],
+    ['contar', 'Contar stock', 'contar'],
+    ['recibir', 'Recibir mercadería', 'recibir'],
+    ['pasar', 'Pasar a otra sucursal', 'pasar'],
+    ['stock', 'Arreglo de stock', 'stock'],
+    ['encargos', 'Encargos de clientes', 'pedidos'],
+    ['reponer', 'Reponer', 'reponer'],
+    ['faltantes', 'Faltantes', 'faltantes']
+  ].filter(([id]) => id === 'escanear' || SECCIONES[id])
+  pintarSeccion('inicio',
+    cabecera('Hola', nombreSucursal(S.sucursal) + ' · encargado'),
+    el('div', { clase: 'mas-grilla' }, tareas.map(([id, nombre, ic, fn]) => el('button', { clase: 'acceso', onclick: fn || (() => ir(id)) }, el('span', { clase: 'ico' }, icono(ic)), nombre))),
+    negativos || bajos
+      ? el('div', { clase: 'tarjeta tocable', estilo: { marginTop: '12px' }, onclick: () => ir(negativos ? 'stock' : 'reponer') },
+        negativos ? el('b', { clase: 'rojo' }, negativos + ' productos en negativo') : null,
+        bajos ? el('div', { clase: 'sub' }, bajos + ' productos bajo el mínimo') : null,
+        el('div', { clase: 'sub' }, negativos ? 'Contalos y corregilos' : 'Para reponer'))
+      : null)
+}
+
 async function secInicio () {
+  if (esEncargado()) return secInicioEncargado()
   const todas = !!leerLocal('bs.inicioTodas', false) && S.sucursales.length > 1
   const [resumenes, reps, hists, anul, deudas] = await Promise.all([
     leerResumen(true),
@@ -993,7 +1042,8 @@ async function abrirBuscador (inicial) {
       leerCatalogo(S.sucursal).catch(() => []), leerDatos('clientes').catch(() => ({})), leerDatos('proveedores').catch(() => ({})),
       leerDatos('ventas_hoy').catch(() => ({})), leerDatos('ventas_ayer').catch(() => ({}))
     ])
-    datos = { cat, cli: datosDe(cli) || [], prov: datosDe(prov) || [], ventas: (datosDe(vh) || []).concat(datosDe(va) || []) }
+    // El encargado no busca ventas ni proveedores (es plata del dueño).
+    datos = { cat, cli: datosDe(cli) || [], prov: esEncargado() ? [] : datosDe(prov) || [], ventas: esEncargado() ? [] : (datosDe(vh) || []).concat(datosDe(va) || []) }
     return datos
   }
   let espera = null

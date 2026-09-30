@@ -315,10 +315,10 @@ function secAjustes () {
 // --- MAS (celular) ---------------------------------------------------------------------------
 
 function secMas () {
-  const ids = ['reportes', 'clientes', 'caja', 'gastos', 'stock', 'pasar', 'proveedores', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'historial', 'avisos', 'ajustes']
+  const ids = ['reportes', 'clientes', 'encargos', 'caja', 'gastos', 'contar', 'recibir', 'stock', 'pasar', 'proveedores', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'historial', 'avisos', 'ajustes']
   pintarSeccion('mas',
-    cabecera('Más', S.negocio),
-    el('div', { clase: 'mas-grilla' }, ids.filter((id) => SECCIONES[id]).map((id) => el('button', { clase: 'acceso', onclick: () => ir(id) },
+    cabecera('Más', S.negocio + (esEncargado() ? ' · encargado' : '')),
+    el('div', { clase: 'mas-grilla' }, ids.filter((id) => SECCIONES[id] && seccionPermitida(id)).map((id) => el('button', { clase: 'acceso', onclick: () => ir(id) },
       el('span', { clase: 'ico' }, icono(SECCIONES[id].icono)), SECCIONES[id].nombre,
       id === 'avisos' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null))))
   contarAvisos()

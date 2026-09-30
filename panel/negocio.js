@@ -667,7 +667,8 @@ async function hojaPagarDeuda (d) {
 
 const TIPOS_AUDITORIA = {
   precio: ['Precio', 'gastos'], costo: ['Costo', 'gastos'], nombre: ['Nombre', 'editar'], baja: ['Dado de baja', 'basura'], alta: ['Vuelve a venderse', 'ok'],
-  producto_nuevo: ['Producto nuevo', 'sumar'], stock: ['Stock', 'stock'], anulacion: ['Venta anulada', 'ventas'], cuenta_ajuste: ['Ajuste de cuenta', 'clientes'], aumento: ['Aumento de precios', 'reportes']
+  producto_nuevo: ['Producto nuevo', 'sumar'], stock: ['Stock', 'stock'], anulacion: ['Venta anulada', 'ventas'], cuenta_ajuste: ['Ajuste de cuenta', 'clientes'], aumento: ['Aumento de precios', 'reportes'],
+  foto: ['Foto nueva', 'foto']
 }
 const MOVS_STOCK = { ajuste_conteo: 'ajuste', rotura: 'rotura', vencimiento: 'vencimiento', carga_inicial: 'stock inicial' }
 
