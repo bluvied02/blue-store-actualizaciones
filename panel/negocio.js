@@ -440,6 +440,8 @@ function itemCierre (c) {
       el('div', { clase: 'fila' }, el('b', {}, 'Diferencia'), chip),
       el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Fondo con que arrancó'), el('b', { clase: 'num' }, plata(c.fondoFijo))),
       c.diferenciaFondo ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Contra lo que dejó el turno anterior'), el('b', { clase: 'num ' + (c.diferenciaFondo < 0 ? 'rojo' : 'ambar') }, (c.diferenciaFondo < 0 ? 'faltaban ' : 'sobraban ') + plata(Math.abs(c.diferenciaFondo)))) : null,
+      (c.controles || []).length ? el('h3', {}, 'Controles a mitad de turno') : null,
+      (c.controles || []).map((x) => el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, hora(x.ts) + (x.tarde ? ' (tarde)' : '')), el('b', { clase: 'num ' + (!x.diferencia || !x.fuera ? 'verde' : x.diferencia < 0 ? 'rojo' : 'ambar') }, !x.diferencia ? 'OK' : (x.diferencia < 0 ? 'faltaban ' : 'sobraban ') + plata(Math.abs(x.diferencia))))),
       c.fondoSiguiente != null ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Dejó para el próximo turno'), el('b', { clase: 'num' }, plata(c.fondoSiguiente))) : null,
       c.entregado != null ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Entregó'), el('b', { clase: 'num' }, plata(c.entregado))) : null,
       c.gastos ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Gastos de caja'), el('b', { clase: 'num' }, plata(c.gastos))) : null,
