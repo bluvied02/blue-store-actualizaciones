@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '11.7'
+const VERSION_APP = '11.8'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -376,7 +376,7 @@ const NOMBRE_ORDEN = {
   cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto',
   proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor',
   transferencia_salida: 'Pasar a otra sucursal', conteo: 'Conteo de stock', recepcion: 'Mercadería recibida',
-  producto_foto: 'Foto del producto', encargo_guardar: 'Encargo', encargo_estado: 'Encargo'
+  producto_foto: 'Foto del producto', venta_celular: 'Venta', modo_emergencia: 'Modo emergencia', encargo_guardar: 'Encargo', encargo_estado: 'Encargo'
 }
 
 async function cargarCola () {
@@ -529,7 +529,12 @@ function pantallaMensaje (titulo, texto, reintentar) {
     reintentar ? el('button', { clase: 'btn primario ancho grande', onclick: () => location.reload() }, 'Probar de nuevo') : null))
 }
 
+// Los empleados entran con su usuario y el PIN de la caja. Por detras es una
+// cuenta comun: el mail y la contraseña se arman igual que en la caja.
+const DOMINIO_EMPLEADOS = 'empleados.pos.local'
+
 function pantallaEntrar (mensaje) {
+  if (leerLocal('bs.modoEntrar', '') === 'empleado') return pantallaEntrarEmpleado(mensaje)
   const email = el('input', { type: 'email', autocomplete: 'username', placeholder: 'tu@email.com', inputmode: 'email' })
   const clave = el('input', { type: 'password', autocomplete: 'current-password', placeholder: 'Contraseña' })
   const error = el('div', { clase: 'error' }, mensaje || '')
@@ -560,8 +565,42 @@ function pantallaEntrar (mensaje) {
     el('label', { clase: 'campo' }, 'Email', email),
     el('label', { clase: 'campo' }, 'Contraseña', clave),
     error, boton,
-    el('p', { estilo: { marginTop: '16px', textAlign: 'center' } }, el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); olvide() } }, 'Me olvidé la contraseña'))))
+    el('p', { estilo: { marginTop: '16px', textAlign: 'center' } }, el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); olvide() } }, 'Me olvidé la contraseña')),
+    el('button', { clase: 'btn ancho', estilo: { marginTop: '18px' }, onclick: () => { guardarLocal('bs.modoEntrar', 'empleado'); pantallaEntrarEmpleado() } }, 'Soy empleado: entrar con mi usuario y PIN')))
   ;(email.value ? clave : email).focus()
+}
+
+function pantallaEntrarEmpleado (mensaje) {
+  const usuario = el('input', { type: 'text', autocomplete: 'username', placeholder: 'Ej: lucia', autocapitalize: 'none', spellcheck: 'false' })
+  const pin = el('input', { type: 'password', inputmode: 'numeric', autocomplete: 'current-password', placeholder: 'El PIN de la caja', maxlength: '8' })
+  const error = el('div', { clase: 'error' }, mensaje || '')
+  usuario.value = leerLocal('bs.usuarioEmpleado', '') || ''
+  const boton = el('button', { clase: 'btn primario ancho grande' }, 'Entrar')
+  const entrar = async () => {
+    const u = usuario.value.trim().toLowerCase()
+    if (!u || !pin.value.trim()) { error.textContent = 'Escribí tu usuario y tu PIN.'; return }
+    error.textContent = ''
+    boton.disabled = true
+    boton.textContent = 'Entrando…'
+    const { data, error: err } = await S.sb.auth.signInWithPassword({ email: u + '@' + DOMINIO_EMPLEADOS, password: 'bs-pin-' + pin.value.trim() })
+    boton.disabled = false
+    boton.textContent = 'Entrar'
+    pin.value = ''
+    if (err) { error.textContent = /invalid/i.test(err.message) ? 'Usuario o PIN incorrectos. Si no tenés usuario, pedíselo al dueño.' : esDeRed(err) ? 'Sin conexión. Revisá internet y probá de nuevo.' : /many|rate/i.test(err.message) ? 'Demasiados intentos. Esperá unos minutos.' : err.message; return }
+    guardarLocal('bs.usuarioEmpleado', u)
+    entrarAlPanel(data.session)
+  }
+  boton.addEventListener('click', entrar)
+  pin.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') entrar() })
+  poner($app, el('div', { clase: 'entrar' },
+    el('img', { clase: 'logo', src: 'icono-192.png', alt: '' }),
+    el('h1', {}, S.negocio),
+    el('p', {}, 'Entrá con tu usuario y el mismo PIN de la caja. Funciona mientras tengas el turno iniciado.'),
+    el('label', { clase: 'campo' }, 'Usuario', usuario),
+    el('label', { clase: 'campo' }, 'PIN', pin),
+    error, boton,
+    el('button', { clase: 'btn ancho', estilo: { marginTop: '18px' }, onclick: () => { guardarLocal('bs.modoEntrar', ''); pantallaEntrar() } }, 'Soy el dueño o encargado: entrar con mail')))
+  ;(usuario.value ? pin : usuario).focus()
 }
 
 function pantallaNuevaClave () {
@@ -586,10 +625,18 @@ function pantallaNuevaClave () {
 async function entrarAlPanel (sesion) {
   S.email = (sesion && sesion.user && sesion.user.email) || leerLocal('bs.email', '') || ''
   // El rol lo pone la caja en la cuenta: el usuario no lo puede cambiar.
+  const ROLES_CEL = ['encargado', 'empleado']
   if (sesion && sesion.user) {
-    S.rol = ((sesion.user.app_metadata || {}).rol === 'encargado') ? 'encargado' : 'duenio'
+    const meta = sesion.user.app_metadata || {}
+    S.rol = ROLES_CEL.includes(meta.rol) ? meta.rol : 'duenio'
+    // El empleado es de una sola sucursal y firma con su usuario de la caja.
+    S.empleado = S.rol === 'empleado' ? { usuarioId: meta.usuarioId, sucursalId: meta.sucursalId } : null
     guardarLocal('bs.rol', S.rol)
-  } else S.rol = leerLocal('bs.rol', 'duenio') === 'encargado' ? 'encargado' : 'duenio'
+    guardarLocal('bs.empleado', S.empleado)
+  } else {
+    S.rol = ROLES_CEL.includes(leerLocal('bs.rol', 'duenio')) ? leerLocal('bs.rol', 'duenio') : 'duenio'
+    S.empleado = S.rol === 'empleado' ? leerLocal('bs.empleado', null) : null
+  }
   await cargarCola()
   // Sin internet se entra con lo guardado; el permiso se revisa al volver.
   try {
@@ -605,6 +652,10 @@ async function entrarAlPanel (sesion) {
   S.sucursales = filas.map((f) => ({ id: f.sucursal_id, nombre: f.nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   S.sucursal = leerLocal('bs.sucursal', '') || ''
   if (!S.sucursales.some((x) => x.id === S.sucursal)) S.sucursal = S.sucursales[0] ? S.sucursales[0].id : ''
+  if (esEmpleado() && S.empleado && S.empleado.sucursalId) {
+    S.sucursal = S.empleado.sucursalId
+    S.sucursales = S.sucursales.filter((x) => x.id === S.sucursal)
+  }
   pintarArmazon()
   const m = /^#\/(\w+)/.exec(location.hash)
   ir(m && SECCIONES[m[1]] ? m[1] : 'inicio', {}, true)
@@ -625,21 +676,28 @@ function seccion (id, def) { SECCIONES[id] = def }
 // Dueño o encargado. El encargado ve lo del local; la plata, los costos y los
 // precios son del dueño. (La caja revisa lo mismo antes de aplicar cada orden.)
 const SOLO_DUENIO = ['reportes', 'caja', 'gastos', 'apagar', 'proveedores', 'promos', 'cierres', 'historial', 'ventas']
-const PERMISOS_ENCARGADO = ['verStock', 'ajustarStock', 'contar', 'recibir', 'pasar', 'clientes', 'productoNuevo', 'fotos', 'pedidosClientes']
+const PERMISOS_ENCARGADO = ['verStock', 'ajustarStock', 'contar', 'recibir', 'pasar', 'clientes', 'productoNuevo', 'fotos', 'pedidosClientes', 'vender']
+// El empleado: vender y contar stock, nada mas (y solo con el turno abierto).
+const PERMISOS_EMPLEADO = ['contar', 'vender']
+const SECCIONES_EMPLEADO = ['inicio', 'vender', 'contar', 'ajustes', 'mas']
 const esEncargado = () => S.rol === 'encargado'
-function puede (permiso) { return !esEncargado() || PERMISOS_ENCARGADO.includes(permiso) }
-const seccionPermitida = (id) => !esEncargado() || !SOLO_DUENIO.includes(id)
+const esEmpleado = () => S.rol === 'empleado'
+function puede (permiso) {
+  if (esEmpleado()) return PERMISOS_EMPLEADO.includes(permiso)
+  return !esEncargado() || PERMISOS_ENCARGADO.includes(permiso)
+}
+const seccionPermitida = (id) => esEmpleado() ? SECCIONES_EMPLEADO.includes(id) : (!esEncargado() || !SOLO_DUENIO.includes(id))
 
 const GRUPOS = [['principal', ''], ['negocio', 'Negocio'], ['mercaderia', 'Mercadería'], ['control', 'Control']]
 const ABAJO = ['inicio', 'productos', 'escanear', 'ventas', 'mas']
-const abajo = () => esEncargado() ? ['inicio', 'productos', 'escanear', 'contar', 'mas'] : ABAJO
+const abajo = () => esEmpleado() ? ['inicio', 'vender', 'escanear', 'contar', 'mas'] : esEncargado() ? ['inicio', 'productos', 'escanear', 'contar', 'mas'] : ABAJO
 
 function pintarArmazon () {
   const lado = el('nav', { clase: 'lado', 'aria-label': 'Secciones' },
     el('div', { clase: 'marca' }, el('img', { src: 'icono-192.png', alt: '' }), S.negocio),
     el('button', { onclick: () => abrirBuscador() }, icono('buscar'), 'Buscar', el('span', { clase: 'sub', estilo: { marginLeft: 'auto' } }, '/')),
     el('button', { onclick: () => escanearYAbrir() }, icono('escanear'), 'Escanear'),
-    GRUPOS.map(([g, t]) => [t ? el('div', { clase: 'grupo' }, t) : null,
+    GRUPOS.map(([g, t]) => [t && Object.entries(SECCIONES).some(([id, s]) => s.grupo === g && seccionPermitida(id)) ? el('div', { clase: 'grupo' }, t) : null,
       Object.entries(SECCIONES).filter(([id, s]) => s.grupo === g && seccionPermitida(id)).map(([id, s]) => el('button', { 'data-sec': id, onclick: () => ir(id) },
         icono(s.icono), s.nombre, id === 'avisos' ? el('span', { clase: 'insignia', 'data-insignia': '', estilo: { display: 'none' } }) : null))]))
   const tabbar = el('nav', { clase: 'tabbar', 'aria-label': 'Secciones' }, abajo().map((id) => id === 'escanear'
@@ -884,6 +942,7 @@ async function secInicioEncargado () {
 }
 
 async function secInicio () {
+  if (esEmpleado()) return secInicioEmpleado()
   if (esEncargado()) return secInicioEncargado()
   const todas = !!leerLocal('bs.inicioTodas', false) && S.sucursales.length > 1
   const [resumenes, reps, hists, anul, deudas] = await Promise.all([
@@ -1043,7 +1102,7 @@ async function abrirBuscador (inicial) {
       leerDatos('ventas_hoy').catch(() => ({})), leerDatos('ventas_ayer').catch(() => ({}))
     ])
     // El encargado no busca ventas ni proveedores (es plata del dueño).
-    datos = { cat, cli: datosDe(cli) || [], prov: esEncargado() ? [] : datosDe(prov) || [], ventas: esEncargado() ? [] : (datosDe(vh) || []).concat(datosDe(va) || []) }
+    datos = { cat, cli: esEmpleado() ? [] : datosDe(cli) || [], prov: esEncargado() || esEmpleado() ? [] : datosDe(prov) || [], ventas: esEncargado() || esEmpleado() ? [] : (datosDe(vh) || []).concat(datosDe(va) || []) }
     return datos
   }
   let espera = null

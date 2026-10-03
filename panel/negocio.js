@@ -420,6 +420,11 @@ async function secCaja () {
               el('div', { clase: 'fin' }, el('b', { clase: 'num ' + (m.importe < 0 ? 'rojo' : 'verde') }, (m.importe < 0 ? '−' : '+') + plata(Math.abs(m.importe)).replace('−', '')))))) : el('p', { clase: 'sub', estilo: { padding: '0 16px' } }, 'Sin gastos, retiros ni cobros en este turno.'))))
   pintarSeccion('caja',
     cabecera('Caja', nombreSucursal(S.sucursal)),
+    // Si la compu no anda, el dueño deja vender desde el celular aunque nadie haya abierto el turno.
+    el('button', { clase: 'btn ancho', estilo: { marginBottom: '10px' }, onclick: async () => {
+      if (!confirm('¿Poner el modo emergencia en ' + nombreSucursal(S.sucursal) + '?\n\nDurante 8 horas los empleados con usuario del celular pueden vender y contar aunque no tengan el turno abierto en la compu. Las ventas entran a la caja cuando vuelva a andar.')) return
+      await mandarOrden(S.sucursal, 'modo_emergencia', { horas: 8 }, { texto: 'Modo emergencia' })
+    } }, icono('faltantes'), 'La compu no anda: modo emergencia'),
     turno,
     el('p', { clase: 'sub' }, 'Los gastos y retiros de la caja se cargan en el local, donde está la plata. El que está en el mostrador no ve estos totales (caja ciega).'),
     el('div', { clase: 'tarjeta-cab', estilo: { marginTop: '16px' } }, el('h2', {}, 'Cierres anteriores'), el('button', { clase: 'btn chico', onclick: () => ir('cierres') }, 'Ver todos')),

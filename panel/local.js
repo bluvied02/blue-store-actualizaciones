@@ -61,6 +61,7 @@ function buscadorParaAgregar (lista, alElegir) {
 async function secContar () {
   if (!S.sucursal) return pintarSeccion('contar', cabecera('Contar stock'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'stock')))
   const suc = S.sucursal
+  if (esEmpleado() && !(await estadoTurno()).puede) return pintarSeccion('contar', cabecera('Contar stock'), avisoSinTurno())
   const lista = await leerCatalogo(suc)
   const L = listaEscaneada('bs.contar.' + suc, () => ({ lineas: [], nota: '' }))
   const C = L.datos
@@ -330,3 +331,167 @@ async function hojaEncargo (suc) {
 seccion('encargos', { nombre: 'Encargos', icono: 'pedidos', grupo: 'negocio', fn: secEncargos })
 seccion('contar', { nombre: 'Contar stock', corto: 'Contar', icono: 'contar', grupo: 'mercaderia', fn: secContar })
 seccion('recibir', { nombre: 'Recibir mercadería', icono: 'recibir', grupo: 'mercaderia', fn: secRecibir })
+
+// --- EL TURNO DEL EMPLEADO -------------------------------------------------------------
+//
+// El empleado usa el celular solo con el turno iniciado en la caja (lo sube la
+// caja cada minuto), o si el dueño puso el modo emergencia (la compu no anda).
+
+async function estadoTurno () {
+  const d = datosDe(await leerDatos('venta_celular', true).catch(() => ({})), S.sucursal) || {}
+  const yo = S.empleado && S.empleado.usuarioId
+  const trabajando = !esEmpleado() || (d.trabajando || []).includes(yo)
+  let emergencia = !!(d.emergenciaHasta && d.emergenciaHasta > new Date().toISOString())
+  if (!emergencia) {
+    // Con la compu rota la caja no lo aplico todavia: se mira la orden del dueño.
+    try {
+      const { data } = await S.sb.from('pos_ordenes').select('creado,datos').eq('sucursal_id', S.sucursal).eq('tipo', 'modo_emergencia')
+        .gte('creado', new Date(Date.now() - 24 * 3600000).toISOString()).order('creado', { ascending: false }).limit(1)
+      const o = (data || [])[0]
+      if (o) emergencia = new Date(o.creado).getTime() + (Number((o.datos || {}).horas) || 8) * 3600000 > Date.now()
+    } catch (e) { /* sin internet: vale lo que se sabia */ }
+  }
+  return { puede: trabajando || emergencia, trabajando, emergencia, datos: d }
+}
+
+function avisoSinTurno () {
+  return el('div', { clase: 'tarjeta' }, vacio('Iniciá tu turno en la caja de la compu para usar el celular. Si la compu no anda, pedile al dueño que ponga el modo emergencia.', 'caja'))
+}
+
+async function secInicioEmpleado () {
+  const t = await estadoTurno()
+  pintarSeccion('inicio',
+    cabecera('Hola', nombreSucursal(S.sucursal) + (t.puede ? ' · turno abierto' : ' · sin turno')),
+    t.puede
+      ? el('div', {},
+        t.emergencia && !t.trabajando ? el('div', { clase: 'aviso alerta' }, el('b', {}, 'Modo emergencia'), 'Las ventas se cargan en la caja cuando vuelva a andar la compu.') : null,
+        el('div', { clase: 'mas-grilla' },
+          el('button', { clase: 'acceso', onclick: () => ir('vender') }, el('span', { clase: 'ico' }, icono('ventas')), 'Vender'),
+          el('button', { clase: 'acceso', onclick: () => ir('contar') }, el('span', { clase: 'ico' }, icono('contar')), 'Contar stock'),
+          el('button', { clase: 'acceso', onclick: () => escanearYAbrir() }, el('span', { clase: 'ico' }, icono('escanear')), 'Consultar precio')))
+      : avisoSinTurno())
+}
+
+// --- VENDER DESDE EL CELULAR --------------------------------------------------------------
+//
+// Escanear, ver el total (con las mismas promos que la caja), elegir como paga
+// y listo. La venta viaja como orden y la caja la registra en el turno abierto
+// a nombre de quien vendio; sin internet queda guardada y sale sola despues.
+
+const MEDIOS_CELULAR = [['efectivo', 'Efectivo'], ['transferencia', 'Transferencia'], ['debito', 'Débito'], ['credito', 'Crédito'], ['mercado_pago', 'Mercado Pago']]
+
+function cuentaVenta (lineas, datos) {
+  const entrada = lineas.map((l) => ({ productoId: l.productoId, rubroId: l.rubroId || null, cantidad: l.cantidad, precioUnit: l.precioUnit, precioManual: false }))
+  let calc = { lineas: entrada.map(() => null) }
+  if (window.Promociones && (datos.promos || []).length) {
+    try { calc = window.Promociones.calcularVenta(entrada, datos.promos, new Date(), plata) } catch (e) { calc = { lineas: entrada.map(() => null) } }
+  }
+  const filas = entrada.map((it, i) => {
+    const promo = calc.lineas[i]
+    const c = window.Promociones ? window.Promociones.importeLinea({ cantidad: it.cantidad, precioUnit: it.precioUnit, descuentoBasis: 0 }, promo) : { importe: Math.round(it.cantidad * it.precioUnit / 1000), descuentoPromo: 0 }
+    return { importe: c.importe, ahorro: c.descuentoPromo || 0, promo: promo && promo.descuentoPromo ? promo.promoNombre : '' }
+  })
+  return { filas, total: filas.reduce((s, f) => s + f.importe, 0), ahorro: filas.reduce((s, f) => s + f.ahorro, 0) }
+}
+
+async function secVender () {
+  if (!S.sucursal) return pintarSeccion('vender', cabecera('Vender'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'ventas')))
+  const suc = S.sucursal
+  const t = await estadoTurno()
+  if (!t.puede) return pintarSeccion('vender', cabecera('Vender'), avisoSinTurno())
+  const lista = await leerCatalogo(suc)
+  const datos = t.datos || {}
+  const L = listaEscaneada('bs.vender.' + suc, () => ({ lineas: [] }))
+  const V = L.datos
+  const zona = el('div', { clase: 'lista' })
+  const totalNodo = el('div', {})
+
+  const pintar = () => {
+    L.guardar()
+    const c = cuentaVenta(V.lineas, datos)
+    poner(zona, V.lineas.length ? V.lineas.map((l, i) => el('div', { clase: 'item' },
+      el('div', { clase: 'cuerpo' },
+        el('b', {}, l.descripcion),
+        el('div', { clase: 'sub' }, plata(l.precioUnit) + ' c/u' + (c.filas[i].promo ? ' · ' + c.filas[i].promo : ''))),
+      el('div', { clase: 'fin pila' },
+        el('b', { clase: 'num' }, plata(c.filas[i].importe)),
+        campoCantidad(l, () => { if (l.cantidad <= 0) V.lineas.splice(i, 1); pintar() }))))
+      : vacio('Escaneá lo que lleva el cliente.', 'ventas'))
+    poner(totalNodo, V.lineas.length
+      ? el('div', { clase: 'tarjeta', estilo: { textAlign: 'center' } },
+        el('div', { clase: 'sub' }, 'Total'),
+        el('div', { clase: 'num', estilo: { fontSize: '40px', fontWeight: '800' } }, plata(c.total)),
+        c.ahorro ? el('div', { clase: 'sub verde' }, 'Ahorra ' + plata(c.ahorro) + ' con promos') : null,
+        el('button', { clase: 'btn primario ancho grande', estilo: { marginTop: '10px' }, onclick: () => cobrar(c.total) }, 'Cobrar'))
+      : null)
+  }
+
+  const agregar = (p) => {
+    const l = sumarALinea(V.lineas, p, (x) => ({ precioUnit: x.precio || 0, rubroId: x.rubroId || null }))
+    L.guardar()
+    return l
+  }
+
+  const cobrar = (total) => {
+    const recargos = datos.recargos || {}
+    let medio = 'efectivo'
+    const conCuanto = el('input', { type: 'text', inputmode: 'decimal', placeholder: 'Con cuánto paga (opcional)' })
+    const detalle = el('div', {})
+    const botones = el('div', { clase: 'chips', estilo: { flexWrap: 'wrap' } })
+    const aCobrar = () => total + (recargos[medio] ? Math.round(total * recargos[medio] / 10000) : 0)
+    const pintarCobro = () => {
+      poner(botones, MEDIOS_CELULAR.map(([id, nombre]) => el('button', { clase: 'btn' + (medio === id ? ' primario' : ''), onclick: () => { medio = id; pintarCobro() } }, nombre)))
+      const paga = aCentavos(conCuanto.value)
+      poner(detalle,
+        el('div', { clase: 'num', estilo: { fontSize: '34px', fontWeight: '800', textAlign: 'center', margin: '10px 0' } }, plata(aCobrar())),
+        recargos[medio] ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Con recargo de ' + pct(recargos[medio])) : null,
+        medio === 'efectivo' ? el('label', { clase: 'campo' }, 'Con cuánto paga', conCuanto) : null,
+        medio === 'efectivo' && Number.isFinite(paga) && paga > aCobrar() ? el('div', { clase: 'aviso info' }, el('b', {}, 'Vuelto: ' + plata(paga - aCobrar()))) : null,
+        medio === 'transferencia' ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Cobrá cuando te muestre el comprobante.') : null,
+        medio === 'mercado_pago' ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Cobrá cuando veas el pago aprobado.') : null)
+    }
+    conCuanto.addEventListener('input', pintarCobro)
+    pintarCobro()
+    abrirHoja({
+      titulo: 'Cobrar',
+      cuerpo: el('div', {}, botones, detalle),
+      botones: [{ texto: 'Listo, cobrado', primario: true, alTocar: async () => {
+        const paga = aCentavos(conCuanto.value)
+        cerrarHoja()
+        await mandarOrden(suc, 'venta_celular', {
+          items: V.lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, precioUnit: l.precioUnit })),
+          medio, total, ts: new Date().toISOString(),
+          efectivoRecibido: medio === 'efectivo' && Number.isFinite(paga) ? paga : 0
+        }, { texto: 'Venta ' + plata(aCobrar()), callado: true })
+        toast('Venta guardada (' + plata(aCobrar()) + '). Se carga en la caja sola.', 'ok', 4)
+        L.nueva()
+        S.listas['bs.vender.' + suc] = null
+        refrescarSeccion()
+      } }]
+    })
+  }
+
+  const escanear = () => leerCodigo({
+    titulo: 'Vendiendo',
+    texto: 'Cada código que leés suma uno',
+    textoListo: 'Listo',
+    alLeer: async (c) => {
+      const r = await buscarCodigo(c, suc).catch(() => ({}))
+      if (!r.producto) return '✗ ' + c + ' no está en el catálogo'
+      if (!r.producto.precio) return '✗ ' + r.producto.descripcion + ' no tiene precio'
+      const l = agregar(r.producto)
+      return '✓ ' + l.descripcion + ' · ' + unidades(l.cantidad)
+    }
+  }).then(pintar)
+
+  pintar()
+  pintarSeccion('vender',
+    cabecera('Vender', nombreSucursal(suc) + (t.emergencia && !t.trabajando ? ' · modo emergencia' : '')),
+    el('button', { clase: 'btn primario ancho grande', estilo: { marginBottom: '10px' }, onclick: escanear }, icono('escanear'), 'Escanear productos'),
+    buscadorParaAgregar(lista.filter((p) => p.precio > 0), (p) => { agregar(p); pintar() }),
+    el('div', { clase: 'tarjeta sin-relleno' }, zona),
+    totalNodo,
+    V.lineas.length ? el('button', { clase: 'btn ancho', estilo: { marginTop: '8px' }, onclick: () => { if (!confirm('¿Borrar esta venta?')) return; L.nueva(); S.listas['bs.vender.' + suc] = null; refrescarSeccion() } }, 'Borrar y empezar de nuevo') : null)
+}
+
+seccion('vender', { nombre: 'Vender', icono: 'ventas', grupo: 'principal', fn: secVender })

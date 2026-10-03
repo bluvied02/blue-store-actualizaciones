@@ -255,12 +255,14 @@ async function hojaProducto (p, sucursalId) {
       p.foto ? el('img', { clase: 'foto-producto', src: p.foto, alt: p.descripcion }) : null,
       el('div', { clase: 'acciones-grandes' },
         precios ? el('button', { clase: 'btn primario grande', onclick: () => hojaPrecio(p, suc) }, icono('gastos'), 'Cambiar precio') : null,
-        el('button', { clase: 'btn primario grande', onclick: () => hojaAjusteStock(p, suc) }, icono('stock'), 'Ajustar stock'),
-        el('button', { clase: 'btn grande', onclick: () => sacarFoto(p, suc) }, icono('foto'), p.foto ? 'Cambiar la foto' : 'Sacarle una foto'),
+        puede('ajustarStock') ? el('button', { clase: 'btn primario grande', onclick: () => hojaAjusteStock(p, suc) }, icono('stock'), 'Ajustar stock') : null,
+        puede('fotos') ? el('button', { clase: 'btn grande', onclick: () => sacarFoto(p, suc) }, icono('foto'), p.foto ? 'Cambiar la foto' : 'Sacarle una foto') : null,
         precios ? el('button', { clase: 'btn grande', onclick: () => hojaEditarProducto(p, suc) }, icono('editar'), 'Editar todo') : null,
-        el('button', { clase: 'btn grande', onclick: () => { const x = extra.querySelector('[data-hist]'); if (x) x.scrollIntoView({ behavior: 'smooth' }) } }, icono('historial'), 'Historial')),
+        esEmpleado() ? null : el('button', { clase: 'btn grande', onclick: () => { const x = extra.querySelector('[data-hist]'); if (x) x.scrollIntoView({ behavior: 'smooth' }) } }, icono('historial'), 'Historial')),
       extra)
   })
+  // El empleado consulta precio y stock: el historial y las ventas no son para el.
+  if (esEmpleado()) { limpiar(extra); return }
   // Ventas y cambios del producto (se cargan despues de abrir: no demoran la ficha).
   try {
     const [aud, vh, va] = await Promise.all([leerDatos('auditoria').catch(() => ({})), leerDatos('ventas_hoy').catch(() => ({})), leerDatos('ventas_ayer').catch(() => ({}))])

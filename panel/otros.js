@@ -190,6 +190,7 @@ async function secCierres () {
 // --- AVISOS ---------------------------------------------------------------------------------
 
 async function contarAvisos () {
+  if (esEmpleado()) return
   try {
     const visto = leerLocal('bs.avisosVistos', '') || '1970-01-01'
     const { count } = await S.sb.from('pos_avisos').select('id', { count: 'exact', head: true }).gt('creado', visto)
