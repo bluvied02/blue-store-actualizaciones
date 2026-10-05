@@ -95,7 +95,7 @@ async function secVentas () {
 
 // --- REPORTES ------------------------------------------------------------------
 
-const PERIODOS_REPORTE = [['hoy', 'Hoy'], ['ayer', 'Ayer'], ['semana', '7 días'], ['mes', 'Este mes'], ['mesPasado', 'Mes pasado'], ['30', '30 días'], ['anio', 'Este año']]
+const PERIODOS_REPORTE = [['hoy', 'Hoy'], ['ayer', 'Ayer'], ['semana', '7 días'], ['mes', 'Este mes'], ['mesPasado', 'Mes pasado'], ['30', '30 días'], ['anio', 'Este año'], ['elegir', 'Elegir día y hora']]
 
 // Junta los reportes de varias sucursales (por nombre de producto, familia...).
 function juntarReportes (lista) {
@@ -113,7 +113,7 @@ function juntarReportes (lista) {
     r.productos.push(...x.productos); r.familias.push(...x.familias); r.medios.push(...x.medios); r.vendedores.push(...x.vendedores)
     x.horas.forEach((h, i) => { r.horas[i][0] += h[0]; r.horas[i][1] += h[1] })
     for (const [d, i, n] of x.porDia || []) { const y = dias[d] || (dias[d] = [d, 0, 0]); y[1] += i; y[2] += n }
-    r.desde = x.desde; r.hasta = x.hasta; r.anterior.desde = (x.anterior || {}).desde; r.anterior.hasta = (x.anterior || {}).hasta
+    r.desde = x.desde; r.hasta = x.hasta; r.franja = x.franja || null; r.anterior.desde = (x.anterior || {}).desde; r.anterior.hasta = (x.anterior || {}).hasta
   }
   r.productos = mapa(r.productos, 'd', ['u', 'i', 'g']).sort((a, b) => b.i - a.i)
   r.familias = mapa(r.familias, 'n', ['u', 'i', 'g']).sort((a, b) => b.i - a.i)
@@ -136,8 +136,21 @@ async function secReportes (params) {
   // 30 dias y el año salen del dia por dia (tambien el de Gestion Comercio).
   if (E.periodo === '30' || E.periodo === 'anio') return reporteHistorial(E, ids, segPeriodo, segSuc)
 
-  const reps = await leerDatos('reportes')
-  const lista = ids.map((id) => { const d = datosDe(reps, id); return d && d[E.periodo] }).filter(Boolean)
+  // Un dia y horario elegidos: se le pide a la caja y se muestra igual que los demas.
+  let formElegir = null
+  let lista
+  if (E.periodo === 'elegir') {
+    formElegir = formularioReporte(E, ids)
+    const p = E.pedido
+    const listo = p && p.clave === ids.join(',') && p.resultados.length + p.errores.length === ids.length
+    if (!listo || !p.resultados.length) {
+      return pintarSeccion('reportes', cabecera('Reportes', 'El día y el horario que quieras'), segSuc, segPeriodo, formElegir,
+        p && p.clave === ids.join(',') ? estadoPedidoReporte(p) : null)
+    }
+    lista = p.resultados
+  }
+  const reps = E.periodo === 'elegir' ? {} : await leerDatos('reportes')
+  if (!lista) lista = ids.map((id) => { const d = datosDe(reps, id); return d && d[E.periodo] }).filter(Boolean)
   if (!lista.length) {
     return pintarSeccion('reportes', cabecera('Reportes'), segSuc, segPeriodo,
       el('div', { clase: 'tarjeta' }, vacio('La caja todavía no subió reportes. Aparecen unos minutos después de actualizar la caja a la versión 0.11.', 'reportes')))
@@ -167,8 +180,9 @@ async function secReportes (params) {
   const totalMedios = r.medios.reduce((s, m) => s + m.i, 0)
 
   pintarSeccion('reportes',
-    cabecera('Reportes', (unDia ? fechaCorta(r.desde) : fechaCorta(r.desde) + ' al ' + fechaCorta(r.hasta)) + ' · ' + (E.todas ? 'todas las sucursales' : nombreSucursal(S.sucursal)) + (armado ? ' · armado ' + hace(armado) : '')),
-    segSuc, segPeriodo,
+    cabecera('Reportes', (unDia ? fechaCorta(r.desde) : fechaCorta(r.desde) + ' al ' + fechaCorta(r.hasta)) + (r.franja ? ' · de ' + r.franja + ' h' : '') + ' · ' + (E.todas ? 'todas las sucursales' : nombreSucursal(S.sucursal)) + (armado ? ' · armado ' + hace(armado) : '')),
+    segSuc, segPeriodo, formElegir,
+    E.periodo === 'elegir' && E.pedido && E.pedido.errores.length ? estadoPedidoReporte(E.pedido) : null,
     el('div', { clase: 'kpis' },
       kpi('Facturación', plata(r.total), delta(r.total, ant.total, contraQue), { clase: 'principal' }),
       kpi('Ventas', String(r.ventas), delta(r.ventas, ant.ventas)),
@@ -193,6 +207,65 @@ async function secReportes (params) {
       el('div', { clase: 'tarjeta' }, el('h2', {}, 'Vendedores'),
         r.vendedores.length ? ranking(r.vendedores.map((v) => ({ n: v.n, texto: plata(v.i), sub: v.v ? v.v + ' ventas · ticket ' + plata(v.i / v.v) : '', v: v.i }))) : el('div', { clase: 'sub' }, 'Sin ventas.'))),
     r.historial ? el('p', { clase: 'sub', estilo: { marginTop: '10px' } }, 'Incluye ventas de Gestión Comercio del ' + fechaCorta(r.historial.desde) + ' al ' + fechaCorta(r.historial.hasta) + '.') : null)
+}
+
+// Elegir los dias y el horario. Los dias son los del local: "sabado de 22 a
+// 02" incluye la madrugada del domingo.
+function formularioReporte (E, ids) {
+  const f = E.elegido = Object.assign({ desde: sumarDias(hoyISO(), -1), hasta: '', todoElDia: true, horaDesde: '20:00', horaHasta: '00:00' }, E.elegido || {})
+  const desde = el('input', { type: 'date', valor: f.desde, max: hoyISO() })
+  const hasta = el('input', { type: 'date', valor: f.hasta || f.desde, max: hoyISO() })
+  const hDesde = el('input', { type: 'time', valor: f.horaDesde })
+  const hHasta = el('input', { type: 'time', valor: f.horaHasta })
+  const todo = el('input', { type: 'checkbox', checked: f.todoElDia })
+  const horas = el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Desde las', hDesde), el('label', { clase: 'campo' }, 'Hasta las', hHasta))
+  const pintarHoras = () => { horas.style.display = todo.checked ? 'none' : '' }
+  todo.addEventListener('change', pintarHoras)
+  desde.addEventListener('change', () => { if (!hasta.value || hasta.value < desde.value) hasta.value = desde.value })
+  pintarHoras()
+  const pedido = E.pedido && E.pedido.clave === ids.join(',') ? E.pedido : null
+  const esperando = pedido && pedido.resultados.length + pedido.errores.length < ids.length
+  return el('div', { clase: 'tarjeta' },
+    el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Día', desde), el('label', { clase: 'campo' }, 'Hasta el día', hasta)),
+    el('label', { estilo: { display: 'flex', alignItems: 'center', gap: '10px', margin: '6px 0 10px' } }, todo, 'Todo el día'),
+    horas,
+    el('button', { clase: 'btn primario ancho', disabled: !!esperando, onclick: () => {
+      if (!desde.value) return toast('Elegí el día', 'mal')
+      const h = hasta.value || desde.value
+      if (h < desde.value) return toast('El "hasta" tiene que ser después del "desde"', 'mal')
+      if (!todo.checked && hDesde.value === hHasta.value) return toast('El horario tiene que empezar y terminar a distinta hora', 'mal')
+      Object.assign(f, { desde: desde.value, hasta: h, todoElDia: todo.checked, horaDesde: hDesde.value, horaHasta: hHasta.value })
+      pedirReporte(E, ids, { desde: desde.value, hasta: h, horaDesde: todo.checked ? null : hDesde.value, horaHasta: todo.checked ? null : hHasta.value })
+    } }, esperando ? 'Armando el reporte…' : 'Ver el reporte'),
+    el('p', { clase: 'sub', estilo: { marginTop: '8px' } }, 'Lo arma la caja de cada sucursal con todas sus ventas: tarda hasta un minuto y la caja tiene que estar prendida. El horario cruza la medianoche si hace falta (de 22 a 02).'))
+}
+
+function pedirReporte (E, ids, datos) {
+  const p = E.pedido = { clave: ids.join(','), datos, resultados: [], errores: [], desde: Date.now() }
+  for (const id of ids) {
+    mandarOrden(id, 'reporte', datos, {
+      callado: true,
+      silencioso: true,
+      alTerminar: (r) => {
+        if (E.pedido !== p) return
+        const res = r.resultado || {}
+        if (r.estado === 'aplicada' && res.datos) p.resultados.push(res.datos)
+        else p.errores.push(nombreSucursal(id) + ': ' + (res.error || 'no se pudo'))
+        if (S.seccion === 'reportes') render()
+      }
+    })
+  }
+  render()
+}
+
+function estadoPedidoReporte (p) {
+  const faltan = p.resultados.length + p.errores.length < p.clave.split(',').length
+  if (faltan) {
+    const seg = Math.round((Date.now() - p.desde) / 1000)
+    return el('div', { clase: 'aviso' + (seg > 120 ? ' mal' : '') }, el('b', {}, 'Pidiéndole el reporte a la caja…'),
+      seg > 120 ? 'Ya pasaron más de 2 minutos: fijate que la caja esté prendida y con internet. Llega solo cuando se conecte.' : 'Tarda hasta un minuto.')
+  }
+  return p.errores.length ? el('div', { clase: 'aviso mal' }, el('b', {}, 'No se pudo armar'), p.errores.join(' · ')) : null
 }
 
 async function reporteHistorial (E, ids, segPeriodo, segSuc) {

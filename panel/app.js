@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '11.8'
+const VERSION_APP = '11.9'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -371,6 +371,7 @@ async function buscarCodigo (codigo, sucursalId) {
 // --- las ordenes (lo que se le pide a la caja) --------------------------------------
 
 const NOMBRE_ORDEN = {
+  reporte: 'Reporte',
   producto: 'Cambio de producto', stock: 'Ajuste de stock', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
   promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular',
   cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto',
@@ -390,7 +391,7 @@ const guardarEsperando = () => DB.set('esperando', [...S.esperando.values()])
 // Deja una orden. Primero queda guardada en el celular; si hay internet se
 // manda ya, si no, cuando vuelva. alTerminar(resultado) cuando la caja responde.
 async function mandarOrden (sucursalId, tipo, datos, opciones = {}) {
-  const o = { id: uuid(), sucursal_id: sucursalId, tipo, datos, texto: opciones.texto || NOMBRE_ORDEN[tipo] || tipo, creado: new Date().toISOString() }
+  const o = { id: uuid(), sucursal_id: sucursalId, tipo, datos, texto: opciones.texto || NOMBRE_ORDEN[tipo] || tipo, creado: new Date().toISOString(), silencioso: !!opciones.silencioso }
   S.cola.push(o)
   await guardarCola()
   if (opciones.alTerminar) S.alTerminar.set(o.id, opciones.alTerminar)
@@ -449,13 +450,13 @@ function seguirOrdenes () {
         const o = S.esperando.get(r.id)
         S.esperando.delete(r.id)
         const res = r.resultado || {}
-        if (r.estado === 'aplicada') toast('✓ ' + (o ? o.texto : 'Listo') + (res.mensaje ? ': ' + res.mensaje : ''), 'ok', 4.5)
+        if (o && o.silencioso) { /* lo muestra quien la pidio */ } else if (r.estado === 'aplicada') toast('✓ ' + (o ? o.texto : 'Listo') + (res.mensaje ? ': ' + res.mensaje : ''), 'ok', 4.5)
         else toast('✗ ' + (o ? o.texto : 'La caja') + ' no se pudo: ' + (res.error || 'error'), 'mal', 8)
         // La caja marca la orden y enseguida sube los datos nuevos: se espera
         // unos segundos antes de volver a leer, asi no se ve el valor viejo.
         const fn = S.alTerminar.get(r.id)
         S.alTerminar.delete(r.id)
-        setTimeout(() => { S.cache = {}; if (fn) { try { fn(r) } catch (e) {} } }, 5000)
+        if (o && o.silencioso) { if (fn) { try { fn(r) } catch (e) {} } } else setTimeout(() => { S.cache = {}; if (fn) { try { fn(r) } catch (e) {} } }, 5000)
       }
       // Lo que ya no existe en la nube (o es muy viejo) se deja de seguir.
       for (const id of ids) {
