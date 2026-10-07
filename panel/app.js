@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '11.9'
+const VERSION_APP = '12.0'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -311,7 +311,13 @@ async function leerResumen (forzar) {
   const c = S.cache.resumen
   if (!forzar && c && Date.now() - c.t < 20000) return c.v
   try {
-    const { data, error } = await S.sb.from('pos_resumen').select('*').order('nombre')
+    // Encargados y empleados ven la lista de sucursales, sin lo vendido (ver
+    // docs/panel-supabase-seguridad.sql). Si ese SQL todavia no se corrio, se
+    // lee como antes.
+    let { data, error } = S.rol !== 'duenio'
+      ? await S.sb.from('pos_sucursales').select('sucursal_id,nombre,actualizado').order('nombre')
+      : await S.sb.from('pos_resumen').select('*').order('nombre')
+    if (error && S.rol !== 'duenio' && !esDeRed(error)) ({ data, error } = await S.sb.from('pos_resumen').select('*').order('nombre'))
     if (error) throw error
     S.cache.resumen = { t: Date.now(), v: data || [] }
     DB.set('resumen', { t: Date.now(), v: data || [] })
@@ -332,8 +338,16 @@ async function leerCatalogo (sucursalId, forzar) {
   if (!forzar && c && Date.now() - c.t < 60000) return c.v
   try {
     const filas = []
+    // Encargados y empleados: el catalogo sin costos (si el SQL de seguridad
+    // todavia no se corrio, el de siempre).
+    let tabla = S.rol !== 'duenio' && S.catalogoEquipo !== false ? 'pos_catalogo_equipo' : 'pos_catalogo'
     for (let desde = 0; desde < 30000; desde += 1000) {
-      const { data, error } = await S.sb.from('pos_catalogo').select('producto_id,datos').eq('sucursal_id', sucursalId).range(desde, desde + 999)
+      let { data, error } = await S.sb.from(tabla).select('producto_id,datos').eq('sucursal_id', sucursalId).range(desde, desde + 999)
+      if (error && tabla === 'pos_catalogo_equipo' && !esDeRed(error)) {
+        S.catalogoEquipo = false
+        tabla = 'pos_catalogo';
+        ({ data, error } = await S.sb.from(tabla).select('producto_id,datos').eq('sucursal_id', sucursalId).range(desde, desde + 999))
+      }
       if (error) throw error
       filas.push(...data)
       if (data.length < 1000) break
