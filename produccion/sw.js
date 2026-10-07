@@ -4,8 +4,8 @@
 //     primero pide la version nueva y, si no hay conexion, usa la guardada.
 // Los datos los maneja la app (la nube, y la cola de lo anotado sin señal).
 
-const VERSION = 'bs-produccion-1.1'
-const APP = ['./', 'index.html', 'estilos.css?v=1.1', 'calculo.js?v=1.1', 'comun.js?v=1.1', 'datos.js?v=1.1', 'app.js?v=1.1', 'produccion.js?v=1.1', 'local.js?v=1.1', 'duenio.js?v=1.1', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const VERSION = 'bs-produccion-1.2'
+const APP = ['./', 'index.html', 'estilos.css?v=1.2', 'calculo.js?v=1.2', 'comun.js?v=1.2', 'datos.js?v=1.2', 'app.js?v=1.2', 'produccion.js?v=1.2', 'local.js?v=1.2', 'duenio.js?v=1.2', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {

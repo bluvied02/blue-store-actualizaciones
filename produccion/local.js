@@ -29,6 +29,7 @@ const Local = {
             el('div', { clase: 'sub' }, (p.persona ? p.persona + ' · ' : '') + (p.productos || []).map((id) => { const x = Local.producto(id); return x ? x.nombre : 'Producto' }).join(', '))),
           icono('flecha', 'tenue'))))))
     }
+    cont.append(botonInstalar())
     poner($app, cont)
   },
   recibir (p) {

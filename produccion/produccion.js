@@ -56,7 +56,8 @@ const Prod = {
           el('div', { clase: 'ico-grande' }, icono('balanza')),
           el('h2', {}, 'Hoy todavía no empezaste'),
           el('p', { clase: 'tenue' }, e.config.contarAlAbrir ? 'Al empezar vas a pesar y contar lo que hay, sin mirar nada más. Tarda unos minutos.' : 'Tocá para empezar el día.'),
-          el('button', { clase: 'btn primario ancho grande', onclick: () => Prod.empezarDia() }, 'Empezar el día')))
+          el('button', { clase: 'btn primario ancho grande', onclick: () => Prod.empezarDia() }, 'Empezar el día')),
+        botonInstalar())
       return poner($app, cont)
     }
     const conteoApertura = (e.hoy || []).some((m) => m.tipo === 'conteo' && m.datos && m.datos.momento === 'apertura')
@@ -76,6 +77,7 @@ const Prod = {
     cont.append(el('div', { clase: 'acciones-chica' }, acciones.map((a) =>
       el('button', { clase: 'accion-chica' + (a.clase ? ' ' + a.clase : ''), onclick: () => { vibrar(); a.fn() } }, el('span', { clase: 'ico' }, icono(a.icono)), a.nombre))))
     cont.append(Prod.hoyLista())
+    cont.append(botonInstalar())
     poner($app, cont)
     pintarCola()
   },

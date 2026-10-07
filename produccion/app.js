@@ -10,7 +10,7 @@
 // Archivos: comun.js (piezas de pantalla), calculo.js (faltantes y costos),
 // datos.js (la nube o la prueba), produccion.js, local.js y duenio.js.
 
-const VERSION_APP = '1.1'
+const VERSION_APP = '1.2'
 const S = {
   negocio: 'Blue Store',
   sesion: null, // { token, persona } de la chica o el que recibe
