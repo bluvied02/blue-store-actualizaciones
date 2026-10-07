@@ -10,7 +10,7 @@
 // Archivos: comun.js (piezas de pantalla), calculo.js (faltantes y costos),
 // datos.js (la nube o la prueba), produccion.js, local.js y duenio.js.
 
-const VERSION_APP = '1.0'
+const VERSION_APP = '1.1'
 const S = {
   negocio: 'Blue Store',
   sesion: null, // { token, persona } de la chica o el que recibe
@@ -155,6 +155,7 @@ function pantallaPin (mensaje) {
       clase: 'tecla' + (t === 'ok' ? ' ok' : ''), type: 'button', 'aria-label': t === 'borrar' ? 'Borrar' : t === 'ok' ? 'Entrar' : t, onclick: () => tecla(t)
     }, t === 'borrar' ? '⌫' : t === 'ok' ? 'Entrar' : t))),
     el('button', { clase: 'btn ancho', estilo: { marginTop: '22px' }, onclick: () => { guardarLocal('prod.modo', 'duenio'); pantallaEntrarDuenio() } }, 'Soy el dueño: entrar con mail'),
+    el('div', { estilo: { marginTop: '10px' } }, botonInstalar('suave')),
     PRUEBA ? el('p', { clase: 'sub centro', estilo: { marginTop: '14px' } }, 'Prueba: Mica 1234 · Duffy 2222 · Alberdi 3333') : null))
   pintar()
   const teclado = (ev) => {
@@ -219,7 +220,8 @@ function pantallaEntrarDuenio (mensaje) {
     el('label', { clase: 'campo' }, 'Contraseña', clave),
     error, boton,
     el('p', { estilo: { marginTop: '16px', textAlign: 'center' } }, el('a', { href: '#', onclick: (ev) => { ev.preventDefault(); olvide() } }, 'Me olvidé la contraseña')),
-    el('button', { clase: 'btn ancho', estilo: { marginTop: '18px' }, onclick: () => { guardarLocal('prod.modo', 'pin'); pantallaPin() } }, 'Entrar con PIN')))
+    el('button', { clase: 'btn ancho', estilo: { marginTop: '18px' }, onclick: () => { guardarLocal('prod.modo', 'pin'); pantallaPin() } }, 'Entrar con PIN'),
+    el('div', { estilo: { marginTop: '10px' } }, botonInstalar('suave'))))
   ;(email.value ? clave : email).focus()
 }
 

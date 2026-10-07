@@ -77,7 +77,9 @@ const ICONOS = {
   regla: 'M3 17 17 3l4 4L7 21z M7 13l2 2 M10 10l2 2 M13 7l2 2',
   historial: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7v5l3 2',
   plata: 'M12 2v20 M17 6H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6',
-  editar: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4'
+  editar: 'M4 20h4L19 9l-4-4L4 16z M13.5 6.5l4 4',
+  descargar: 'M12 4v11 M7 10l5 5 5-5 M5 20h14',
+  compartir: 'M12 15V3 M8 7l4-4 4 4 M5 11v9h14v-9'
 }
 function icono (nombre, clase) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
@@ -261,6 +263,58 @@ function eleccion (items, alElegir, opciones) {
       x.icono ? icono(x.icono) : null,
       el('span', { clase: 'txt' }, el('b', {}, x.nombre), x.sub ? el('span', { clase: 'sub' }, x.sub) : null),
       opciones.sinFlecha ? null : icono('flecha', 'tenue'))))
+}
+
+// --- instalar en el celular (acceso directo en la pantalla de inicio) ------------------------
+// Android/Chrome avisa que se puede instalar y se abre su cartel. iPhone no
+// tiene cartel: hay que hacerlo desde Safari. Y si el link se abrio desde
+// WhatsApp, primero hay que pasarlo al navegador de verdad.
+const INSTALAR = { evento: null }
+window.addEventListener('beforeinstallprompt', (ev) => { ev.preventDefault(); INSTALAR.evento = ev })
+window.addEventListener('appinstalled', () => { INSTALAR.evento = null; toast('Listo: ya está en la pantalla de inicio', 'ok', 5) })
+const yaInstalada = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true
+function botonInstalar (clase) {
+  if (yaInstalada()) return null
+  return el('button', { clase: 'btn ancho ' + (clase || ''), type: 'button', onclick: () => instalar() }, icono('descargar'), 'Instalar en este celular')
+}
+async function instalar () {
+  if (INSTALAR.evento) {
+    const ev = INSTALAR.evento
+    INSTALAR.evento = null
+    try { ev.prompt(); await ev.userChoice } catch (e) {}
+    return
+  }
+  const ua = navigator.userAgent
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const android = /Android/.test(ua)
+  const dentroDeApp = /FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/.test(ua)
+  const pasos = (titulo, lista, abierto) => el('details', { clase: 'detalles', open: abierto || null },
+    el('summary', {}, titulo), el('ol', { clase: 'pasos' }, lista.map((p) => el('li', {}, p))))
+  const iphone = pasos('iPhone', [
+    'Abrí el link en Safari. Si lo abriste desde WhatsApp, tocá la brújula o "Abrir en Safari".',
+    el('span', {}, 'Tocá el botón Compartir ', el('span', { clase: 'tecla-chica' }, icono('compartir')), ' (abajo en el medio, o arriba a la derecha).'),
+    'Bajá y tocá "Agregar a inicio" (o "Agregar a pantalla de inicio").',
+    'Tocá "Agregar". Queda el ícono de Blue Store con el nombre Producción.'
+  ], ios)
+  const androide = pasos('Android', [
+    'Abrí el link en Chrome. Si lo abriste desde WhatsApp, tocá los tres puntitos ⋮ y "Abrir en Chrome".',
+    'Tocá los tres puntitos ⋮ arriba a la derecha.',
+    'Tocá "Agregar a la pantalla principal" o "Instalar aplicación".',
+    'Confirmá con "Instalar" o "Agregar".'
+  ], android)
+  const compu = pasos('Computadora', [
+    'Abrí el link en Chrome o en Edge.',
+    'En la barra de la dirección, a la derecha, tocá el ícono de instalar (una pantallita con una flecha).',
+    'Si no está: menú ⋮ → "Transmitir, guardar y compartir" → "Instalar página como app" (en Edge: menú ··· → "Aplicaciones" → "Instalar este sitio como aplicación").'
+  ], !ios && !android)
+  hoja({
+    titulo: 'Instalar en este celular',
+    cuerpo: [
+      dentroDeApp ? el('div', { clase: 'aviso alerta' }, el('b', {}, 'Lo abriste desde otra app'), 'Desde ahí no se puede instalar. Primero abrilo en ' + (ios ? 'Safari' : 'Chrome') + ' (mirá el paso 1).') : null,
+      el('p', { clase: 'tenue' }, 'Así queda un ícono en la pantalla de inicio y se abre como una app.'),
+      ios ? [iphone, androide, compu] : android ? [androide, iphone, compu] : [compu, androide, iphone]
+    ]
+  })
 }
 
 function aplicarTema () {

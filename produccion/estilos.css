@@ -388,3 +388,8 @@ label.campo, .campo { display: grid; gap: 5px; margin-bottom: 12px; font-size: 1
 button.alerta-fila { text-align: left; width: 100%; color: inherit; font: inherit; }
 .alerta-fila .txt .sub { display: block; }
 [hidden] { display: none !important; }
+
+/* instalar */
+.pasos { margin: 0 0 12px; padding-left: 22px; display: grid; gap: 8px; font-size: 15px; }
+.tecla-chica { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--sup2); vertical-align: middle; }
+.tecla-chica svg.ic { width: 16px; height: 16px; }

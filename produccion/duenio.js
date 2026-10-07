@@ -705,8 +705,9 @@ const Duenio = {
     // Link para la chica.
     const link = location.origin + location.pathname + (PRUEBA ? '?prueba' : '') + (leerLocal('prod.proyecto', '') ? '#p=' + leerLocal('prod.proyecto', '') : '')
     c.append(el('div', { clase: 'tarjeta' }, el('h2', {}, 'El link para el celular de producción'),
-      el('p', { clase: 'tenue' }, 'Abrilo en el celular de ella, entrá con su PIN y agregalo a la pantalla de inicio (en el menú del navegador: "Agregar a pantalla principal").'),
-      el('div', { clase: 'link-copiar' }, el('code', {}, link), el('button', { clase: 'btn chico', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('Link copiado', 'ok') } catch (e) { toast('Copialo a mano', 'mal') } } }, 'Copiar'))))
+      el('p', { clase: 'tenue' }, 'Abrilo en el celular de ella y agregalo a la pantalla de inicio. Si se lo mandás por WhatsApp, que lo abra en Chrome (Android) o en Safari (iPhone): desde adentro de WhatsApp no se puede.'),
+      el('div', { clase: 'link-copiar' }, el('code', {}, link), el('button', { clase: 'btn chico', onclick: async () => { try { await navigator.clipboard.writeText(link); toast('Link copiado', 'ok') } catch (e) { toast('Copialo a mano', 'mal') } } }, 'Copiar')),
+      el('button', { clase: 'btn ancho', estilo: { marginTop: '10px' }, onclick: () => instalar() }, icono('descargar'), 'Cómo poner el acceso directo')))
     // Locales.
     const listaSuc = el('div', {})
     const pintarSuc = () => poner(listaSuc, conf.sucursales.map((s, k) => el('div', { clase: 'dos', estilo: { alignItems: 'end', marginBottom: '8px' } },
