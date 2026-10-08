@@ -149,7 +149,7 @@ async function secVentas () {
         el('button', { clase: E.dia === 'ayer' ? 'activo' : '', onclick: () => { E.dia = 'ayer'; render() } }, 'Ayer'),
         el('button', { clase: E.dia === '7dias' ? 'activo' : '', onclick: () => { E.dia = '7dias'; render() } }, '7 días')),
       elegir),
-    esperando.length ? el('div', { clase: 'aviso' }, el('b', {}, 'Pidiéndole las ventas a la caja…'), 'Ese día es de hace más de dos semanas: la caja lo manda en menos de un minuto (tiene que estar prendida).') : null,
+    esperando.length ? el('div', { clase: 'aviso' }, el('b', {}, 'Pidiéndole las ventas a la caja…'), 'La caja todavía no los había subido: los manda en menos de un minuto. Tiene que estar prendida y con la versión 0.29 o más nueva (se instala sola al cerrar el turno).') : null,
     errores.length ? el('div', { clase: 'aviso mal' }, el('b', {}, 'No se pudieron traer'), errores.map((r) => r.error).join(' · ')) : null,
     el('div', { clase: 'kpis' },
       kpi('Vendido', plata(total), validas.length + ' ventas', { clase: 'principal' }),
