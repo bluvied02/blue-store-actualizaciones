@@ -9,7 +9,7 @@
 const ESPACIO = /\/paneles\//.test(self.registration.scope) ? new URL(self.registration.scope).pathname : ''
 const PREFIJO = ESPACIO ? 'cliente|' + ESPACIO + '|v' : 'bs-panel-v'
 const VERSION = PREFIJO + '12-2'
-const APP = ['./', 'index.html', 'estilos.css?v=12.7', 'app.js?v=12.7', 'lector.js?v=12.7', 'productos.js?v=12.7', 'negocio.js?v=12.7', 'promociones.js?v=12.7', 'local.js?v=12.7', 'otros.js?v=12.7', 'mayorista-calculo.js?v=12.7', 'mayorista.js?v=12.7', 'metricas-calculo.js?v=12.7', 'metricas.js?v=12.7', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const APP = ['./', 'index.html', 'estilos.css?v=12.8', 'app.js?v=12.8', 'lector.js?v=12.8', 'productos.js?v=12.8', 'negocio.js?v=12.8', 'promociones.js?v=12.8', 'local.js?v=12.8', 'otros.js?v=12.8', 'mayorista-calculo.js?v=12.8', 'mayorista.js?v=12.8', 'metricas-calculo.js?v=12.8', 'metricas.js?v=12.8', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {
