@@ -5,7 +5,9 @@
 
 async function secReponer () {
   if (!S.sucursal) return pintarSeccion('reponer', cabecera('Reponer'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'reponer')))
-  const E = S.rep2 = Object.assign({ vista: 'pedido_hoy', busca: '', ajustes: {} }, S.rep2 || {})
+  const E = S.rep2 = Object.assign({ vista: 'pedidos_compra', busca: '', ajustes: {} }, S.rep2 || {})
+  const pestanas = el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, [['pedidos_compra', 'Pedidos'], ['pedido_sugerido', 'Sugerido'], ['pedido_hoy', 'Lo de hoy'], ['pedido_semana', 'La semana']].map(([id, t]) => el('button', { clase: E.vista === id ? 'activo' : '', onclick: () => { E.vista = id; render() } }, t)))
+  if (E.vista === 'pedidos_compra') return secPedidosCompra(E, pestanas)
   const datos = await leerDatos(E.vista)
   const p = datosDe(datos)
   const busca = el('input', { type: 'search', placeholder: 'Buscar un producto en el pedido…', valor: E.busca })
@@ -26,7 +28,8 @@ async function secReponer () {
           el('div', {}, el('h2', { estilo: { margin: 0 } }, g.nombre), el('div', { clase: 'sub' }, g.filas.length + ' productos' + (g.telefono ? ' · ' + g.telefono : ' · sin teléfono'))),
           el('div', { clase: 'chips' },
             el('a', { clase: 'btn primario chico', href: '#', onclick: (ev) => { ev.preventDefault(); window.open(linkWhatsApp(g.telefono, texto()), '_blank') } }, icono('mensaje'), 'WhatsApp'),
-            el('button', { clase: 'btn chico', onclick: async () => { try { await navigator.clipboard.writeText(texto()); toast('Pedido copiado', 'ok') } catch (e) { toast('No se pudo copiar', 'mal') } } }, 'Copiar'))),
+            el('button', { clase: 'btn chico', onclick: async () => { try { await navigator.clipboard.writeText(texto()); toast('Pedido copiado', 'ok') } catch (e) { toast('No se pudo copiar', 'mal') } } }, 'Copiar'),
+            E.vista === 'pedido_sugerido' && g.proveedorId ? el('button', { clase: 'btn chico', onclick: () => mandarOrden(S.sucursal, 'pedido_guardar', { proveedorId: g.proveedorId, filas: g.filas.map((f) => ({ productoId: f.productoId, cantidad: cant(f), sugerido: f.sugerido })) }, { texto: 'Pedido a ' + g.nombre }) }, 'Guardar pedido') : null)),
         el('div', { clase: 'lista' }, filas.map((f) => {
           const inp = el('input', { type: 'text', inputmode: 'decimal', valor: unidades(cant(f)), estilo: { width: '76px', textAlign: 'right', minHeight: '40px', padding: '8px 10px' } })
           inp.addEventListener('input', () => { const n = aMilesimas(inp.value); if (Number.isFinite(n)) E.ajustes[clave(f)] = Math.max(0, n) })
@@ -41,9 +44,85 @@ async function secReponer () {
   pintar()
   pintarSeccion('reponer',
     cabecera('Reponer', nombreSucursal(S.sucursal) + ' · el pedido a cada proveedor'),
-    el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, [['pedido_hoy', 'Lo de hoy'], ['pedido_semana', 'La semana'], ['pedido_sugerido', 'Sugerido']].map(([id, t]) => el('button', { clase: E.vista === id ? 'activo' : '', onclick: () => { E.vista = id; render() } }, t))),
+    pestanas,
     el('p', { clase: 'sub' }, E.vista === 'pedido_sugerido' ? 'Lo que conviene pedir para llegar a la próxima visita del proveedor.' : 'Se repone lo mismo que se vendió. Cambiá las cantidades y mandalo por WhatsApp.'),
     el('div', { clase: 'buscador' }, icono('buscar'), busca),
+    zona)
+}
+
+// Los pedidos guardados en la caja: los que armo el sistema el dia de visita,
+// los enviados esperando la mercaderia y los ultimos. Se corrigen y se mandan
+// por WhatsApp desde aca; la caja los guarda (ordenes pedido_guardar/estado).
+async function secPedidosCompra (E, pestanas) {
+  const p = datosDe(await leerDatos('pedidos_compra'))
+  const zona = el('div', {})
+  const fecha = (iso) => iso ? new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : ''
+  if (!p) {
+    zona.append(el('div', { clase: 'tarjeta' }, vacio('La caja todavía no subió los pedidos. Necesita la versión 0.44 o más nueva.', 'reponer')))
+  } else {
+    if (p.agenda && p.agenda.length) {
+      zona.append(el('div', { clase: 'tarjeta' }, el('h2', {}, 'Quién pasa'),
+        el('div', { clase: 'lista' }, p.agenda.map((a) => el('div', { clase: 'item' },
+          el('div', { clase: 'cuerpo' }, el('b', {}, a.nombre), el('div', { clase: 'sub' }, a.pedido ? 'Pedido ' + a.pedido.numero + ' · ' + ({ borrador: 'para revisar', enviado: 'enviado', recibido: 'llegó', cancelado: 'cancelado' })[a.pedido.estado] : a.cuando === 'hoy' ? 'Sin nada para pedir' : 'Se arma solo mañana')),
+          el('span', { clase: 'chip ' + (a.cuando === 'hoy' ? 'info' : '') }, a.cuando === 'hoy' ? 'Hoy' : 'Mañana'))))))
+    }
+    const borradores = p.pedidos.filter((x) => x.estado === 'borrador')
+    const enviados = p.pedidos.filter((x) => x.estado === 'enviado')
+    const viejos = p.pedidos.filter((x) => x.estado === 'recibido' || x.estado === 'cancelado').slice(0, 10)
+    const tarjeta = (x) => {
+      const editable = x.estado === 'borrador'
+      const clave = (f) => 'ped|' + x.id + '|' + f.productoId
+      const cant = (f) => (E.ajustes[clave(f)] != null ? E.ajustes[clave(f)] : f.cantidad)
+      const cambiado = () => x.filas.some((f) => cant(f) !== f.cantidad)
+      const texto = () => 'Pedido de ' + S.negocio + ' (' + nombreSucursal(S.sucursal) + ') para ' + x.proveedorNombre + ':\n\n' +
+        x.filas.filter((f) => cant(f) > 0).map((f) => '• ' + unidades(cant(f)) + ' ' + f.descripcion + (f.unidadesPorBulto > 1 && cant(f) % (f.unidadesPorBulto * 1000) === 0 ? ' (' + (cant(f) / 1000 / f.unidadesPorBulto) + ' x ' + f.unidadesPorBulto + ')' : '')).join('\n') + '\n\nGracias!'
+      const guardar = () => mandarOrden(S.sucursal, 'pedido_guardar', { id: x.id, filas: x.filas.map((f) => ({ productoId: f.productoId, cantidad: cant(f), sugerido: f.sugerido })) }, { texto: 'Pedido ' + x.numero, callado: true })
+      const mandar = async () => {
+        if (cambiado()) await guardar()
+        window.open(linkWhatsApp(p.telefonos[x.proveedorId], texto()), '_blank')
+        abrirHoja({
+          titulo: '¿Se mandó el pedido?',
+          cuerpo: el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Si lo mandaste por WhatsApp a ' + x.proveedorNombre + ', confirmalo así queda como enviado en la caja.'),
+          botones: [{ texto: 'Sí, quedó enviado', primario: true, alTocar: (cerrar) => { cerrar(); mandarOrden(S.sucursal, 'pedido_estado', { id: x.id, estado: 'enviado' }, { texto: 'Pedido ' + x.numero + ' enviado' }) } }]
+        })
+      }
+      const estado = (nuevo, pregunta) => abrirHoja({
+        titulo: pregunta,
+        cuerpo: el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, nuevo === 'recibido' ? 'Queda como llegado. Para cargar el stock y ver qué faltó, recibilo en la caja (Recibir).' : 'No se borra: queda como cancelado.'),
+        botones: [{ texto: nuevo === 'recibido' ? 'Sí, llegó' : 'Cancelar pedido', primario: nuevo === 'recibido', peligro: nuevo === 'cancelado', alTocar: (cerrar) => { cerrar(); mandarOrden(S.sucursal, 'pedido_estado', { id: x.id, estado: nuevo }) } }]
+      })
+      return el('div', { clase: 'tarjeta sin-relleno' },
+        el('div', { clase: 'tarjeta-cab', estilo: { padding: '12px 16px 4px' } },
+          el('div', {}, el('h2', { estilo: { margin: 0 } }, x.proveedorNombre),
+            el('div', { clase: 'sub' }, x.numero + ' · ' + (x.automatico ? 'lo armó el sistema' : 'armado a mano') + ' · ' + fecha(x.creadoEn) + (x.enviadoEn ? ' · enviado ' + fecha(x.enviadoEn) : '') + (p.telefonos[x.proveedorId] ? '' : ' · sin teléfono'))),
+          el('div', { clase: 'chips' },
+            editable ? el('button', { clase: 'btn primario chico', onclick: mandar }, icono('mensaje'), 'WhatsApp') : null,
+            editable ? el('button', { clase: 'btn chico', onclick: () => { if (!cambiado()) return toast('No cambiaste nada', '', 2); guardar().then(() => toast('Cambios mandados a la caja', 'ok')) } }, 'Guardar') : null,
+            x.estado === 'enviado' ? el('button', { clase: 'btn primario chico', onclick: () => estado('recibido', '¿Llegó el pedido ' + x.numero + '?') }, 'Llegó') : null,
+            el('button', { clase: 'btn chico', onclick: () => estado('cancelado', 'Cancelar el pedido ' + x.numero) }, 'Cancelar'))),
+        el('div', { clase: 'lista' }, x.filas.map((f) => {
+          if (!editable) return el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', {}, f.descripcion)), el('b', { clase: 'num' }, unidades(f.cantidad)))
+          const inp = el('input', { type: 'text', inputmode: 'decimal', valor: unidades(cant(f)), estilo: { width: '76px', textAlign: 'right', minHeight: '40px', padding: '8px 10px' } })
+          inp.addEventListener('input', () => { const n = aMilesimas(inp.value); if (Number.isFinite(n)) E.ajustes[clave(f)] = Math.max(0, n) })
+          return el('div', { clase: 'item' },
+            el('div', { clase: 'cuerpo' }, el('b', {}, f.descripcion), el('div', { clase: 'sub' }, (f.codigo || 'sin código') + (f.sugerido && f.sugerido !== f.cantidad ? ' · sugerido ' + unidades(f.sugerido) : '') + (f.unidadesPorBulto > 1 ? ' · caja de ' + f.unidadesPorBulto : ''))),
+            inp)
+        })))
+    }
+    if (borradores.length) zona.append(el('h2', { estilo: { margin: '14px 4px 6px' } }, 'Para revisar y mandar'), ...borradores.map(tarjeta))
+    if (enviados.length) zona.append(el('h2', { estilo: { margin: '14px 4px 6px' } }, 'Esperando la mercadería'), ...enviados.map(tarjeta))
+    if (!borradores.length && !enviados.length) zona.append(el('div', { clase: 'tarjeta' }, vacio('No hay pedidos pendientes. El día que pasa cada proveedor se arma solo (los días se cargan en la caja, en Proveedores).', 'reponer')))
+    if (viejos.length) {
+      zona.append(el('div', { clase: 'tarjeta' }, el('h2', {}, 'Últimos'),
+        el('div', { clase: 'lista' }, viejos.map((x) => el('div', { clase: 'item' },
+          el('div', { clase: 'cuerpo' }, el('b', {}, x.proveedorNombre), el('div', { clase: 'sub' }, x.numero + ' · ' + fecha(x.creadoEn))),
+          el('span', { clase: 'chip ' + (x.estado === 'cancelado' ? '' : x.cumplimiento && x.cumplimiento.pct < 100 ? 'alerta' : 'ok') },
+            x.estado === 'cancelado' ? 'Cancelado' : x.cumplimiento ? (x.cumplimiento.pct < 100 ? 'Llegó ' + x.cumplimiento.completas + ' de ' + x.cumplimiento.renglones : 'Completo') : 'Llegó'))))))
+    }
+  }
+  pintarSeccion('reponer',
+    cabecera('Reponer', nombreSucursal(S.sucursal) + ' · pedidos a proveedores'),
+    pestanas,
     zona)
 }
 

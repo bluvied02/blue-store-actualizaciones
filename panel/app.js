@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '12.8'
+const VERSION_APP = '12.9'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -400,7 +400,8 @@ const NOMBRE_ORDEN = {
   proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor',
   transferencia_salida: 'Pasar a otra sucursal', conteo: 'Conteo de stock', recepcion: 'Mercadería recibida',
   producto_foto: 'Foto del producto', venta_celular: 'Venta', modo_emergencia: 'Modo emergencia', encargo_guardar: 'Encargo', encargo_estado: 'Encargo',
-  mayorista_guardar: 'Presupuesto mayorista', mayorista_estado: 'Presupuesto mayorista', mayorista_venta: 'Venta mayorista'
+  mayorista_guardar: 'Presupuesto mayorista', mayorista_estado: 'Presupuesto mayorista', mayorista_venta: 'Venta mayorista',
+  pedido_guardar: 'Pedido a proveedor', pedido_estado: 'Pedido a proveedor'
 }
 
 async function cargarCola () {
