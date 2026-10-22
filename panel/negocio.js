@@ -417,11 +417,22 @@ async function secClientes () {
     el('div', { clase: 'tarjeta sin-relleno' }, zona))
 }
 
-const linkWhatsApp = (tel, texto) => {
-  const t = String(tel || '').replace(/[^0-9]/g, '')
-  const num = t ? (t.length === 10 ? '549' + t : t.replace(/^0/, '549')) : ''
-  return 'https://wa.me/' + num + (texto ? '?text=' + encodeURIComponent(texto) : '')
+// Saca el 0 de la caracteristica y el 15 del celular: 0358 15 459-0403 -> 5493584590403.
+const numeroWhatsApp = (tel) => {
+  let d = String(tel || '').replace(/[^0-9]/g, '').replace(/^00/, '')
+  if (!d) return ''
+  if (d.startsWith('549') && d.length === 13) return d
+  if (d.startsWith('54') && d.length === 12) return '549' + d.slice(2)
+  if (d.startsWith('9') && d.length === 11) return '54' + d
+  if (d.startsWith('0')) d = d.slice(1)
+  if (d.length === 12) {
+    for (const largo of (d.startsWith('11') ? [2] : [3, 4, 2])) {
+      if (d.substr(largo, 2) === '15') { d = d.slice(0, largo) + d.slice(largo + 2); break }
+    }
+  }
+  return d.length === 10 ? '549' + d : d
 }
+const linkWhatsApp = (tel, texto) => 'https://wa.me/' + numeroWhatsApp(tel) + (texto ? '?text=' + encodeURIComponent(texto) : '')
 
 function hojaCliente (c) {
   const suc = S.sucursal
