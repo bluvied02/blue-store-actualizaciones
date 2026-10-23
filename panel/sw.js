@@ -1,4 +1,4 @@
-// El que trabaja por detras de la app:
+﻿// El que trabaja por detras de la app:
 //   - Guarda la app (las pantallas, no los datos) para que abra sin internet.
 //     Primero pide la version nueva; si no hay conexion, usa la guardada.
 //   - Recibe las notificaciones aunque la app este cerrada.
@@ -8,8 +8,8 @@
 // comparten dominio): al actualizarse, cada una borra solo los suyos.
 const ESPACIO = /\/paneles\//.test(self.registration.scope) ? new URL(self.registration.scope).pathname : ''
 const PREFIJO = ESPACIO ? 'cliente|' + ESPACIO + '|v' : 'bs-panel-v'
-const VERSION = PREFIJO + '12-2'
-const APP = ['./', 'index.html', 'estilos.css?v=13.2', 'app.js?v=13.2', 'lector.js?v=13.2', 'productos.js?v=13.2', 'negocio.js?v=13.2', 'promociones.js?v=13.2', 'local.js?v=13.2', 'otros.js?v=13.2', 'mayorista-calculo.js?v=13.2', 'mayorista.js?v=13.2', 'metricas-calculo.js?v=13.2', 'metricas.js?v=13.2', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const VERSION = PREFIJO + '12-5'
+const APP = ['./', 'index.html', 'estilos.css?v=13.5', 'app.js?v=13.5', 'lector.js?v=13.5', 'productos.js?v=13.5', 'negocio.js?v=13.5', 'promociones.js?v=13.5', 'local.js?v=13.5', 'otros.js?v=13.5', 'personal.js?v=13.5', 'configuracion.js?v=13.5', 'mayorista-calculo.js?v=13.5', 'mayorista.js?v=13.5', 'metricas-calculo.js?v=13.5', 'metricas.js?v=13.5', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {

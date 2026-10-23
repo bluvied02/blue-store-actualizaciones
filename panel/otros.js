@@ -154,89 +154,168 @@ async function secFaltantes () {
 }
 
 // --- PROMOS -----------------------------------------------------------------------------
+// Las mismas promos que la caja: ver, crear, EDITAR, duplicar, pausar y borrar. Los seis tipos
+// (% off, $ menos, precio fijo, lleva N paga M, llevando uno descuento en otro y combos),
+// con días, fechas y horario. Los valores van como los guarda la caja: porcentaje en
+// centésimas (10% = 1000), pesos en centavos.
+
+const TIPOS_PROMO_HOJA = [['porcentaje', '% off'], ['descuento', '$ menos'], ['precio', 'Precio fijo'], ['nxm', 'Lleva N paga M'], ['llevando', 'Llevando uno…'], ['combo', 'Combo']]
 
 async function secPromos () {
   if (!S.sucursal) return pintarSeccion('promos', cabecera('Promos'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'promos')))
   const lista = datosDe(await leerDatos('promos')) || []
+  const E = S.pro = Object.assign({ filtro: 'todas' }, S.pro || {})
   const estado = (p) => (!p.activa ? el('span', { clase: 'chip' }, 'Pausada') : p.vencida ? el('span', { clase: 'chip' }, 'Vencida') : p.vigenteAhora ? el('span', { clase: 'chip ok' }, '● Aplicándose') : el('span', { clase: 'chip alerta' }, 'Programada'))
+  const cuantas = { todas: lista.length, ahora: lista.filter((p) => p.activa && p.vigenteAhora).length, pausadas: lista.filter((p) => !p.activa).length }
+  const visibles = lista.filter((p) => E.filtro === 'todas' || (E.filtro === 'ahora' && p.activa && p.vigenteAhora) || (E.filtro === 'pausadas' && !p.activa))
+  const otras = S.sucursales.filter((x) => x.id !== S.sucursal)
   pintarSeccion('promos',
-    cabecera('Promos', nombreSucursal(S.sucursal), el('button', { clase: 'btn primario', onclick: () => hojaPromo(S.sucursal) }, icono('sumar'), 'Nueva')),
-    el('div', { clase: 'tarjeta sin-relleno' }, lista.length ? el('div', { clase: 'lista' }, lista.map((p) => el('div', { clase: 'item' },
-      el('div', { clase: 'cuerpo' }, el('b', {}, p.nombre), el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, [p.etiqueta, p.tipo === 'combo' ? p.textoComponentes : p.textoAlcance, p.textoDisparador ? 'llevando ' + p.textoDisparador : '', p.textoVigencia].filter(Boolean).join(' · '))),
+    cabecera('Promos', nombreSucursal(S.sucursal) + ' · ' + cuantas.ahora + ' aplicándose', el('button', { clase: 'btn primario', onclick: () => hojaPromo(S.sucursal) }, icono('sumar'), 'Nueva')),
+    el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, [['todas', 'Todas ' + cuantas.todas], ['ahora', 'Aplicándose ' + cuantas.ahora], ['pausadas', 'Pausadas ' + cuantas.pausadas]].map(([id, t]) => el('button', { clase: E.filtro === id ? 'activo' : '', onclick: () => { E.filtro = id; render() } }, t))),
+    el('div', { clase: 'tarjeta sin-relleno' }, visibles.length ? el('div', { clase: 'lista' }, visibles.map((p) => el('div', { clase: 'item' },
+      el('button', { clase: 'cuerpo', estilo: { background: 'none', border: 0, textAlign: 'left', padding: 0, color: 'inherit', cursor: 'pointer' }, onclick: () => hojaPromo(S.sucursal, p) },
+        el('b', {}, p.nombre), el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, [p.etiqueta, p.tipo === 'combo' ? p.textoComponentes : p.textoAlcance, p.textoDisparador ? 'llevando ' + p.textoDisparador : '', p.textoVigencia, p.tipo !== 'combo' ? p.productos + ' productos' : ''].filter(Boolean).join(' · '))),
       el('div', { clase: 'fin' }, estado(p), el('div', { clase: 'chips', estilo: { marginTop: '6px', justifyContent: 'flex-end' } },
+        el('button', { clase: 'btn chico', onclick: () => hojaPromo(S.sucursal, p) }, 'Editar'),
         el('button', { clase: 'btn chico', onclick: () => mandarOrden(S.sucursal, 'promo_estado', { promoId: p.id, activa: !p.activa }, { texto: (p.activa ? 'Pausar ' : 'Activar ') + p.nombre, alTerminar: refrescarSeccion }) }, p.activa ? 'Pausar' : 'Activar'),
-        el('button', { clase: 'btn chico peligro', onclick: () => { if (confirm('¿Borrar "' + p.nombre + '"? Las ventas que ya la usaron no cambian.')) mandarOrden(S.sucursal, 'promo_borrar', { promoId: p.id }, { texto: 'Borrar ' + p.nombre, alTerminar: refrescarSeccion }) } }, 'Borrar')))))) : vacio('No hay promociones en esta sucursal.', 'promos')))
+        el('button', { clase: 'btn chico', onclick: () => hojaPromo(S.sucursal, p, true) }, 'Duplicar'),
+        el('button', { clase: 'btn chico peligro', onclick: () => { if (confirm('¿Borrar "' + p.nombre + '"? Las ventas que ya la usaron no cambian.')) mandarOrden(S.sucursal, 'promo_borrar', { promoId: p.id }, { texto: 'Borrar ' + p.nombre, alTerminar: refrescarSeccion }) } }, 'Borrar')))))) : vacio(lista.length ? 'No hay promos en este filtro.' : 'No hay promociones en esta sucursal.', 'promos')),
+    otras.length ? el('p', { clase: 'sub' }, 'Cada sucursal tiene sus promos: cambiá de sucursal arriba para ver o editar las de las otras.') : null)
 }
 
-async function hojaPromo (sucursalId) {
-  const [lista, rubrosD] = await Promise.all([leerCatalogo(sucursalId), leerDatos('rubros')])
-  const rubros = datosDe(rubrosD, sucursalId) || []
+// Elige productos y/o familias. `sel` = { productoIds: [], rubroIds: [] } (se modifica).
+function selectorProductos (lista, rubros, sel, opciones = {}) {
   const ruta = (id) => { const x = []; let r = rubros.find((y) => y.id === id); let n = 0; while (r && n++ < 6) { x.unshift(r.nombre); r = rubros.find((y) => y.id === r.padreId) } return x.join(' › ') }
-  const nombre = el('input', { type: 'text', placeholder: 'Ej: Finde bebidas 10%', maxlength: '60' })
-  let tipo = 'porcentaje'
-  let alcance = 'productos'
-  const elegidos = []
-  const rubrosElegidos = []
-  const valor = el('input', { type: 'text', inputmode: 'decimal' })
-  const lleva = el('input', { type: 'number', valor: '3', min: '2' })
-  const paga = el('input', { type: 'number', valor: '2', min: '1' })
-  const zonaValor = el('div', {})
-  const segTipo = el('div', { clase: 'seg' })
-  const pintarTipo = () => {
-    poner(segTipo, [['porcentaje', '% off'], ['descuento', '$ menos'], ['precio', 'Precio fijo'], ['nxm', 'Lleva N paga M']].map(([id, t]) => el('button', { clase: tipo === id ? 'activo' : '', onclick: () => { tipo = id; pintarTipo() } }, t)))
-    poner(zonaValor, tipo === 'nxm'
-      ? el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Lleva', lleva), el('label', { clase: 'campo' }, 'Paga', paga))
-      : el('label', { clase: 'campo' }, tipo === 'porcentaje' ? 'Descuento (%)' : tipo === 'precio' ? 'Precio fijo por unidad ($)' : 'Pesos menos por unidad ($)', valor))
-  }
-  pintarTipo()
   const busca = el('input', { type: 'search', placeholder: 'Buscar producto…' })
   const resultados = el('div', { clase: 'lista' })
   const chips = el('div', { clase: 'chips', estilo: { margin: '8px 0' } })
   const selRubro = selectorRubro(rubros, '')
-  const zonaAlcance = el('div', {})
-  const segAlcance = el('div', { clase: 'seg' })
-  const pintarChips = () => {
-    poner(chips, (alcance === 'productos' ? elegidos.map((p) => [p.id, p.descripcion]) : rubrosElegidos.map((id) => [id, ruta(id)])).map(([id, t]) =>
-      el('span', { clase: 'chip info' }, t, el('button', { estilo: { background: 'none', border: 0, cursor: 'pointer', color: 'inherit', padding: 0 }, onclick: () => {
-        const arr = alcance === 'productos' ? elegidos : rubrosElegidos
-        const i = arr.findIndex((x) => (x.id || x) === id); if (i >= 0) arr.splice(i, 1); pintarChips()
-      } }, '×'))))
-  }
-  const pintarAlcance = () => {
-    poner(segAlcance, [['productos', 'Productos'], ['rubros', 'Familias']].map(([id, t]) => el('button', { clase: alcance === id ? 'activo' : '', onclick: () => { alcance = id; pintarAlcance() } }, t)))
-    poner(zonaAlcance, alcance === 'productos' ? [el('div', { clase: 'buscador' }, icono('buscar'), busca), resultados] : [selRubro])
-    pintarChips()
+  selRubro.firstChild.textContent = 'Agregar una familia…'
+  const pintar = () => {
+    const nombre = (id) => (lista.find((p) => p.id === id) || {}).descripcion || id
+    const quitar = (arr, id) => el('button', { estilo: { background: 'none', border: 0, cursor: 'pointer', color: 'inherit', padding: '0 0 0 4px' }, 'aria-label': 'Quitar', onclick: () => { const i = arr.indexOf(id); if (i >= 0) arr.splice(i, 1); pintar() } }, '×')
+    poner(chips,
+      sel.productoIds.map((id) => el('span', { clase: 'chip info' }, nombre(id), quitar(sel.productoIds, id))),
+      sel.rubroIds.map((id) => el('span', { clase: 'chip info' }, 'Familia: ' + ruta(id), quitar(sel.rubroIds, id))))
   }
   busca.addEventListener('input', () => {
     limpiar(resultados)
     if (busca.value.trim().length < 2) return
     for (const p of lista.filter((x) => x.activo !== false && coincide(x.descripcion + ' ' + (x.codigos || []).join(' '), busca.value)).slice(0, 8)) {
-      resultados.append(el('button', { clase: 'item', onclick: () => { if (!elegidos.some((x) => x.id === p.id)) elegidos.push(p); busca.value = ''; limpiar(resultados); pintarChips() } },
+      resultados.append(el('button', { clase: 'item', onclick: () => { if (!sel.productoIds.includes(p.id)) sel.productoIds.push(p.id); busca.value = ''; limpiar(resultados); pintar() } },
         el('div', { clase: 'cuerpo' }, el('b', {}, p.descripcion)), el('span', { clase: 'num sub' }, plata(p.precio))))
     }
   })
-  selRubro.addEventListener('change', () => { if (selRubro.value && !rubrosElegidos.includes(selRubro.value)) rubrosElegidos.push(selRubro.value); selRubro.value = ''; pintarChips() })
-  pintarAlcance()
-  const dias = new Set([0, 1, 2, 3, 4, 5, 6])
+  selRubro.addEventListener('change', () => { if (selRubro.value && !sel.rubroIds.includes(selRubro.value)) sel.rubroIds.push(selRubro.value); selRubro.value = ''; pintar() })
+  pintar()
+  return el('div', {}, el('div', { clase: 'buscador' }, icono('buscar'), busca), resultados, opciones.sinFamilias ? null : el('div', { estilo: { marginTop: '8px' } }, selRubro), chips)
+}
+
+// previa: la promo que se edita (o se duplica). Sin previa, una nueva.
+async function hojaPromo (sucursalId, previa, duplicar) {
+  const [lista, rubrosD] = await Promise.all([leerCatalogo(sucursalId), leerDatos('rubros')])
+  const rubros = datosDe(rubrosD, sucursalId) || []
+  const edita = !!previa && !duplicar
+  const p0 = previa || {}
+  const centavosATexto = (c) => c ? String(c / 100).replace('.', ',') : ''
+  const nombre = el('input', { type: 'text', placeholder: 'Ej: Finde bebidas 10%', maxlength: '60', valor: duplicar ? p0.nombre + ' (copia)' : (p0.nombre || '') })
+  let tipo = p0.tipo || 'porcentaje'
+  let alcance = p0.alcance === 'todo' || p0.alcance === 'rubros' || p0.alcance === 'productos' ? p0.alcance : 'productos'
+  let activa = previa ? p0.activa !== false : true
+  const sel = { productoIds: (p0.productoIds || []).slice(), rubroIds: (p0.rubroIds || []).slice() }
+  const disp = { productoIds: ((p0.disparador || {}).productoIds || []).slice(), rubroIds: ((p0.disparador || {}).rubroIds || []).slice() }
+  const comps = (p0.componentes || []).map((c) => ({ nombre: c.nombre, cantidad: c.cantidad, productoIds: (c.productoIds || []).slice(), rubroIds: (c.rubroIds || []).slice() }))
+  const valor = el('input', { type: 'text', inputmode: 'decimal', valor: ['porcentaje', 'llevando', 'descuento', 'precio'].includes(p0.tipo) ? centavosATexto(p0.valor) : '' })
+  const lleva = el('input', { type: 'number', valor: String(p0.lleva || 3), min: '2' })
+  const paga = el('input', { type: 'number', valor: String(p0.paga || 2), min: '1' })
+  const mezclar = el('input', { type: 'checkbox' })
+  mezclar.checked = !!p0.mezclar
+  const precioCombo = el('input', { type: 'text', inputmode: 'decimal', valor: p0.tipo === 'combo' ? centavosATexto(p0.precio) : '' })
+  const nombreDisp = el('input', { type: 'text', maxlength: '30', placeholder: 'Sale en el ticket (opcional)', valor: p0.nombreDisparador || '' })
+  const desde = el('input', { type: 'date', valor: p0.desde || '' })
+  const hasta = el('input', { type: 'date', valor: p0.hasta || '' })
+  const horaDesde = el('input', { type: 'time', valor: p0.horaDesde || '' })
+  const horaHasta = el('input', { type: 'time', valor: p0.horaHasta || '' })
+  const dias = new Set(p0.dias && p0.dias.length ? p0.dias : [0, 1, 2, 3, 4, 5, 6])
+
+  const segTipo = el('div', { clase: 'seg', estilo: { flexWrap: 'wrap' } })
+  const zonaValor = el('div', {})
+  const zonaAlcance = el('div', {})
+  const pintar = () => {
+    poner(segTipo, TIPOS_PROMO_HOJA.map(([id, t]) => el('button', { clase: tipo === id ? 'activo' : '', onclick: () => { tipo = id; pintar() } }, t)))
+    if (tipo === 'combo') {
+      const zonaComps = el('div', {})
+      const pintarComps = () => poner(zonaComps, comps.map((c, i) => {
+        const n = el('input', { type: 'text', placeholder: 'Qué es (ej: Monster)', maxlength: '40', valor: c.nombre || '' })
+        n.addEventListener('input', () => { c.nombre = n.value })
+        const q = el('input', { type: 'number', min: '1', valor: String(c.cantidad || 1) })
+        q.addEventListener('input', () => { c.cantidad = Number(q.value) })
+        return el('div', { clase: 'tarjeta', estilo: { marginBottom: '8px' } },
+          el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Producto del combo', n), el('label', { clase: 'campo' }, 'Cantidad', q)),
+          selectorProductos(lista, rubros, c),
+          el('button', { clase: 'btn chico peligro', onclick: () => { comps.splice(i, 1); pintarComps() } }, 'Sacar este producto'))
+      }))
+      if (!comps.length) comps.push({ nombre: '', cantidad: 1, productoIds: [], rubroIds: [] })
+      pintarComps()
+      poner(zonaValor, el('label', { clase: 'campo' }, 'Precio del combo ($)', precioCombo), zonaComps,
+        el('button', { clase: 'btn chico', onclick: () => { comps.push({ nombre: '', cantidad: 1, productoIds: [], rubroIds: [] }); pintarComps() } }, icono('sumar'), 'Agregar otro producto'))
+      poner(zonaAlcance)
+      return
+    }
+    poner(zonaValor, tipo === 'nxm'
+      ? [el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Lleva', lleva), el('label', { clase: 'campo' }, 'Paga', paga)), el('label', { clase: 'campo', estilo: { display: 'flex', gap: '8px', alignItems: 'center' } }, mezclar, 'Se puede mezclar entre productos distintos')]
+      : el('label', { clase: 'campo' }, tipo === 'porcentaje' ? 'Descuento (%)' : tipo === 'llevando' ? 'Descuento en lo que se lleva (%)' : tipo === 'precio' ? 'Precio fijo por unidad ($)' : 'Pesos menos por unidad ($)', valor))
+    const segAlcance = el('div', { clase: 'seg' }, [['productos', 'Productos'], ['rubros', 'Familias'], ['todo', 'Todo']].map(([id, t]) => el('button', { clase: alcance === id ? 'activo' : '', onclick: () => { alcance = id; pintar() } }, t)))
+    poner(zonaAlcance,
+      tipo === 'llevando' ? el('div', { clase: 'campo' }, 'Qué tiene que llevar el cliente', selectorProductos(lista, rubros, disp), el('label', { clase: 'campo' }, 'Nombre corto', nombreDisp)) : null,
+      el('div', { clase: 'campo' }, tipo === 'llevando' ? 'A qué se le hace el descuento' : 'A qué productos', segAlcance),
+      alcance === 'todo' ? el('p', { clase: 'sub' }, 'Vale para todos los productos del local.') : selectorProductos(lista, rubros, sel, { sinFamilias: alcance === 'productos' }))
+  }
+  pintar()
   const segDias = el('div', { clase: 'chips' })
-  const pintarDias = () => { poner(segDias, [1, 2, 3, 4, 5, 6, 0].map((d) => el('button', { clase: 'filtro' + (dias.has(d) ? ' activo' : ''), onclick: () => { if (dias.has(d) && dias.size > 1) dias.delete(d); else dias.add(d); pintarDias() } }, DIAS[d]))) }
+  const pintarDias = () => poner(segDias, [1, 2, 3, 4, 5, 6, 0].map((d) => el('button', { clase: 'filtro' + (dias.has(d) ? ' activo' : ''), onclick: () => { if (dias.has(d) && dias.size > 1) dias.delete(d); else dias.add(d); pintarDias() } }, DIAS[d])))
   pintarDias()
+  const chkActiva = el('input', { type: 'checkbox' })
+  chkActiva.checked = activa
+  chkActiva.addEventListener('change', () => { activa = chkActiva.checked })
   abrirHoja({
-    titulo: 'Promo nueva · ' + nombreSucursal(sucursalId),
+    titulo: (edita ? 'Editar promo' : duplicar ? 'Duplicar promo' : 'Promo nueva') + ' · ' + nombreSucursal(sucursalId),
     completa: true,
     cuerpo: el('div', {},
       el('label', { clase: 'campo' }, 'Nombre (sale en el ticket)', nombre),
-      el('div', { clase: 'campo' }, 'Qué descuento', segTipo), zonaValor,
-      el('div', { clase: 'campo' }, 'A qué productos', segAlcance), zonaAlcance, chips,
+      el('div', { clase: 'campo' }, 'Qué tipo de promo', segTipo), zonaValor, zonaAlcance,
       el('div', { clase: 'campo' }, 'Qué días', segDias),
-      el('p', { clase: 'sub' }, 'Para combos y "llevando uno, descuento en otro", usá la pantalla Promos de la caja.')),
-    botones: [{ texto: 'Crear promo', primario: true, alTocar: async () => {
-      const promo = { nombre: nombre.value.trim(), tipo, alcance, productoIds: elegidos.map((p) => p.id), rubroIds: rubrosElegidos.slice(), dias: dias.size === 7 ? [] : [...dias], activa: true }
+      el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Desde el día', desde), el('label', { clase: 'campo' }, 'Hasta el día', hasta)),
+      el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Desde la hora', horaDesde), el('label', { clase: 'campo' }, 'Hasta la hora', horaHasta)),
+      el('p', { clase: 'sub' }, 'Dejá fechas y horas vacías para que valga siempre. Un horario puede cruzar la medianoche (22:00 a 06:00).'),
+      el('label', { clase: 'campo', estilo: { display: 'flex', gap: '8px', alignItems: 'center' } }, chkActiva, 'Activa (si no, queda pausada)')),
+    botones: [{ texto: edita ? 'Guardar cambios' : 'Crear promo', primario: true, alTocar: async () => {
+      const promo = { nombre: nombre.value.trim(), tipo, activa, dias: dias.size === 7 ? [] : [...dias], desde: desde.value, hasta: hasta.value, horaDesde: horaDesde.value, horaHasta: horaHasta.value }
+      if (edita) promo.id = p0.id
       if (!promo.nombre) return toast('Ponele un nombre', 'mal')
-      if (tipo === 'nxm') { promo.lleva = Number(lleva.value); promo.paga = Number(paga.value) } else if (tipo === 'porcentaje') promo.valor = Math.round(Number(String(valor.value).replace(',', '.')) * 100)
-      else promo.valor = aCentavos(valor.value)
-      if (tipo !== 'nxm' && !(promo.valor > 0)) return toast('Completá el valor del descuento', 'mal')
-      if (alcance === 'productos' ? !promo.productoIds.length : !promo.rubroIds.length) return toast('Elegí a qué productos se aplica', 'mal')
+      if ((promo.horaDesde || promo.horaHasta) && !(promo.horaDesde && promo.horaHasta)) return toast('Completá la hora desde y hasta', 'mal')
+      if (promo.desde && promo.hasta && promo.desde > promo.hasta) return toast('La fecha "desde" es posterior a "hasta"', 'mal')
+      if (tipo === 'combo') {
+        promo.precio = aCentavos(precioCombo.value)
+        if (!(promo.precio > 0)) return toast('Poné el precio del combo', 'mal')
+        promo.componentes = comps.filter((c) => c.productoIds.length || c.rubroIds.length).map((c) => ({ nombre: (c.nombre || '').trim(), cantidad: Math.round(Number(c.cantidad) || 0), productoIds: c.productoIds, rubroIds: c.rubroIds }))
+        if (promo.componentes.some((c) => !c.nombre)) return toast('Ponele nombre a cada producto del combo', 'mal')
+        if (!promo.componentes.length) return toast('Elegí los productos del combo', 'mal')
+      } else {
+        promo.alcance = alcance
+        promo.productoIds = alcance === 'productos' ? sel.productoIds.slice() : []
+        promo.rubroIds = alcance === 'rubros' ? sel.rubroIds.slice() : []
+        if (tipo === 'nxm') { promo.lleva = Number(lleva.value); promo.paga = Number(paga.value); promo.mezclar = mezclar.checked } else if (tipo === 'porcentaje' || tipo === 'llevando') promo.valor = Math.round(Number(String(valor.value).replace(',', '.')) * 100)
+        else promo.valor = aCentavos(valor.value)
+        if (tipo !== 'nxm' && !(promo.valor > 0)) return toast('Completá el valor del descuento', 'mal')
+        if (alcance === 'productos' && !promo.productoIds.length) return toast('Elegí a qué productos se aplica', 'mal')
+        if (alcance === 'rubros' && !promo.rubroIds.length) return toast('Elegí a qué familias se aplica', 'mal')
+        if (tipo === 'llevando') {
+          if (!disp.productoIds.length && !disp.rubroIds.length) return toast('Elegí qué tiene que llevar el cliente', 'mal')
+          promo.disparador = { productoIds: disp.productoIds.slice(), rubroIds: disp.rubroIds.slice() }
+          promo.nombreDisparador = nombreDisp.value.trim()
+        }
+      }
       cerrarHoja()
       await mandarOrden(sucursalId, 'promo_guardar', { promo }, { texto: 'Promo ' + promo.nombre, alTerminar: refrescarSeccion })
     } }]
@@ -395,7 +474,7 @@ function secAjustes () {
 // --- MAS (celular) ---------------------------------------------------------------------------
 
 function secMas () {
-  const ids = ['metricas', 'reportes', 'clientes', 'encargos', 'mayorista', 'caja', 'gastos', 'contar', 'recibir', 'stock', 'pasar', 'proveedores', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'historial', 'avisos', 'ajustes']
+  const ids = ['metricas', 'reportes', 'clientes', 'encargos', 'mayorista', 'caja', 'gastos', 'contar', 'recibir', 'stock', 'pasar', 'proveedores', 'personal', 'vencimientos', 'envases', 'rubrosganancia', 'medios', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'historial', 'avisos', 'ajustes']
   pintarSeccion('mas',
     cabecera('Más', S.negocio + (esEncargado() ? ' · encargado' : '')),
     el('div', { clase: 'mas-grilla' }, ids.filter((id) => SECCIONES[id] && seccionPermitida(id)).map((id) => el('button', { clase: 'acceso', onclick: () => ir(id) },
