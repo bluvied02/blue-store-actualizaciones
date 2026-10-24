@@ -420,9 +420,9 @@ async function secVender () {
     poner(totalNodo, V.lineas.length
       ? el('div', { clase: 'tarjeta', estilo: { textAlign: 'center' } },
         el('div', { clase: 'sub' }, 'Total'),
-        el('div', { clase: 'num', estilo: { fontSize: '40px', fontWeight: '800' } }, plata(c.total)),
+        el('div', { clase: 'num venta-total', estilo: { fontSize: '40px', fontWeight: '800' } }, plata(c.total)),
         c.ahorro ? el('div', { clase: 'sub verde' }, 'Ahorra ' + plata(c.ahorro) + ' con promos') : null,
-        el('button', { clase: 'btn primario ancho grande', estilo: { marginTop: '10px' }, onclick: () => cobrar(c.total) }, 'Cobrar'))
+        el('button', { clase: 'btn primario ancho grande venta-cobrar', estilo: { marginTop: '10px' }, onclick: () => cobrar(c.total) }, 'Cobrar'))
       : null)
   }
 
@@ -443,7 +443,7 @@ async function secVender () {
       poner(botones, MEDIOS_CELULAR.map(([id, nombre]) => el('button', { clase: 'btn' + (medio === id ? ' primario' : ''), onclick: () => { medio = id; pintarCobro() } }, nombre)))
       const paga = aCentavos(conCuanto.value)
       poner(detalle,
-        el('div', { clase: 'num', estilo: { fontSize: '34px', fontWeight: '800', textAlign: 'center', margin: '10px 0' } }, plata(aCobrar())),
+        el('div', { clase: 'num venta-total', estilo: { fontSize: '34px', fontWeight: '800', textAlign: 'center', margin: '10px 0' } }, plata(aCobrar())),
         recargos[medio] ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Con recargo de ' + pct(recargos[medio])) : null,
         medio === 'efectivo' ? el('label', { clase: 'campo' }, 'Con cuánto paga', conCuanto) : null,
         medio === 'efectivo' && Number.isFinite(paga) && paga > aCobrar() ? el('div', { clase: 'aviso info' }, el('b', {}, 'Vuelto: ' + plata(paga - aCobrar()))) : null,
@@ -454,6 +454,7 @@ async function secVender () {
     pintarCobro()
     abrirHoja({
       titulo: 'Cobrar',
+      clase: 'hoja-cobrar',
       cuerpo: el('div', {}, botones, detalle),
       botones: [{ texto: 'Listo, cobrado', primario: true, alTocar: async () => {
         const paga = aCentavos(conCuanto.value)

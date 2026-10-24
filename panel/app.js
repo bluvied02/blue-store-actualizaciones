@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.7'
+const VERSION_APP = '13.8'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -880,12 +880,12 @@ function pintarSeccion (id, ...hijos) {
 
 function abrirHoja (opciones) {
   if (S.ignorarPop > 0) { S.trasAtras.push(() => abrirHoja(opciones)); return null }
-  const { titulo, cuerpo, botones, completa, alCerrar, sinCancelar } = opciones
+  const { titulo, cuerpo, botones, completa, alCerrar, sinCancelar, clase } = opciones
   const telon = el('div', { clase: 'telon', onclick: (ev) => { if (ev.target === telon) cerrarHoja() } })
   const pie = (botones || []).length ? el('div', { clase: 'pie-hoja' },
     sinCancelar ? null : el('button', { clase: 'btn', onclick: () => cerrarHoja() }, 'Cancelar'),
     botones.map((b) => el('button', { clase: 'btn' + (b.primario ? ' primario' : '') + (b.peligro ? ' peligro' : ''), onclick: (ev) => b.alTocar(cerrarHoja, ev.currentTarget) }, b.texto))) : null
-  const hoja = el('div', { clase: 'hoja' + (completa ? ' completa' : ''), role: 'dialog', 'aria-label': titulo },
+  const hoja = el('div', { clase: 'hoja' + (completa ? ' completa' : '') + (clase ? ' ' + clase : ''), role: 'dialog', 'aria-label': titulo },
     el('div', { clase: 'agarre' }),
     el('div', { clase: 'cab-hoja' }, el('h2', {}, titulo), el('button', { clase: 'btn-ico', 'aria-label': 'Cerrar', onclick: () => cerrarHoja() }, icono('cerrar'))),
     el('div', { clase: 'cuerpo-hoja' }, cuerpo),
@@ -1174,9 +1174,17 @@ async function abrirBuscador (inicial) {
 
 function aplicarTema () {
   const t = leerLocal('bs.tema', 'auto')
-  if (t === 'auto') document.documentElement.removeAttribute('data-theme')
-  else document.documentElement.setAttribute('data-theme', t)
+  const hora = new Date().getHours()
+  const tema = t === 'auto' ? (hora >= 7 && hora < 20 ? 'light' : 'dark') : t
+  document.documentElement.setAttribute('data-theme', tema)
+  const barraNavegador = document.querySelector('meta[name="theme-color"]')
+  if (barraNavegador) barraNavegador.content = tema === 'dark' ? '#0a0c0f' : '#e3edf5'
+  // En equipos de poca memoria se evitan varias capas de desenfoque.
+  if (navigator.deviceMemory && navigator.deviceMemory <= 2) document.documentElement.setAttribute('data-liviano', '')
 }
+
+setInterval(() => { if (!document.hidden) aplicarTema() }, 60000)
+document.addEventListener('visibilitychange', () => { if (!document.hidden) aplicarTema() })
 
 seccion('inicio', { nombre: 'Inicio', icono: 'inicio', grupo: 'principal', fn: secInicio })
 
