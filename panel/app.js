@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.6'
+const VERSION_APP = '13.7'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -721,7 +721,7 @@ function puede (permiso) {
 const seccionPermitida = (id) => esEmpleado() ? SECCIONES_EMPLEADO.includes(id) : (!esEncargado() || !SOLO_DUENIO.includes(id))
 
 const GRUPOS = [['principal', ''], ['negocio', 'Negocio'], ['mercaderia', 'Mercadería'], ['control', 'Control']]
-const ABAJO = ['inicio', 'productos', 'escanear', 'ventas', 'mas']
+const ABAJO = ['inicio', 'vender', 'escanear', 'ventas', 'mas']
 const abajo = () => esEmpleado() ? ['inicio', 'vender', 'escanear', 'contar', 'mas'] : esEncargado() ? ['inicio', 'productos', 'escanear', 'contar', 'mas'] : ABAJO
 
 function pintarArmazon () {
