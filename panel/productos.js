@@ -625,6 +625,11 @@ async function secStock () {
   const negativos = productos.filter((p) => p.stock < 0)
   const enCero = productos.filter((p) => p.stock === 0).length
   const positivos = productos.filter((p) => p.stock > 0).length
+  const esDuenio = !esEncargado() && !esEmpleado()
+  const valorDe = (p) => Math.round(p.stock * (p.costo || 0) / 1000)
+  const valorExistencias = productos.reduce((total, p) => total + (p.stock > 0 ? valorDe(p) : 0), 0)
+  const valorNegativos = negativos.reduce((total, p) => total + valorDe(p), 0)
+  const sinCosto = productos.filter((p) => p.stock > 0 && !p.costo).length
   const V = S.stockVista || (S.stockVista = { filtro: 'todos', busca: '' })
   const busca = el('input', { type: 'search', placeholder: 'Buscar producto o código…', valor: V.busca, enterkeyhint: 'search' })
   const zona = el('div', { clase: 'lista' })
@@ -652,7 +657,8 @@ async function secStock () {
       filas.length ? filas.slice(0, limite).map((p) => el('div', { clase: 'item tocable' + (p.activo === false ? ' inactivo' : ''), onclick: () => hojaAjusteStock(p) },
         el('div', { clase: 'cuerpo' }, el('b', {}, p.descripcion),
           el('div', { clase: 'sub' }, ((p.codigos || [])[0] || 'sin código') + (p.activo === false ? ' · dado de baja' : ''))),
-        el('div', { clase: 'fin' }, el('b', { clase: 'num ' + colorStock(p) }, unidades(p.stock)), el('div', { clase: 'sub' }, 'en stock'))))
+        el('div', { clase: 'fin' }, el('b', { clase: 'num ' + colorStock(p) }, unidades(p.stock)),
+          el('div', { clase: 'sub' }, esDuenio && p.stock > 0 ? plata(valorDe(p)) + ' al costo' : 'en stock'))))
         : vacio(q ? 'No hay productos con esa búsqueda.' : 'No hay productos en esta categoría.', 'stock'),
       filas.length > limite ? el('button', { clase: 'btn ancho', onclick: () => { limite += 100; pintar() } }, 'Ver más (' + (filas.length - limite) + ')') : null)
   }
@@ -660,7 +666,6 @@ async function secStock () {
   pintarFiltros()
   pintar()
   const ajustes = (datosDe(aud) || []).filter((x) => x.tipo === 'stock').slice(0, 30)
-  const esDuenio = !esEncargado() && !esEmpleado()
   const ponerNegativosACero = async () => {
     const actual = await leerCatalogo(S.sucursal, true)
     const cantidad = actual.filter((p) => p.stock < 0).length
@@ -670,6 +675,11 @@ async function secStock () {
   }
   pintarSeccion('stock',
     cabecera('Stock', nombreSucursal(S.sucursal) + ' · existencias y correcciones', esDuenio ? el('button', { clase: 'btn primario', onclick: () => ir('perdidas') }, 'Registrar pérdida') : null),
+    esDuenio ? el('div', { clase: 'kpis' },
+      kpi('Mercadería en stock', plata(valorExistencias), 'al costo · sólo cantidades positivas', { clase: 'principal' }),
+      negativos.length ? kpi('Saldo del sistema', plata(valorExistencias + valorNegativos), 'incluye los ' + negativos.length + ' productos negativos') : null) : null,
+    esDuenio && sinCosto ? el('div', { clase: 'aviso alerta' },
+      sinCosto + (sinCosto === 1 ? ' producto con stock no tiene costo cargado.' : ' productos con stock no tienen costo cargado.') + ' Su valor figura como $ 0 hasta que cargues el costo.') : null,
     el('div', { clase: 'tarjeta' },
       el('div', { clase: 'fila' }, el('b', {}, positivos + ' con stock'), el('b', {}, enCero + ' en cero'), el('b', { clase: negativos.length ? 'rojo' : '' }, negativos.length + ' en negativo')),
       el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Tocá un producto para corregir su cantidad. Los negativos aparecen primero en la lista.'),
