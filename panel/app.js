@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.10'
+const VERSION_APP = '13.11'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -128,6 +128,7 @@ const ICONOS = {
   proveedores: 'M2 6h12v10H2z M14 10h4l3 3v3h-7 M6 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z M17 19.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z',
   apagar: 'M4 5h16v16H4z M4 10h16 M9 3v4 M15 3v4 M8 14h3',
   stock: 'M4 7h10 M18 7h2 M4 17h4 M12 17h8 M16 5v4 M10 15v4',
+  perdidas: 'M4 7h16 M7 7l1 14h8l1-14 M9 7V4h6v3 M10 11v6 M14 11v6',
   reponer: 'M9 3h6v3H9z M7 4.5H5V21h14V4.5h-2 M9 12h6 M9 16h4',
   faltantes: 'M12 3 2 20h20z M12 10v4 M12 17h.01',
   promos: 'M3 12V4h8l10 10-8 8z M7.5 7.5h.01',
@@ -395,7 +396,7 @@ const NOMBRE_ORDEN = {
   reporte: 'Reporte',
   cierre_semana_previsualizar: 'Calcular cierre semanal', cierre_mes_previsualizar: 'Calcular cierre mensual',
   ventas_dia: 'Ventas de un día',
-  producto: 'Cambio de producto', stock: 'Ajuste de stock', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
+  producto: 'Cambio de producto', stock: 'Ajuste de stock', stock_negativos_cero: 'Negativos puestos en cero', perdida_registrar: 'Pérdida registrada', perdida_anular: 'Pérdida anulada', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
   promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular',
   cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto',
   proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor',
@@ -708,7 +709,7 @@ function seccion (id, def) { SECCIONES[id] = def }
 
 // Dueño o encargado. El encargado ve lo del local; la plata, los costos y los
 // precios son del dueño. (La caja revisa lo mismo antes de aplicar cada orden.)
-const SOLO_DUENIO = ['cierresemana', 'cierremes', 'envases', 'medios', 'rubrosganancia', 'personal', 'vencimientos', 'reportes', 'caja', 'gastos', 'apagar', 'proveedores', 'promos', 'cierres', 'historial', 'ventas', 'mayorista', 'metricas']
+const SOLO_DUENIO = ['cierresemana', 'cierremes', 'envases', 'medios', 'rubrosganancia', 'personal', 'vencimientos', 'perdidas', 'reportes', 'caja', 'gastos', 'apagar', 'proveedores', 'promos', 'cierres', 'historial', 'ventas', 'mayorista', 'metricas']
 const PERMISOS_ENCARGADO = ['verStock', 'ajustarStock', 'contar', 'recibir', 'pasar', 'clientes', 'productoNuevo', 'fotos', 'pedidosClientes', 'vender']
 // El empleado: vender y contar stock, nada mas (y solo con el turno abierto).
 const PERMISOS_EMPLEADO = ['contar', 'vender']
@@ -926,7 +927,8 @@ function cerrarHoja (n) {
 const ACCESOS = {
   escanear: { nombre: 'Escanear', icono: 'escanear', fn: () => escanearYAbrir() },
   nuevoProducto: { nombre: 'Nuevo producto', icono: 'sumar', fn: () => hojaNuevoProducto({}) },
-  stock: { nombre: 'Arreglo de stock', icono: 'stock', fn: () => ir('stock') },
+  stock: { nombre: 'Stock', icono: 'stock', fn: () => ir('stock') },
+  perdidas: { nombre: 'Pérdidas', icono: 'perdidas', fn: () => ir('perdidas') },
   clientes: { nombre: 'Clientes', icono: 'clientes', fn: () => ir('clientes') },
   caja: { nombre: 'Caja', icono: 'caja', fn: () => ir('caja') },
   ventas: { nombre: 'Ventas', icono: 'ventas', fn: () => ir('ventas') },
@@ -941,7 +943,7 @@ const ACCESOS = {
   historial: { nombre: 'Historial', icono: 'historial', fn: () => ir('historial') },
   avisos: { nombre: 'Avisos', icono: 'avisos', fn: () => ir('avisos') }
 }
-const ACCESOS_DE_FABRICA = ['escanear', 'nuevoProducto', 'stock', 'clientes', 'caja', 'ventas', 'reportes', 'gastos']
+const ACCESOS_DE_FABRICA = ['escanear', 'nuevoProducto', 'stock', 'perdidas', 'clientes', 'caja', 'ventas', 'reportes', 'gastos']
 const accesosElegidos = () => (leerLocal('bs.accesos', null) || ACCESOS_DE_FABRICA).filter((k) => ACCESOS[k] && seccionPermitida(k))
 
 // El orden del dia operativo: de las 6 a las 5 del otro dia (un local 24 horas).
@@ -958,7 +960,7 @@ async function secInicioEncargado () {
     ['contar', 'Contar stock', 'contar'],
     ['recibir', 'Recibir mercadería', 'recibir'],
     ['pasar', 'Pasar a otra sucursal', 'pasar'],
-    ['stock', 'Arreglo de stock', 'stock'],
+    ['stock', 'Stock', 'stock'],
     ['encargos', 'Encargos de clientes', 'pedidos'],
     ['reponer', 'Reponer', 'reponer'],
     ['faltantes', 'Faltantes', 'faltantes']

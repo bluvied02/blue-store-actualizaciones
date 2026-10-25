@@ -616,26 +616,66 @@ function hojaAsignarProveedor (ids, proveedores) {
   })
 }
 
-// --- ARREGLO DE STOCK ---------------------------------------------------------------
+// --- STOCK --------------------------------------------------------------------------
 
 async function secStock () {
-  if (!S.sucursal) return pintarSeccion('stock', cabecera('Arreglo de stock'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'stock')))
+  if (!S.sucursal) return pintarSeccion('stock', cabecera('Stock'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'stock')))
   const [lista, aud] = await Promise.all([leerCatalogo(S.sucursal), leerDatos('auditoria').catch(() => ({}))])
-  const busca = el('input', { type: 'search', placeholder: 'Buscar el producto a corregir…', enterkeyhint: 'search' })
+  const productos = lista.filter((p) => p.activo !== false || p.stock < 0)
+  const negativos = productos.filter((p) => p.stock < 0)
+  const enCero = productos.filter((p) => p.stock === 0).length
+  const positivos = productos.filter((p) => p.stock > 0).length
+  const V = S.stockVista || (S.stockVista = { filtro: 'todos', busca: '' })
+  const busca = el('input', { type: 'search', placeholder: 'Buscar producto o código…', valor: V.busca, enterkeyhint: 'search' })
   const zona = el('div', { clase: 'lista' })
-  const pintar = () => {
-    const q = busca.value.trim()
-    const filas = q ? lista.filter((p) => p.activo !== false && coincide(p.descripcion + ' ' + (p.codigos || []).join(' '), q)).slice(0, 30)
-      : lista.filter((p) => p.activo !== false && p.stock < 0).sort((a, b) => a.stock - b.stock).slice(0, 30)
-    poner(zona, filas.length ? filas.map((p) => itemProducto(p, () => hojaAjusteStock(p))) : vacio(q ? 'Nada coincide.' : 'No hay productos en negativo.', 'stock'))
-    titulo.textContent = q ? 'Resultados' : 'En negativo (para revisar)'
-  }
   const titulo = el('h3', {}, '')
-  busca.addEventListener('input', pintar)
+  const filtros = el('div', { clase: 'filtros' })
+  let limite = 80
+  const opciones = [
+    ['todos', 'Todos', productos.length],
+    ['negativo', 'En negativo', negativos.length],
+    ['cero', 'En cero', enCero],
+    ['con', 'Con stock', positivos]
+  ]
+  const pintarFiltros = () => poner(filtros, opciones.map(([id, nombre, cantidad]) => el('button', {
+    clase: 'filtro' + (V.filtro === id ? ' activo' : ''),
+    onclick: () => { V.filtro = id; limite = 80; pintarFiltros(); pintar() }
+  }, nombre, el('span', { clase: 'n' }, String(cantidad)))))
+  const pintar = () => {
+    const q = V.busca.trim()
+    const filas = productos.filter((p) =>
+      (V.filtro === 'todos' || (V.filtro === 'negativo' && p.stock < 0) || (V.filtro === 'cero' && p.stock === 0) || (V.filtro === 'con' && p.stock > 0)) &&
+      (!q || coincide(p.descripcion + ' ' + (p.codigos || []).join(' '), q)))
+      .sort((a, b) => a.stock - b.stock || a.descripcion.localeCompare(b.descripcion, 'es'))
+    titulo.textContent = filas.length + (filas.length === 1 ? ' producto' : ' productos') + (V.filtro === 'negativo' ? ' en negativo' : '')
+    poner(zona,
+      filas.length ? filas.slice(0, limite).map((p) => el('div', { clase: 'item tocable' + (p.activo === false ? ' inactivo' : ''), onclick: () => hojaAjusteStock(p) },
+        el('div', { clase: 'cuerpo' }, el('b', {}, p.descripcion),
+          el('div', { clase: 'sub' }, ((p.codigos || [])[0] || 'sin código') + (p.activo === false ? ' · dado de baja' : ''))),
+        el('div', { clase: 'fin' }, el('b', { clase: 'num ' + colorStock(p) }, unidades(p.stock)), el('div', { clase: 'sub' }, 'en stock'))))
+        : vacio(q ? 'No hay productos con esa búsqueda.' : 'No hay productos en esta categoría.', 'stock'),
+      filas.length > limite ? el('button', { clase: 'btn ancho', onclick: () => { limite += 100; pintar() } }, 'Ver más (' + (filas.length - limite) + ')') : null)
+  }
+  busca.addEventListener('input', () => { V.busca = busca.value; limite = 80; pintar() })
+  pintarFiltros()
   pintar()
   const ajustes = (datosDe(aud) || []).filter((x) => x.tipo === 'stock').slice(0, 30)
+  const esDuenio = !esEncargado() && !esEmpleado()
+  const ponerNegativosACero = async () => {
+    const actual = await leerCatalogo(S.sucursal, true)
+    const cantidad = actual.filter((p) => p.stock < 0).length
+    if (!cantidad) return toast('Ya no hay productos en negativo.', 'ok')
+    if (!confirm('¿Poner en cero los ' + cantidad + ' productos con stock negativo de ' + nombreSucursal(S.sucursal) + '?\n\nLa caja revisa el stock actual cuando recibe la orden. Los productos con stock positivo no se tocan. Cada corrección queda en el historial.')) return
+    await mandarOrden(S.sucursal, 'stock_negativos_cero', {}, { texto: 'Negativos puestos en cero', alTerminar: refrescarSeccion })
+  }
   pintarSeccion('stock',
-    cabecera('Arreglo de stock', nombreSucursal(S.sucursal) + ' · sumar, restar o dejar el número exacto, con motivo'),
+    cabecera('Stock', nombreSucursal(S.sucursal) + ' · existencias y correcciones', esDuenio ? el('button', { clase: 'btn primario', onclick: () => ir('perdidas') }, 'Registrar pérdida') : null),
+    el('div', { clase: 'tarjeta' },
+      el('div', { clase: 'fila' }, el('b', {}, positivos + ' con stock'), el('b', {}, enCero + ' en cero'), el('b', { clase: negativos.length ? 'rojo' : '' }, negativos.length + ' en negativo')),
+      el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Tocá un producto para corregir su cantidad. Los negativos aparecen primero en la lista.'),
+      el('button', { clase: 'btn peligro ancho', disabled: !negativos.length || !esDuenio, onclick: ponerNegativosACero },
+        'Poner todos los negativos en cero' + (negativos.length ? ' (' + negativos.length + ')' : '')),
+      !esDuenio && negativos.length ? el('p', { clase: 'sub' }, 'La puesta en cero de todos los negativos la hace el dueño.') : null),
     el('button', { clase: 'btn primario ancho grande', estilo: { marginBottom: '10px' }, onclick: async () => {
       const c = await leerCodigo({ titulo: 'Producto a corregir' })
       if (!c) return
@@ -644,6 +684,7 @@ async function secStock () {
       else hojaNoEncontrado(c, r.enOtra)
     } }, icono('escanear'), 'Escanear producto'),
     el('div', { clase: 'buscador' }, icono('buscar'), busca),
+    filtros,
     titulo,
     el('div', { clase: 'tarjeta sin-relleno' }, zona),
     el('h3', {}, 'Últimos ajustes'),
@@ -762,5 +803,5 @@ async function secPasar () {
 
 
 seccion('productos', { nombre: 'Productos', icono: 'productos', grupo: 'principal', fn: secProductos })
-seccion('stock', { nombre: 'Arreglo de stock', icono: 'stock', grupo: 'mercaderia', fn: secStock })
+seccion('stock', { nombre: 'Stock', icono: 'stock', grupo: 'mercaderia', fn: secStock })
 seccion('pasar', { nombre: 'Pasar a otra sucursal', icono: 'pasar', grupo: 'mercaderia', fn: secPasar })
