@@ -4,7 +4,7 @@
 // Lo mismo que en la caja, desde el celular. La caja sube lo ya cerrado y lo
 // que toca cerrar (con lo que tendria que haber por medio de pago); aca se
 // cargan los totales reales y la orden vuelve a la caja, que vuelve a calcular
-// y guarda el cierre. Los rangos con hora exacta distinta se hacen en la caja.
+// y guarda el cierre. La caja tambien calcula las vistas previas elegidas aca.
 
 const NOMBRES_LINEA = { efectivo: 'Efectivo', mercado_pago: 'Mercado Pago', transferencia: 'Transferencia', tarjeta: 'Tarjeta' }
 const cuandoCierre = (iso) => fechaHora(iso)
@@ -14,6 +14,12 @@ const nombreMesCierre = (mes) => {
   const t = new Date(a, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
   return t.charAt(0).toUpperCase() + t.slice(1)
 }
+const localCierre = (iso) => {
+  const d = new Date(iso)
+  const z = (n) => String(n).padStart(2, '0')
+  return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + 'T' + z(d.getHours()) + ':' + z(d.getMinutes())
+}
+const ESTADO_SEMANA = { sucursal: null, desde: '', hasta: '', previo: null, pedido: false, editado: false, revision: 0 }
 
 // --- CERRAR SEMANA ------------------------------------------------------------------------
 
@@ -21,10 +27,37 @@ async function secCierreSemana () {
   if (!S.sucursal) return pintarSeccion('cierresemana', cabecera('Cerrar semana'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'caja')))
   const d = datosDe(await leerDatos('cierre_semana'))
   if (!d) return pintarSeccion('cierresemana', cabecera('Cerrar semana', nombreSucursal(S.sucursal)), el('div', { clase: 'tarjeta' }, vacio('La caja todavía no subió los cierres. Aparecen cuando se actualiza a la versión nueva.', 'caja')))
-  const p = d.proximo
+  const e = ESTADO_SEMANA
+  if (e.sucursal !== S.sucursal) {
+    e.sucursal = S.sucursal
+    e.desde = d.proximo ? localCierre(d.proximo.desde) : ''
+    e.hasta = d.proximo ? localCierre(d.proximo.hasta) : ''
+    e.previo = null
+    e.pedido = false
+    e.editado = false
+    e.revision++
+  }
+  const p = e.pedido ? null : e.previo || (!e.editado && d.proximo && e.desde === localCierre(d.proximo.desde) && e.hasta === localCierre(d.proximo.hasta) ? d.proximo : null)
   const cuerpo = []
-  if (p) cuerpo.push(tarjetaCierreSemana(p))
-  else cuerpo.push(el('div', { clase: 'tarjeta' }, vacio('No hay nada para cerrar todavía: la semana está al día.', 'cierres')))
+  const desde = el('input', { type: 'datetime-local', valor: e.desde })
+  const hasta = el('input', { type: 'datetime-local', valor: e.hasta })
+  const vista = el('div', {})
+  const boton = el('button', { clase: 'btn primario ancho', disabled: e.pedido, onclick: () => pedirCierreSemana() }, e.pedido ? 'Calculando en la caja…' : 'Calcular este período')
+  const mensaje = () => el('div', { clase: 'tarjeta' }, el('p', { clase: 'sub' }, e.pedido ? 'Esperando el cálculo de la caja…' : 'Elegí el período y tocá «Calcular este período» para ver los importes antes de cerrar.'))
+  const cambiar = () => {
+    e.desde = desde.value; e.hasta = hasta.value; e.previo = null; e.pedido = false; e.editado = true; e.revision++
+    boton.disabled = false
+    boton.textContent = 'Calcular este período'
+    poner(vista, mensaje())
+  }
+  desde.addEventListener('change', cambiar)
+  hasta.addEventListener('change', cambiar)
+  cuerpo.push(el('div', { clase: 'tarjeta' },
+    el('div', { clase: 'dos cierre-fechas' }, el('label', { clase: 'campo' }, 'Desde (fecha y hora)', desde), el('label', { clase: 'campo' }, 'Hasta (fecha y hora)', hasta)),
+    boton,
+    el('p', { clase: 'sub' }, 'Cuenta desde la hora de inicio hasta justo antes de la hora de fin. La caja debe estar encendida y conectada.')))
+  poner(vista, p ? tarjetaCierreSemana(p) : mensaje())
+  cuerpo.push(vista)
   cuerpo.push(el('h3', {}, 'Cierres guardados'))
   cuerpo.push(el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((c) => {
     const difs = Object.keys(NOMBRES_LINEA).filter((l) => c.lineas[l] && c.lineas[l].diferencia).map((l) => NOMBRES_LINEA[l] + ' ' + signoPlata(c.lineas[l].diferencia)).join(' · ')
@@ -33,8 +66,32 @@ async function secCierreSemana () {
         el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, (difs || 'Sin diferencias') + (c.nota ? ' · ' + c.nota : ''))),
       el('div', { clase: 'fin' }, el('span', { clase: 'chip ' + (c.estado === 'ok' ? 'ok' : 'mal') }, c.estado === 'ok' ? 'OK' : 'Con diferencia')))
   })) : vacio('Todavía no hay cierres.', 'cierres')))
-  cuerpo.push(el('p', { clase: 'sub' }, 'Acá se cierra la semana completa (de lunes a lunes). Para un rango con otra hora de inicio o de fin, usá Cerrar semana en la caja.'))
   pintarSeccion('cierresemana', cabecera('Cerrar semana', nombreSucursal(S.sucursal)), ...cuerpo)
+}
+
+async function pedirCierreSemana () {
+  const e = ESTADO_SEMANA
+  const desde = new Date(e.desde).getTime()
+  const hasta = new Date(e.hasta).getTime()
+  if (!Number.isFinite(desde) || !Number.isFinite(hasta)) return toast('Elegí fecha y hora de inicio y de fin', 'mal')
+  if (hasta <= desde) return toast('El fin tiene que ser después del inicio', 'mal')
+  const sucursal = S.sucursal
+  const revision = ++e.revision
+  e.pedido = true
+  e.previo = null
+  e.editado = true
+  refrescarSeccion()
+  await mandarOrden(sucursal, 'cierre_semana_previsualizar', { desde: new Date(desde).toISOString(), hasta: new Date(hasta).toISOString() }, {
+    texto: 'Calcular cierre semanal', callado: true, silencioso: true,
+    alTerminar: (r) => {
+      if (e.revision !== revision || e.sucursal !== sucursal) return
+      e.pedido = false
+      const res = r.resultado || {}
+      if (r.estado === 'aplicada' && res.datos) { e.previo = res.datos; e.editado = false }
+      else toast('No se pudo calcular: ' + (res.error || 'error de la caja'), 'mal', 7)
+      if (S.seccion === 'cierresemana') refrescarSeccion()
+    }
+  })
 }
 
 function tarjetaCierreSemana (p) {
@@ -84,7 +141,7 @@ function tarjetaCierreSemana (p) {
       if (hay && !nota.value.trim()) return toast('Escribí una nota para cerrar con diferencia', 'mal')
       const r = {}
       for (const l of lineas) { const v = leer(reales[l]); if (Number.isNaN(v)) return toast('Revisá el importe de ' + NOMBRES_LINEA[l], 'mal'); r[l] = v }
-      await mandarOrden(S.sucursal, 'cierre_semana_cerrar', { desde: p.desde, hasta: p.hasta, fondoInicial: leer(fondo) || 0, reales: r, estado: hay ? 'con_diferencia' : 'ok', nota: nota.value.trim() }, { texto: 'Cerrar semana', alTerminar: refrescarSeccion })
+      await mandarOrden(S.sucursal, 'cierre_semana_cerrar', { desde: p.desde, hasta: p.hasta, fondoInicial: leer(fondo) || 0, reales: r, estado: hay ? 'con_diferencia' : 'ok', nota: nota.value.trim() }, { texto: 'Cerrar semana', alTerminar: () => { ESTADO_SEMANA.previo = null; ESTADO_SEMANA.editado = false; refrescarSeccion() } })
     } }, 'Confirmar cierre'))
   calcular()
   return tarjeta
@@ -92,24 +149,58 @@ function tarjetaCierreSemana (p) {
 
 // --- CERRAR MES ---------------------------------------------------------------------------
 
-const ESTADO_MES = { mes: null }
+const ESTADO_MES = { sucursal: null, mes: null, previo: null, pedido: false, revision: 0 }
 
 async function secCierreMes () {
   if (!S.sucursal) return pintarSeccion('cierremes', cabecera('Cerrar mes'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'caja')))
   const d = datosDe(await leerDatos('cierre_mes'))
   if (!d) return pintarSeccion('cierremes', cabecera('Cerrar mes', nombreSucursal(S.sucursal)), el('div', { clase: 'tarjeta' }, vacio('La caja todavía no subió los cierres. Aparecen cuando se actualiza a la versión nueva.', 'caja')))
   const claves = Object.keys(d.meses).sort().reverse()
-  if (!ESTADO_MES.mes || !d.meses[ESTADO_MES.mes]) ESTADO_MES.mes = claves[0] || null
-  const p = ESTADO_MES.mes ? d.meses[ESTADO_MES.mes] : null
+  const e = ESTADO_MES
+  if (e.sucursal !== S.sucursal) {
+    e.sucursal = S.sucursal
+    e.mes = claves[0] || null
+    e.previo = null
+    e.pedido = false
+    e.revision++
+  }
+  const p = e.pedido ? null : e.previo && e.previo.mes === e.mes ? e.previo : d.meses[e.mes]
   const cuerpo = []
-  cuerpo.push(el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, claves.map((m) => el('button', { clase: m === ESTADO_MES.mes ? 'activo' : '', onclick: () => { ESTADO_MES.mes = m; refrescarSeccion() } }, nombreMesCierre(m)))))
+  const mes = el('input', { type: 'month', valor: e.mes || '' })
+  mes.addEventListener('change', () => { e.mes = mes.value; e.previo = null; e.pedido = false; e.revision++; refrescarSeccion() })
+  cuerpo.push(el('div', { clase: 'tarjeta' }, el('label', { clase: 'campo' }, 'Mes que querés cerrar', mes),
+    el('button', { clase: 'btn primario ancho', disabled: e.pedido, onclick: () => pedirCierreMes() }, e.pedido ? 'Calculando en la caja…' : 'Calcular este mes'),
+    el('p', { clase: 'sub' }, 'El mes va del día 1 al último día calendario. La caja debe estar encendida y conectada.')))
+  cuerpo.push(el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, claves.map((m) => el('button', { clase: m === e.mes ? 'activo' : '', onclick: () => { e.mes = m; e.previo = null; e.pedido = false; e.revision++; refrescarSeccion() } }, nombreMesCierre(m)))))
   if (p) cuerpo.push(...tarjetasMes(p, d))
+  else cuerpo.push(el('div', { clase: 'tarjeta' }, el('p', { clase: 'sub' }, e.pedido ? 'Esperando el cálculo de la caja…' : 'Tocá «Calcular este mes» para ver las cuentas antes de cerrar.')))
   cuerpo.push(el('h3', {}, 'Meses cerrados'))
   cuerpo.push(el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((c) => el('div', { clase: 'item' },
     el('div', { clase: 'cuerpo' }, el('b', {}, nombreMesCierre(c.mes)), el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, c.reparto.map((x) => x.nombre + ' ' + plata(x.importe)).join(' · '))),
     el('div', { clase: 'fin' }, el('b', { clase: 'num' }, plata(c.cuentas.gananciaNeta)), el('div', {}, el('button', { clase: 'btn chico', onclick: () => copiarResumenMes(c, nombreSucursal(S.sucursal)) }, 'Copiar'))))))
     : vacio('Todavía no hay meses cerrados.', 'cierres')))
   pintarSeccion('cierremes', cabecera('Cerrar mes', nombreSucursal(S.sucursal), el('button', { clase: 'btn primario', onclick: () => hojaSocios(d.socios) }, icono('editar'), 'Socios')), ...cuerpo)
+}
+
+async function pedirCierreMes () {
+  const e = ESTADO_MES
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(e.mes || '')) return toast('Elegí el mes', 'mal')
+  const sucursal = S.sucursal
+  const revision = ++e.revision
+  e.pedido = true
+  e.previo = null
+  refrescarSeccion()
+  await mandarOrden(sucursal, 'cierre_mes_previsualizar', { mes: e.mes }, {
+    texto: 'Calcular cierre mensual', callado: true, silencioso: true,
+    alTerminar: (r) => {
+      if (e.revision !== revision || e.sucursal !== sucursal) return
+      e.pedido = false
+      const res = r.resultado || {}
+      if (r.estado === 'aplicada' && res.datos) e.previo = res.datos
+      else toast('No se pudo calcular: ' + (res.error || 'error de la caja'), 'mal', 7)
+      if (S.seccion === 'cierremes') refrescarSeccion()
+    }
+  })
 }
 
 function tarjetasMes (p, d) {
@@ -142,7 +233,7 @@ function tarjetasMes (p, d) {
     c.gananciaNeta <= 0 ? el('p', { clase: 'sub mal' }, 'No hubo ganancia este mes: no hay nada para repartir.') : null))
   out.push(el('div', { clase: 'tarjeta' }, el('label', { clase: 'campo' }, 'Nota', nota),
     el('button', { clase: 'btn primario ancho grande', disabled: !!p.yaCerrado || !p.terminado, onclick: async () => {
-      await mandarOrden(S.sucursal, 'cierre_mes_cerrar', { mes: p.mes, nota: nota.value.trim() }, { texto: 'Cerrar mes', alTerminar: refrescarSeccion })
+      await mandarOrden(S.sucursal, 'cierre_mes_cerrar', { mes: p.mes, nota: nota.value.trim() }, { texto: 'Cerrar mes', alTerminar: () => { ESTADO_MES.previo = null; refrescarSeccion() } })
     } }, 'Confirmar cierre del mes'),
     el('button', { clase: 'btn ancho', estilo: { marginTop: '8px' }, onclick: () => copiarResumenMes({ mes: p.mes, cuentas: c, reparto: p.reparto }, nombreSucursal(S.sucursal)) }, 'Copiar resumen para los socios')))
   return out

@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.9'
+const VERSION_APP = '13.10'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -393,6 +393,7 @@ async function buscarCodigo (codigo, sucursalId) {
 
 const NOMBRE_ORDEN = {
   reporte: 'Reporte',
+  cierre_semana_previsualizar: 'Calcular cierre semanal', cierre_mes_previsualizar: 'Calcular cierre mensual',
   ventas_dia: 'Ventas de un día',
   producto: 'Cambio de producto', stock: 'Ajuste de stock', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
   promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular',

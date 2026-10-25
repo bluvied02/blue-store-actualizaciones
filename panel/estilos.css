@@ -201,12 +201,14 @@ button.item:active, .item.tocable:active { background: var(--sup2); }
 .btn svg.ic { width: 18px; height: 18px; }
 .btn-ico { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 11px; border: 1px solid var(--borde); background: var(--sup); color: var(--texto2); cursor: pointer; flex: none; }
 
-input[type=text], input[type=search], input[type=email], input[type=password], input[type=number], input[type=date], input[type=tel], select, textarea {
+input[type=text], input[type=search], input[type=email], input[type=password], input[type=number], input[type=date], input[type=datetime-local], input[type=month], input[type=tel], select, textarea {
   width: 100%; background: var(--sup); border: 1px solid var(--borde2); border-radius: 11px; padding: 11px 13px; outline: none; font-size: 16px; min-height: 46px; }
 input:focus, select:focus, textarea:focus { border-color: var(--acento); box-shadow: 0 0 0 3px var(--acento-suave); }
 label.campo, .campo { display: grid; gap: 5px; margin-bottom: 12px; font-size: 13px; color: var(--texto2); font-weight: 600; }
 .campo .ayuda { font-weight: 500; color: var(--texto3); font-size: 12.5px; }
 .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cierre-fechas > * { min-width: 0; }
+@media (max-width: 600px) { .cierre-fechas { grid-template-columns: minmax(0, 1fr); } }
 .buscador { position: relative; margin-bottom: 10px; display: flex; gap: 8px; }
 .buscador input { padding-left: 40px; flex: 1; }
 .buscador > svg.ic { position: absolute; left: 13px; top: 13px; color: var(--texto3); pointer-events: none; }
