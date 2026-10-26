@@ -19,7 +19,23 @@ const localCierre = (iso) => {
   const z = (n) => String(n).padStart(2, '0')
   return d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + 'T' + z(d.getHours()) + ':' + z(d.getMinutes())
 }
-const ESTADO_SEMANA = { sucursal: null, desde: '', hasta: '', previo: null, pedido: false, editado: false, revision: 0 }
+// Fecha + hora en 24 horas. El campo "datetime-local" del telefono usa a. m. / p. m.
+// segun el idioma: escribir "12" deja las 12 de la noche y "3" las 3 de la madrugada,
+// y el horario parece que nunca cambia. Con la hora en una lista de 00 a 23 no hay confusion.
+// alCambiar recibe 'AAAA-MM-DDTHH:MM' (o '' si falta la fecha).
+function campoFechaHora (inicial, alCambiar) {
+  const z = (n) => String(n).padStart(2, '0')
+  const [dia, h, m] = String(inicial || '').split(/[T:]/)
+  const fecha = el('input', { type: 'date', valor: dia || '' })
+  const horas = el('select', {}, Array.from({ length: 24 }, (_, i) => el('option', { value: z(i) }, z(i))))
+  const minutos = el('select', {}, Array.from({ length: 60 }, (_, i) => el('option', { value: z(i) }, z(i))))
+  horas.value = h || '00'
+  minutos.value = m || '00'
+  const cambio = () => alCambiar(fecha.value ? fecha.value + 'T' + horas.value + ':' + minutos.value : '')
+  for (const c of [fecha, horas, minutos]) c.addEventListener('change', cambio)
+  return el('div', { clase: 'fila', estilo: { gap: '6px', alignItems: 'center' } }, fecha, horas, el('b', {}, ':'), minutos, el('span', { clase: 'sub' }, 'hs'))
+}
+const ESTADO_SEMANA ={ sucursal: null, desde: '', hasta: '', previo: null, pedido: false, editado: false, revision: 0 }
 
 // --- CERRAR SEMANA ------------------------------------------------------------------------
 
@@ -39,19 +55,17 @@ async function secCierreSemana () {
   }
   const p = e.pedido ? null : e.previo || (!e.editado && d.proximo && e.desde === localCierre(d.proximo.desde) && e.hasta === localCierre(d.proximo.hasta) ? d.proximo : null)
   const cuerpo = []
-  const desde = el('input', { type: 'datetime-local', valor: e.desde })
-  const hasta = el('input', { type: 'datetime-local', valor: e.hasta })
   const vista = el('div', {})
   const boton = el('button', { clase: 'btn primario ancho', disabled: e.pedido, onclick: () => pedirCierreSemana() }, e.pedido ? 'Calculando en la caja…' : 'Calcular este período')
   const mensaje = () => el('div', { clase: 'tarjeta' }, el('p', { clase: 'sub' }, e.pedido ? 'Esperando el cálculo de la caja…' : 'Elegí el período y tocá «Calcular este período» para ver los importes antes de cerrar.'))
   const cambiar = () => {
-    e.desde = desde.value; e.hasta = hasta.value; e.previo = null; e.pedido = false; e.editado = true; e.revision++
+    e.previo = null; e.pedido = false; e.editado = true; e.revision++
     boton.disabled = false
     boton.textContent = 'Calcular este período'
     poner(vista, mensaje())
   }
-  desde.addEventListener('change', cambiar)
-  hasta.addEventListener('change', cambiar)
+  const desde = campoFechaHora(e.desde, (v) => { e.desde = v; cambiar() })
+  const hasta = campoFechaHora(e.hasta, (v) => { e.hasta = v; cambiar() })
   cuerpo.push(el('div', { clase: 'tarjeta' },
     el('div', { clase: 'dos cierre-fechas' }, el('label', { clase: 'campo' }, 'Desde (fecha y hora)', desde), el('label', { clase: 'campo' }, 'Hasta (fecha y hora)', hasta)),
     boton,
