@@ -26,14 +26,15 @@ const localCierre = (iso) => {
 function campoFechaHora (inicial, alCambiar) {
   const z = (n) => String(n).padStart(2, '0')
   const [dia, h, m] = String(inicial || '').split(/[T:]/)
-  const fecha = el('input', { type: 'date', valor: dia || '' })
-  const horas = el('select', {}, Array.from({ length: 24 }, (_, i) => el('option', { value: z(i) }, z(i))))
-  const minutos = el('select', {}, Array.from({ length: 60 }, (_, i) => el('option', { value: z(i) }, z(i))))
+  const fecha = el('input', { type: 'date', valor: dia || '', estilo: { flex: '1 1 0', minWidth: '0', width: 'auto' } })
+  const lista = { flex: 'none', width: '72px', paddingLeft: '8px', paddingRight: '4px' }
+  const horas = el('select', { estilo: lista }, Array.from({ length: 24 }, (_, i) => el('option', { value: z(i) }, z(i))))
+  const minutos = el('select', { estilo: lista }, Array.from({ length: 60 }, (_, i) => el('option', { value: z(i) }, z(i))))
   horas.value = h || '00'
   minutos.value = m || '00'
   const cambio = () => alCambiar(fecha.value ? fecha.value + 'T' + horas.value + ':' + minutos.value : '')
   for (const c of [fecha, horas, minutos]) c.addEventListener('change', cambio)
-  return el('div', { clase: 'fila', estilo: { gap: '6px', alignItems: 'center' } }, fecha, horas, el('b', {}, ':'), minutos, el('span', { clase: 'sub' }, 'hs'))
+  return el('div', { estilo: { display: 'flex', gap: '6px', alignItems: 'center', minWidth: '0' } }, fecha, horas, el('b', {}, ':'), minutos)
 }
 const ESTADO_SEMANA ={ sucursal: null, desde: '', hasta: '', previo: null, pedido: false, editado: false, revision: 0 }
 
