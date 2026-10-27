@@ -142,11 +142,31 @@ function tarjetaCierreSemana (p) {
     return el('div', { clase: 'fila' }, el('div', { clase: 'izq' }, el('b', {}, NOMBRES_LINEA[l]), el('div', { clase: 'sub' }, 'Esperado ' + plata(p.lineas[l].esperado))), el('div', { estilo: { textAlign: 'right' } }, i, el('div', {}, difs[l])))
   })
   fondo.addEventListener('input', calcular)
+  // Lo que dice Mercado Pago para este rango: la caja lo consulta y se completa solo.
+  const avisoMP = el('p', { clase: 'sub' })
+  const botonMP = el('button', { clase: 'btn ancho', onclick: async () => {
+    botonMP.disabled = true
+    botonMP.textContent = 'Consultando Mercado Pago…'
+    avisoMP.textContent = ''
+    await mandarOrden(S.sucursal, 'cierre_semana_mercadopago', { desde: p.desde, hasta: p.hasta }, {
+      texto: 'Mercado Pago', callado: true, silencioso: true,
+      alTerminar: (r) => {
+        botonMP.disabled = false
+        botonMP.textContent = 'Traer de Mercado Pago'
+        const res = r.resultado || {}
+        if (r.estado !== 'aplicada' || !res.datos) { avisoMP.textContent = 'No se pudo traer de Mercado Pago: ' + (res.error || 'error de la caja') + '. Podés cargar el total a mano.'; return }
+        reales.mercado_pago.value = String(res.datos.mp / 100).replace('.', ',')
+        avisoMP.textContent = 'Mercado Pago: ' + plata(res.datos.mp) + ' (' + res.datos.cantidad + ' cobros)' + (res.datos.point ? ' · además ' + plata(res.datos.point) + ' de la terminal de tarjetas (Point): va en Tarjeta.' : '')
+        calcular()
+      }
+    })
+  } }, 'Traer de Mercado Pago')
   const tarjeta = el('div', { clase: 'tarjeta' },
     el('h2', {}, cuandoCierre(p.desde) + ' → ' + cuandoCierre(p.hasta)),
     el('p', { clase: 'sub' }, p.cantidadVentas + ' ventas' + (p.enCurso ? ' · la semana todavía no terminó' : '') + (p.aCuenta ? ' · ' + plata(p.aCuenta) + ' a cuenta corriente' : '')),
     p.yaCerrado ? el('p', { clase: 'sub mal' }, 'Este rango se pisa con un cierre ya guardado.') : null,
     filas,
+    botonMP, avisoMP,
     el('label', { clase: 'campo' }, 'Fondo que ya había en la caja al empezar ($)', fondo),
     resumen,
     el('label', { clase: 'campo' }, 'Nota', nota),
