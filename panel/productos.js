@@ -399,6 +399,8 @@ async function hojaEditarProducto (p, sucursalId) {
   const precio = el('input', { type: 'text', inputmode: 'decimal', valor: plataExacta(p.precio) })
   const costo = el('input', { type: 'text', inputmode: 'decimal', valor: p.costo ? plataExacta(p.costo) : '' })
   const minimo = el('input', { type: 'text', inputmode: 'decimal', valor: p.minimo ? unidades(p.minimo) : '' })
+  // Cuantas trae la caja del proveedor: sirve para el pedido (vacio o 1 = suelto).
+  const bulto = el('input', { type: 'text', inputmode: 'numeric', valor: p.bulto > 1 ? String(p.bulto) : '', placeholder: 'Suelto' })
   const prov = el('select', {}, el('option', { valor: '' }, 'Sin proveedor'), proveedores.map((x) => el('option', { valor: x.id }, x.nombre)))
   prov.value = p.proveedorId || ''
   const rub = selectorRubro(rubros, p.rubroId)
@@ -410,7 +412,8 @@ async function hojaEditarProducto (p, sucursalId) {
     cuerpo: el('div', {},
       el('label', { clase: 'campo' }, 'Nombre', nombre),
       el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Precio ($)', precio), el('label', { clase: 'campo' }, 'Costo ($)', costo)),
-      el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Stock mínimo', minimo), el('label', { clase: 'campo' }, 'Estado', activo)),
+      el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Stock mínimo', minimo), el('label', { clase: 'campo' }, 'Unidades por caja', bulto)),
+      el('label', { clase: 'campo' }, 'Estado', activo),
       el('label', { clase: 'campo' }, 'Familia / rubro', rub),
       el('label', { clase: 'campo' }, 'Proveedor', prov),
       el('p', { clase: 'sub' }, 'El stock se cambia con "Ajustar stock", así queda el motivo.')),
@@ -428,13 +431,16 @@ async function hojaEditarProducto (p, sucursalId) {
       const mi = minimo.value.trim() ? aMilesimas(minimo.value) : 0
       if (!Number.isFinite(mi) || mi < 0) return toast('El mínimo no es válido', 'mal')
       if (mi !== (p.minimo || 0)) cambios.minimo = mi
+      const bu = bulto.value.trim() ? Math.round(Number(bulto.value.replace(',', '.'))) : 1
+      if (!Number.isFinite(bu) || bu < 1 || bu > 1000) return toast('Las unidades por caja no son válidas', 'mal')
+      if (bu !== (p.bulto || 1)) cambios.unidadesPorBulto = bu
       if ((prov.value || null) !== (p.proveedorId || null)) cambios.proveedorId = prov.value || null
       if ((rub.value || null) !== (p.rubroId || null)) cambios.rubroId = rub.value || null
       const act = activo.value === '1'
       if (act !== (p.activo !== false)) cambios.activo = act
       if (!Object.keys(cambios).length) return cerrarHoja()
       cerrarHoja()
-      marcarPendiente(suc, p.id, Object.assign({}, cambios, cambios.descripcion ? { descripcion: cambios.descripcion } : {}))
+      marcarPendiente(suc, p.id, Object.assign({}, cambios, cambios.descripcion ? { descripcion: cambios.descripcion } : {}, cambios.unidadesPorBulto ? { bulto: cambios.unidadesPorBulto } : {}))
       await mandarOrden(suc, 'producto', { productoId: p.id, cambios }, { texto: 'Cambios en ' + p.descripcion, alTerminar: refrescarSeccion })
       refrescarSeccion()
     } }]

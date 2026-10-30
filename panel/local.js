@@ -125,6 +125,24 @@ async function secContar () {
 
 // --- RECIBIR MERCADERIA -----------------------------------------------------------------
 
+// Por caja: "2 cajas de 12 a $X la caja". La cantidad y el costo por unidad salen
+// solos (igual que en la caja). Hasta saber cuantas trae la caja, no se toca nada.
+function derivarCaja (l) {
+  if (!l.porCaja || !(l.unidadesCaja > 1)) return
+  if (l.cajas > 0) l.cantidad = Math.round(l.cajas * l.unidadesCaja * 1000)
+  if (l.costoCaja == null && l.costoUnit != null) l.costoCaja = l.costoUnit * l.unidadesCaja
+  l.costoUnit = l.costoCaja > 0 ? Math.round(l.costoCaja / l.unidadesCaja) : null
+}
+
+function pasarACaja (l) {
+  const u = Number(l.unidadesPorBulto) > 1 ? Number(l.unidadesPorBulto) : 0
+  l.porCaja = true
+  l.unidadesCaja = u
+  l.cajas = u && l.cantidad % (u * 1000) === 0 ? l.cantidad / (u * 1000) : 1
+  l.costoCaja = l.costoUnit != null && u ? l.costoUnit * u : null
+  derivarCaja(l)
+}
+
 async function secRecibir (params) {
   if (!S.sucursal) return pintarSeccion('recibir', cabecera('Recibir mercadería'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'proveedores')))
   const suc = S.sucursal
@@ -147,7 +165,10 @@ async function secRecibir (params) {
     R.resto = false
     R.lineas = x.filas.map((f) => {
       const p = porId.get(f.productoId) || {}
-      return { productoId: f.productoId, descripcion: f.descripcion, codigo: f.codigo || '', stock: p.stock || 0, cantidad: f.cantidad, costoUnit: conCostos && p.costo > 0 ? p.costo : null, vence: '', ts: new Date().toISOString() }
+      const l = { productoId: f.productoId, descripcion: f.descripcion, codigo: f.codigo || '', stock: p.stock || 0, unidadesPorBulto: p.bulto || f.unidadesPorBulto || 1, cantidad: f.cantidad, costoUnit: conCostos && p.costo > 0 ? p.costo : null, vence: '', ts: new Date().toISOString() }
+      // Lo pedido en cajas justas se carga por caja, como viene en el remito.
+      if (l.unidadesPorBulto > 1 && l.cantidad % (l.unidadesPorBulto * 1000) === 0) pasarACaja(l)
+      return l
     })
     L.guardar()
     return true
@@ -180,23 +201,49 @@ async function secRecibir (params) {
   const zona = el('div', { clase: 'lista' })
   const resumen = el('div', { clase: 'sub', estilo: { margin: '6px 2px' } })
   const total = () => R.lineas.reduce((s, l) => s + (l.costoUnit > 0 ? Math.round(l.cantidad * l.costoUnit / 1000) : 0), 0)
+  // Un producto mas: si ya se esta cargando por caja, es una caja mas.
+  const sumarARecibir = (p) => {
+    const ya = R.lineas.find((x) => x.productoId === p.id)
+    if (ya && ya.porCaja) { ya.cajas += 1; derivarCaja(ya); ya.ts = new Date().toISOString(); return ya }
+    return sumarALinea(R.lineas, p, (x) => ({ costoUnit: conCostos && x.costo > 0 ? x.costo : null, vence: '', unidadesPorBulto: x.bulto || 1 }))
+  }
 
   const pintar = () => {
     L.guardar()
     poner(zona, R.lineas.length ? R.lineas.map((l, i) => {
-      const costo = conCostos ? el('input', { type: 'text', inputmode: 'decimal', clase: 'num', placeholder: 'costo', valor: l.costoUnit > 0 ? plataExacta(l.costoUnit) : '', estilo: { width: '96px' } }) : null
-      if (costo) costo.addEventListener('change', () => { const c = aCentavos(costo.value); l.costoUnit = Number.isFinite(c) && c > 0 ? c : null; pintar() })
+      const caja = !!l.porCaja
+      const costo = conCostos ? el('input', { type: 'text', inputmode: 'decimal', clase: 'num', placeholder: caja ? 'la caja' : 'costo', valor: caja ? (l.costoCaja > 0 ? plataExacta(l.costoCaja) : '') : (l.costoUnit > 0 ? plataExacta(l.costoUnit) : ''), estilo: { width: caja ? '118px' : '96px' } }) : null
+      if (costo) {
+        costo.addEventListener('change', () => {
+          const c = aCentavos(costo.value)
+          const valido = Number.isFinite(c) && c > 0 ? c : null
+          if (caja) { l.costoCaja = valido; if (!valido) l.costoUnit = null; derivarCaja(l) } else l.costoUnit = valido
+          pintar()
+        })
+      }
       const vto = el('input', { type: 'date', valor: l.vence || '', estilo: { width: '140px' } })
       vto.addEventListener('change', () => { l.vence = vto.value; L.guardar() })
+      // Por caja: cuantas cajas y cuantas trae cada una.
+      const cajas = el('input', { type: 'text', inputmode: 'decimal', clase: 'num', valor: caja && l.cajas ? String(l.cajas).replace('.', ',') : '', estilo: { width: '56px', textAlign: 'center' } })
+      const unid = el('input', { type: 'text', inputmode: 'numeric', clase: 'num', valor: caja && l.unidadesCaja ? String(l.unidadesCaja) : '', placeholder: 'u.', estilo: { width: '56px', textAlign: 'center' } })
+      cajas.addEventListener('change', () => { const n = Number(cajas.value.replace(',', '.')); if (n > 0 && n <= 9999) l.cajas = Math.round(n * 1000) / 1000; derivarCaja(l); pintar() })
+      unid.addEventListener('change', () => { const n = Math.round(Number(unid.value.replace(',', '.'))); if (n > 1 && n <= 1000) l.unidadesCaja = n; derivarCaja(l); pintar() })
+      const modo = el('button', { clase: 'btn chico', onclick: () => { if (l.porCaja) l.porCaja = false; else pasarACaja(l); pintar() } },
+        caja ? 'Por unidad' : l.unidadesPorBulto > 1 ? 'Cajas de ' + l.unidadesPorBulto : 'Por caja')
       return el('div', { clase: 'item', estilo: { flexWrap: 'wrap' } },
         el('div', { clase: 'cuerpo' },
           el('b', {}, l.descripcion),
           el('div', { clase: 'sub' }, (l.codigo || 'sin código') + ' · hay ' + unidades(l.stock))),
         el('div', { clase: 'fin pila' },
-          campoCantidad(l, pintar),
-          el('button', { clase: 'btn chico', onclick: () => { R.lineas.splice(i, 1); pintar() } }, 'Sacar')),
-        el('div', { clase: 'fila', estilo: { width: '100%', gap: '8px', marginTop: '6px', alignItems: 'center' } },
-          costo ? el('label', { clase: 'sub fila', estilo: { gap: '4px', alignItems: 'center' } }, 'Costo c/u $', costo) : null,
+          caja
+            ? el('div', { clase: 'fila', estilo: { gap: '4px', alignItems: 'center' } }, cajas, el('span', { clase: 'sub' }, 'cajas de'), unid)
+            : campoCantidad(l, pintar),
+          caja ? el('div', { clase: 'sub', estilo: { textAlign: 'right' } }, l.unidadesCaja > 1 ? '= ' + unidades(l.cantidad) + ' unidades' : 'Poné cuántas trae la caja') : null,
+          el('div', { clase: 'fila', estilo: { gap: '4px' } }, modo,
+            el('button', { clase: 'btn chico', onclick: () => { R.lineas.splice(i, 1); pintar() } }, 'Sacar'))),
+        el('div', { clase: 'fila', estilo: { width: '100%', gap: '8px', marginTop: '6px', alignItems: 'center', flexWrap: 'wrap' } },
+          costo ? el('label', { clase: 'sub fila', estilo: { gap: '4px', alignItems: 'center' } }, caja ? 'Costo caja $' : 'Costo c/u $', costo) : null,
+          costo && caja && l.costoUnit > 0 && l.unidadesCaja > 1 ? el('span', { clase: 'sub' }, '= ' + plata(l.costoUnit) + ' c/u') : null,
           el('label', { clase: 'sub fila', estilo: { gap: '4px', alignItems: 'center' } }, 'Vence', vto)))
     }) : vacio('Escaneá lo que trajo el proveedor: cada lectura suma uno.', 'proveedores'))
     const u = R.lineas.reduce((s, l) => s + l.cantidad, 0)
@@ -233,15 +280,17 @@ async function secRecibir (params) {
     alLeer: async (c) => {
       const r = await buscarCodigo(c, suc).catch(() => ({}))
       if (!r.producto) return '✗ ' + c + ' no está: cargalo en Productos'
-      const l = sumarALinea(R.lineas, r.producto, (p) => ({ costoUnit: conCostos && p.costo > 0 ? p.costo : null, vence: '' }))
+      const l = sumarARecibir(r.producto)
       L.guardar()
-      return '✓ ' + l.descripcion + ' · ' + unidades(l.cantidad)
+      return '✓ ' + l.descripcion + ' · ' + (l.porCaja ? String(l.cajas).replace('.', ',') + (l.cajas === 1 ? ' caja' : ' cajas') : unidades(l.cantidad))
     }
   }).then(pintar)
 
   const mandar = async () => {
     const lineas = R.lineas.filter((l) => l.cantidad > 0)
     if (!lineas.length) return toast('Todavía no cargaste nada', 'mal')
+    const sinUnidades = lineas.find((l) => l.porCaja && !(l.unidadesCaja > 1))
+    if (sinUnidades) return toast('Falta cuántas trae la caja de ' + sinUnidades.descripcion, 'mal')
     const t = total()
     const nombreProv = R.proveedorId ? (proveedores.find((x) => x.id === R.proveedorId) || {}).nombre : ''
     // Hay un pedido esperando y no se cargo desde ahi: ¿es ese?
@@ -258,7 +307,8 @@ async function secRecibir (params) {
       resto: !!(R.pedidoId && R.resto),
       proveedorId: R.proveedorId || null,
       numero: R.numero || '',
-      lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, costoUnit: conCostos && l.costoUnit > 0 ? l.costoUnit : null, vence: l.vence || '' })),
+      lineas: lineas.map((l) => Object.assign({ productoId: l.productoId, cantidad: l.cantidad, costoUnit: conCostos && l.costoUnit > 0 ? l.costoUnit : null, vence: l.vence || '' },
+        l.porCaja && l.unidadesCaja > 1 ? { cajas: l.cajas, unidadesCaja: l.unidadesCaja } : {})),
       deuda: R.aPagar && R.proveedorId && t > 0 && R.vence ? { vence: R.vence } : null
     }, { texto: 'Recepción' + (nombreProv ? ' de ' + nombreProv : ''), alTerminar: () => refrescarSeccion() })
     L.nueva()
@@ -274,7 +324,7 @@ async function secRecibir (params) {
       el('label', { clase: 'campo' }, 'Número de remito o factura', numero)),
     zonaPedido,
     el('button', { clase: 'btn primario ancho grande', estilo: { marginBottom: '10px' }, onclick: escanear }, icono('escanear'), 'Escanear lo que llegó'),
-    buscadorParaAgregar(lista, (p) => { sumarALinea(R.lineas, p, (x) => ({ costoUnit: conCostos && x.costo > 0 ? x.costo : null, vence: '' })); pintar() }),
+    buscadorParaAgregar(lista, (p) => { sumarARecibir(p); pintar() }),
     el('h3', {}, 'Lo que llegó'),
     el('div', { clase: 'tarjeta sin-relleno' }, zona),
     resumen,
