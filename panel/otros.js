@@ -5,7 +5,7 @@
 
 async function secReponer () {
   if (!S.sucursal) return pintarSeccion('reponer', cabecera('Reponer'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'reponer')))
-  const E = S.rep2 = Object.assign({ vista: 'pedidos_compra', busca: '', ajustes: {} }, S.rep2 || {})
+  const E = S.rep2 = Object.assign({ vista: 'pedidos_compra', busca: '', ajustes: {}, agregados: {} }, S.rep2 || {})
   const pestanas = el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, [['pedidos_compra', 'Pedidos'], ['pedido_sugerido', 'Sugerido'], ['pedido_hoy', 'Lo de hoy'], ['pedido_semana', 'La semana']].map(([id, t]) => el('button', { clase: E.vista === id ? 'activo' : '', onclick: () => { E.vista = id; render() } }, t)))
   if (E.vista === 'pedidos_compra') return secPedidosCompra(E, pestanas)
   const datos = await leerDatos(E.vista)
@@ -74,10 +74,57 @@ async function secPedidosCompra (E, pestanas) {
       const editable = x.estado === 'borrador'
       const clave = (f) => 'ped|' + x.id + '|' + f.productoId
       const cant = (f) => (E.ajustes[clave(f)] != null ? E.ajustes[clave(f)] : f.cantidad)
-      const cambiado = () => x.filas.some((f) => cant(f) !== f.cantidad)
+      // Lo agregado desde aca que la caja todavia no guardo.
+      const agregados = E.agregados[x.id] = (E.agregados[x.id] || []).filter((a) => !x.filas.some((f) => f.productoId === a.productoId))
+      const todas = () => x.filas.concat(agregados)
+      const cambiado = () => todas().some((f) => cant(f) !== f.cantidad)
       const texto = () => 'Pedido ' + x.numero + ' de ' + S.negocio + ' (' + nombreSucursal(S.sucursal) + ') para ' + x.proveedorNombre + ':\n\n' +
-        x.filas.filter((f) => cant(f) > 0).map((f) => '• ' + unidades(cant(f)) + ' ' + f.descripcion + (f.unidadesPorBulto > 1 && cant(f) % (f.unidadesPorBulto * 1000) === 0 ? ' (' + (cant(f) / 1000 / f.unidadesPorBulto) + ' x ' + f.unidadesPorBulto + ')' : '')).join('\n') + '\n\nGracias!'
-      const guardar = () => mandarOrden(S.sucursal, 'pedido_guardar', { id: x.id, filas: x.filas.map((f) => ({ productoId: f.productoId, cantidad: cant(f), sugerido: f.sugerido })) }, { texto: 'Pedido ' + x.numero, callado: true })
+        todas().filter((f) => cant(f) > 0).map((f) => '• ' + unidades(cant(f)) + ' ' + f.descripcion + (f.unidadesPorBulto > 1 && cant(f) % (f.unidadesPorBulto * 1000) === 0 ? ' (' + (cant(f) / 1000 / f.unidadesPorBulto) + ' x ' + f.unidadesPorBulto + ')' : '')).join('\n') + '\n\nGracias!'
+      const guardar = () => mandarOrden(S.sucursal, 'pedido_guardar', { id: x.id, filas: todas().map((f) => ({ productoId: f.productoId, cantidad: cant(f), sugerido: f.sugerido })) }, { texto: 'Pedido ' + x.numero, callado: true })
+      // Agregar lo que el sistema no propuso: se escanea o se busca. Queda en
+      // el pedido de aca hasta tocar Guardar (o mandarlo).
+      const agregar = async () => {
+        const lista = await leerCatalogo(S.sucursal).catch(() => [])
+        const elegir = (prod) => {
+          cerrarHoja()
+          if (todas().some((f) => f.productoId === prod.id)) return toast('Ya está en el pedido', '', 2)
+          const bulto = Number(prod.bulto) > 1 ? Number(prod.bulto) : 1
+          agregados.push({ productoId: prod.id, descripcion: prod.descripcion, codigo: (prod.codigos || [])[0] || '', cantidad: 0, sugerido: 0, unidadesPorBulto: bulto, stock: prod.stock, vendidas: prod.vendido30 })
+          E.ajustes[clave({ productoId: prod.id })] = bulto * 1000
+          render()
+          toast('Agregado. Tocá Guardar para mandarlo a la caja.', 'ok', 3)
+        }
+        abrirHoja({
+          titulo: 'Agregar al ' + x.numero,
+          completa: true,
+          cuerpo: el('div', {},
+            el('button', { clase: 'btn primario ancho', estilo: { margin: '0 0 8px' }, onclick: async () => {
+              const c = await leerCodigo({ titulo: 'Producto para el pedido' })
+              if (!c) return
+              const r = await buscarCodigo(c, S.sucursal).catch(() => ({}))
+              if (r.producto) elegir(r.producto)
+              else toast('Ese código no está en el catálogo', 'mal')
+            } }, icono('escanear'), 'Escanear producto'),
+            buscadorParaAgregar(lista, elegir))
+        })
+      }
+      // El automatico se armo temprano: la caja lo vuelve a calcular con el
+      // stock de ahora. Lo cambiado o agregado a mano queda igual.
+      const recalcular = async () => {
+        if (cambiado()) await guardar()
+        await mandarOrden(S.sucursal, 'pedido_recalcular', { id: x.id }, { texto: 'Recalcular ' + x.numero })
+        // Los numeros nuevos los trae la caja; lo recien agregado queda a la vista.
+        for (const f of x.filas) delete E.ajustes[clave(f)]
+        render()
+      }
+      // Lo mismo que el sugerido: cuanto hay, lo vendido y para cuantos dias alcanza.
+      const info = (f) => {
+        const linea1 = f.stock != null
+          ? ['hay ' + unidades(f.stock), f.vendidas != null ? 'vendió ' + unidades(f.vendidas) + ' en 30 días' : null, f.alcanzaDias != null ? 'alcanza ' + String(f.alcanzaDias).replace('.', ',') + ' d' : null].filter(Boolean).join(' · ')
+          : (f.codigo || 'sin código')
+        const linea2 = [!f.sugerido ? 'agregado a mano' : f.sugerido !== f.cantidad ? 'sugerido ' + unidades(f.sugerido) : null, f.enCamino > 0 ? unidades(f.enCamino) + ' en camino' : null, f.unidadesPorBulto > 1 ? 'caja de ' + f.unidadesPorBulto : null].filter(Boolean).join(' · ')
+        return [el('div', { clase: 'sub', estilo: Object.assign({ whiteSpace: 'normal' }, f.stock != null && f.stock <= 0 ? { color: 'var(--rojo)' } : null) }, linea1), linea2 ? el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, linea2) : null]
+      }
       const mandar = async () => {
         if (cambiado()) await guardar()
         window.open(linkWhatsApp(p.telefonos[x.proveedorId], texto()), '_blank')
@@ -103,16 +150,18 @@ async function secPedidosCompra (E, pestanas) {
           el('div', { clase: 'chips' },
             editable ? el('button', { clase: 'btn primario chico', onclick: mandar }, icono('mensaje'), 'WhatsApp') : null,
             editable ? el('button', { clase: 'btn chico', onclick: () => { if (!cambiado()) return toast('No cambiaste nada', '', 2); guardar().then(() => toast('Cambios mandados a la caja', 'ok')) } }, 'Guardar') : null,
+            editable ? el('button', { clase: 'btn chico', onclick: recalcular }, 'Recalcular') : null,
             x.estado === 'enviado' && seccionPermitida('recibir') && puede('recibir') ? el('button', { clase: 'btn primario chico', onclick: recibir }, 'Llegó: recibir') : null,
             el('button', { clase: 'btn chico', onclick: cancelar }, 'Cancelar'))),
-        el('div', { clase: 'lista' }, x.filas.map((f) => {
+        el('div', { clase: 'lista' }, (editable ? todas() : x.filas).map((f) => {
           if (!editable) return el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', {}, f.descripcion)), el('b', { clase: 'num' }, unidades(f.cantidad)))
           const inp = el('input', { type: 'text', inputmode: 'decimal', valor: unidades(cant(f)), estilo: { width: '76px', textAlign: 'right', minHeight: '40px', padding: '8px 10px' } })
           inp.addEventListener('input', () => { const n = aMilesimas(inp.value); if (Number.isFinite(n)) E.ajustes[clave(f)] = Math.max(0, n) })
           return el('div', { clase: 'item' },
-            el('div', { clase: 'cuerpo' }, el('b', {}, f.descripcion), el('div', { clase: 'sub' }, (f.codigo || 'sin código') + (f.sugerido && f.sugerido !== f.cantidad ? ' · sugerido ' + unidades(f.sugerido) : '') + (f.unidadesPorBulto > 1 ? ' · caja de ' + f.unidadesPorBulto : ''))),
+            el('div', { clase: 'cuerpo' }, el('b', {}, f.descripcion), ...info(f)),
             inp)
-        })))
+        })),
+        editable ? el('div', { estilo: { padding: '4px 16px 14px' } }, el('button', { clase: 'btn chico', onclick: agregar }, icono('sumar'), 'Agregar producto')) : null)
     }
     if (borradores.length) zona.append(el('h2', { estilo: { margin: '14px 4px 6px' } }, 'Para revisar y mandar'), ...borradores.map(tarjeta))
     if (enviados.length) zona.append(el('h2', { estilo: { margin: '14px 4px 6px' } }, 'Esperando la mercadería'), ...enviados.map(tarjeta))

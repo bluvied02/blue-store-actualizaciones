@@ -8,8 +8,8 @@
 // comparten dominio): al actualizarse, cada una borra solo los suyos.
 const ESPACIO = /\/paneles\//.test(self.registration.scope) ? new URL(self.registration.scope).pathname : ''
 const PREFIJO = ESPACIO ? 'cliente|' + ESPACIO + '|v' : 'bs-panel-v'
-const VERSION = PREFIJO + '13-17'
-const APP = ['./', 'index.html', 'estilos.css?v=13.17', 'app.js?v=13.17', 'lector.js?v=13.17', 'productos.js?v=13.17', 'perdidas.js?v=13.17', 'negocio.js?v=13.17', 'promociones.js?v=13.17', 'local.js?v=13.17', 'otros.js?v=13.17', 'personal.js?v=13.17', 'configuracion.js?v=13.17', 'cierres.js?v=13.17', 'mayorista-calculo.js?v=13.17', 'mayorista.js?v=13.17', 'metricas-calculo.js?v=13.17', 'metricas.js?v=13.17', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const VERSION = PREFIJO + '13-18'
+const APP = ['./', 'index.html', 'estilos.css?v=13.18', 'app.js?v=13.18', 'lector.js?v=13.18', 'productos.js?v=13.18', 'perdidas.js?v=13.18', 'negocio.js?v=13.18', 'promociones.js?v=13.18', 'local.js?v=13.18', 'otros.js?v=13.18', 'personal.js?v=13.18', 'configuracion.js?v=13.18', 'cierres.js?v=13.18', 'mayorista-calculo.js?v=13.18', 'mayorista.js?v=13.18', 'metricas-calculo.js?v=13.18', 'metricas.js?v=13.18', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {
