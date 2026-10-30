@@ -125,21 +125,54 @@ async function secContar () {
 
 // --- RECIBIR MERCADERIA -----------------------------------------------------------------
 
-async function secRecibir () {
+async function secRecibir (params) {
   if (!S.sucursal) return pintarSeccion('recibir', cabecera('Recibir mercadería'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'proveedores')))
   const suc = S.sucursal
-  const [lista, provs] = await Promise.all([leerCatalogo(suc), leerDatos('proveedores').catch(() => ({}))])
+  const [lista, provs, peds] = await Promise.all([leerCatalogo(suc), leerDatos('proveedores').catch(() => ({})), leerDatos('pedidos_compra').catch(() => ({}))])
   const proveedores = (datosDe(provs, suc) || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
   const conCostos = puede('verCostos')
-  const L = listaEscaneada('bs.recibir.' + suc, () => ({ lineas: [], proveedorId: '', numero: '', aPagar: false, vence: sumarDias(hoyISO(), 21) }))
+  const L = listaEscaneada('bs.recibir.' + suc, () => ({ lineas: [], proveedorId: '', numero: '', aPagar: false, vence: sumarDias(hoyISO(), 21), pedidoId: '', pedidoNumero: '', resto: false }))
   const R = L.datos
+
+  // Los pedidos que esperan mercaderia en esta sucursal (los sube la caja).
+  const pedidos = ((datosDe(peds, suc) || {}).pedidos || []).filter((x) => x.estado === 'enviado' || x.estado === 'borrador')
+  const pendientes = () => pedidos.filter((x) => x.proveedorId === R.proveedorId)
+    .sort((a, b) => (a.estado === b.estado ? 0 : a.estado === 'enviado' ? -1 : 1) || String(a.enviadoEn || a.creadoEn).localeCompare(String(b.enviadoEn || b.creadoEn)))
+  const cargarPedido = (x) => {
+    if (R.lineas.length && R.pedidoId !== x.id && !confirm('Se reemplaza lo que ya cargaste por lo del pedido ' + x.numero + '. ¿Seguir?')) return false
+    const porId = new Map(lista.map((p) => [p.id, p]))
+    R.proveedorId = x.proveedorId
+    R.pedidoId = x.id
+    R.pedidoNumero = x.numero
+    R.resto = false
+    R.lineas = x.filas.map((f) => {
+      const p = porId.get(f.productoId) || {}
+      return { productoId: f.productoId, descripcion: f.descripcion, codigo: f.codigo || '', stock: p.stock || 0, cantidad: f.cantidad, costoUnit: conCostos && p.costo > 0 ? p.costo : null, vence: '', ts: new Date().toISOString() }
+    })
+    L.guardar()
+    return true
+  }
+  // Desde Reponer → "Llegó: recibir": ese pedido, una sola vez.
+  if (params && params.pedidoId) {
+    const x = pedidos.find((y) => y.id === params.pedidoId)
+    delete params.pedidoId
+    if (x) cargarPedido(x)
+    else toast('Ese pedido ya no está esperando', '', 3)
+  }
+  // Si el pedido elegido ya no esta pendiente (lo recibio otro), se suelta.
+  if (R.pedidoId && !pedidos.some((y) => y.id === R.pedidoId)) { R.pedidoId = ''; R.pedidoNumero = ''; R.resto = false; L.guardar() }
 
   const prov = el('select', {}, el('option', { valor: '' }, '— sin proveedor —'), proveedores.map((x) => el('option', { valor: x.id, selected: x.id === R.proveedorId }, x.nombre)))
   const numero = el('input', { type: 'text', valor: R.numero || '', placeholder: 'Opcional', maxlength: '40' })
   const aPagar = el('input', { type: 'checkbox', checked: !!R.aPagar })
   const vence = el('input', { type: 'date', valor: R.vence || sumarDias(hoyISO(), 21) })
   const zonaPagar = el('div', {})
-  prov.addEventListener('change', () => { R.proveedorId = prov.value; pintar() })
+  const zonaPedido = el('div', {})
+  prov.addEventListener('change', () => {
+    R.proveedorId = prov.value
+    if (R.pedidoId && !pendientes().some((x) => x.id === R.pedidoId)) { R.pedidoId = ''; R.pedidoNumero = ''; R.resto = false }
+    pintar()
+  })
   numero.addEventListener('input', () => { R.numero = numero.value; L.guardar() })
   aPagar.addEventListener('change', () => { R.aPagar = aPagar.checked; pintar() })
   vence.addEventListener('change', () => { R.vence = vence.value; L.guardar() })
@@ -169,6 +202,23 @@ async function secRecibir () {
     const u = R.lineas.reduce((s, l) => s + l.cantidad, 0)
     const t = total()
     resumen.textContent = R.lineas.length ? R.lineas.length + (R.lineas.length === 1 ? ' producto · ' : ' productos · ') + unidades(u) + (u === 1000 ? ' unidad' : ' unidades') + (conCostos && t ? ' · total ' + plata(t) : '') : ''
+    const espera = pendientes()
+    if (R.pedidoId) {
+      const resto = el('input', { type: 'checkbox', checked: !!R.resto })
+      resto.addEventListener('change', () => { R.resto = resto.checked; L.guardar() })
+      poner(zonaPedido, el('div', { clase: 'tarjeta' },
+        el('div', { clase: 'fila entre', estilo: { gap: '8px', alignItems: 'center' } },
+          el('div', {}, el('b', {}, 'Recibiendo el pedido ' + R.pedidoNumero),
+            el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Corregí las cantidades a lo que vino y sacá lo que no vino. La caja te dice qué faltó.')),
+          el('button', { clase: 'btn chico', estilo: { whiteSpace: 'nowrap', flexShrink: '0' }, onclick: () => { R.pedidoId = ''; R.pedidoNumero = ''; R.resto = false; pintar() } }, 'No es este')),
+        el('label', { clase: 'fila', estilo: { gap: '8px', alignItems: 'center', marginTop: '8px' } }, resto, 'Si falta algo, lo traen después (queda esperando)')))
+    } else if (espera.length) {
+      poner(zonaPedido, el('div', { clase: 'tarjeta' },
+        el('b', {}, espera.length === 1 ? 'Hay un pedido esperando de este proveedor' : 'Hay ' + espera.length + ' pedidos esperando de este proveedor'),
+        el('div', { clase: 'lista' }, espera.map((x) => el('div', { clase: 'item' },
+          el('div', { clase: 'cuerpo' }, el('b', {}, x.numero), el('div', { clase: 'sub' }, x.filas.length + (x.filas.length === 1 ? ' producto' : ' productos') + (x.estado === 'borrador' ? ' · sin mandar' : '') + (x.atrasado ? ' · atrasado' : ''))),
+          el('button', { clase: 'btn chico primario', onclick: () => { if (cargarPedido(x)) pintar() } }, 'Cargar'))))))
+    } else poner(zonaPedido, null)
     poner(zonaPagar, conCostos && R.proveedorId && t > 0
       ? el('div', { clase: 'tarjeta' },
         el('label', { clase: 'fila', estilo: { gap: '8px', alignItems: 'center' } }, aPagar, 'Anotar ' + plata(t) + ' en A pagar'),
@@ -194,8 +244,18 @@ async function secRecibir () {
     if (!lineas.length) return toast('Todavía no cargaste nada', 'mal')
     const t = total()
     const nombreProv = R.proveedorId ? (proveedores.find((x) => x.id === R.proveedorId) || {}).nombre : ''
-    if (!confirm('¿Cargar ' + lineas.length + ' productos en ' + nombreSucursal(suc) + (nombreProv ? ' de ' + nombreProv : '') + '?' + (R.aPagar && t ? '\n\nSe anota ' + plata(t) + ' en A pagar.' : ''))) return
+    // Hay un pedido esperando y no se cargo desde ahi: ¿es ese?
+    const espera = pendientes()
+    let pedidoId = R.pedidoId
+    let pedidoNumero = R.pedidoNumero
+    if (!pedidoId && espera.length === 1 && confirm('¿Esto es lo que vino del pedido ' + espera[0].numero + '?\n\nAceptar = sí (se compara con lo pedido). Cancelar = no es de un pedido.')) {
+      pedidoId = espera[0].id
+      pedidoNumero = espera[0].numero
+    }
+    if (!confirm('¿Cargar ' + lineas.length + ' productos en ' + nombreSucursal(suc) + (nombreProv ? ' de ' + nombreProv : '') + (pedidoId ? ' (pedido ' + pedidoNumero + ')' : '') + '?' + (R.aPagar && t ? '\n\nSe anota ' + plata(t) + ' en A pagar.' : ''))) return
     await mandarOrden(suc, 'recepcion', {
+      pedidoId: pedidoId || null,
+      resto: !!(R.pedidoId && R.resto),
       proveedorId: R.proveedorId || null,
       numero: R.numero || '',
       lineas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, costoUnit: conCostos && l.costoUnit > 0 ? l.costoUnit : null, vence: l.vence || '' })),
@@ -212,6 +272,7 @@ async function secRecibir () {
     el('div', { clase: 'tarjeta' },
       el('label', { clase: 'campo' }, 'Proveedor', prov),
       el('label', { clase: 'campo' }, 'Número de remito o factura', numero)),
+    zonaPedido,
     el('button', { clase: 'btn primario ancho grande', estilo: { marginBottom: '10px' }, onclick: escanear }, icono('escanear'), 'Escanear lo que llegó'),
     buscadorParaAgregar(lista, (p) => { sumarALinea(R.lineas, p, (x) => ({ costoUnit: conCostos && x.costo > 0 ? x.costo : null, vence: '' })); pintar() }),
     el('h3', {}, 'Lo que llegó'),
