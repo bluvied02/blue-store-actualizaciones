@@ -125,6 +125,8 @@ function hojaEmpleadoSueldo (liq, usuarioId) {
       fila('Valor hora lun-jue / vie-dom', plata(x.valorHoraLunJue) + ' / ' + plata(x.valorHoraVieDom)),
       fila('Sueldo por horas', plata(x.sueldoHoras)),
       x.extras ? fila('+ Extras', plata(x.extras), 'verde') : null,
+      x.adicionales ? fila('+ Aguinaldo, vacaciones y feriados', plata(x.adicionales), 'verde') : null,
+      x.aguinaldoSugerido ? fila('Aguinaldo sin cargar', plata(x.aguinaldoSugerido), 'ambar') : null,
       x.adelantos ? fila('− Adelantos y vales', plata(x.adelantos)) : null,
       x.fiado ? fila('− Fiado de su cuenta', plata(x.fiado)) : null,
       x.descuentos ? fila('− Roturas y descuentos', plata(x.descuentos)) : null,
@@ -134,7 +136,7 @@ function hojaEmpleadoSueldo (liq, usuarioId) {
       fila('Saldo', plata(x.saldo), x.saldo > 0 ? 'rojo' : 'verde'),
       // Lo que debe en su cuenta de fiado (la cuenta se elige en la caja, en Sueldos).
       x.cuenta && x.cuenta.debe > 0 ? el('div', { clase: 'aviso alerta', estilo: { marginTop: '10px' } }, el('b', {}, 'Debe ' + plata(x.cuenta.debe) + ' de fiado'), 'En la cuenta ' + x.cuenta.nombre + '. Al descontarlo del sueldo, la cuenta queda pagada.', el('div', { estilo: { marginTop: '8px' } }, el('button', { clase: 'btn chico primario', onclick: () => hojaMovimientoSueldo(liq, x, 'fiado') }, 'Descontar del sueldo'))) : null,
-      el('div', { clase: 'chips', estilo: { margin: '12px 0' } }, botonTipo('adelanto', '+ Adelanto'), botonTipo('vale', '+ Vale'), botonTipo('descuento', '+ Descuento'), botonTipo('bono', '+ Extra'), botonTipo('pago', 'Pagar sueldo')),
+      el('div', { clase: 'chips', estilo: { margin: '12px 0' } }, botonTipo('adelanto', '+ Adelanto'), botonTipo('vale', '+ Vale'), botonTipo('descuento', '+ Descuento'), botonTipo('bono', '+ Extra'), botonTipo('feriado', '+ Feriado'), botonTipo('vacaciones', '+ Vacaciones'), botonTipo('aguinaldo', '+ Aguinaldo'), botonTipo('pago', 'Pagar sueldo')),
       x.faltantes.length ? [el('h3', {}, 'Faltantes de caja'), x.faltantes.map((f) => el('div', { clase: 'fila' },
         el('span', { clase: 'tenue' }, fechaCorta(f.dia) + ' · ' + plata(f.importe) + (f.perdonado ? ' (perdonado)' : '')),
         el('button', { clase: 'btn chico', onclick: async () => { cerrarHoja(); await mandarOrden(S.sucursal, 'sueldo_perdonar', { cajaId: f.cajaId, perdonado: !f.perdonado, motivo: 'Desde el celular' }, { texto: f.perdonado ? 'Volver a descontar' : 'Perdonar faltante', alTerminar: refrescarSeccion }) } }, f.perdonado ? 'Descontar' : 'Perdonar')))] : null,
@@ -149,7 +151,7 @@ function hojaMovimientoSueldo (liq, x, tipo) {
   const nombres = liq.tipos
   const conPlata = tipo === 'adelanto' || tipo === 'pago'
   const sugerido = tipo === 'pago' && x.saldo > 0 ? x.saldo : tipo === 'fiado' && x.cuenta ? x.cuenta.debe : 0
-  const importe = el('input', { type: 'text', inputmode: 'decimal', clase: 'plata-grande', valor: sugerido ? String(sugerido / 100).replace('.', ',') : '' })
+  const importe = el('input', { type: 'text', inputmode: 'decimal', clase: 'plata-grande', valor: (sugerido || (tipo === 'aguinaldo' && x.aguinaldoSugerido)) ? String((sugerido || x.aguinaldoSugerido) / 100).replace('.', ',') : '' })
   const motivo = el('input', { type: 'text', placeholder: tipo === 'vale' ? 'Qué se llevó' : 'Opcional' })
   const medio = el('select', {}, [['transferencia', 'Transferencia'], ['mercado_pago', 'Mercado Pago'], ['efectivo', 'Efectivo (fuera de la caja)']].map(([id, t]) => el('option', { valor: id }, t)))
   const fecha = el('input', { type: 'date', valor: hoyISO() })
