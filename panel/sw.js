@@ -8,8 +8,8 @@
 // comparten dominio): al actualizarse, cada una borra solo los suyos.
 const ESPACIO = /\/paneles\//.test(self.registration.scope) ? new URL(self.registration.scope).pathname : ''
 const PREFIJO = ESPACIO ? 'cliente|' + ESPACIO + '|v' : 'bs-panel-v'
-const VERSION = PREFIJO + '13-25'
-const APP = ['./', 'index.html', 'estilos.css?v=13.25', 'app.js?v=13.25', 'lector.js?v=13.25', 'productos.js?v=13.25', 'perdidas.js?v=13.25', 'negocio.js?v=13.25', 'promociones.js?v=13.25', 'local.js?v=13.25', 'otros.js?v=13.25', 'personal.js?v=13.25', 'configuracion.js?v=13.25', 'cierres.js?v=13.25', 'mayorista-calculo.js?v=13.25', 'mayorista.js?v=13.25', 'metricas-calculo.js?v=13.25', 'metricas.js?v=13.25', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const VERSION = PREFIJO + '13-26'
+const APP = ['./', 'index.html', 'estilos.css?v=13.26', 'app.js?v=13.26', 'lector.js?v=13.26', 'productos.js?v=13.26', 'perdidas.js?v=13.26', 'negocio.js?v=13.26', 'promociones.js?v=13.26', 'local.js?v=13.26', 'otros.js?v=13.26', 'personal.js?v=13.26', 'configuracion.js?v=13.26', 'cierres.js?v=13.26', 'mayorista-calculo.js?v=13.26', 'mayorista.js?v=13.26', 'metricas-calculo.js?v=13.26', 'metricas.js?v=13.26', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
 
 self.addEventListener('install', (ev) => {
@@ -50,14 +50,16 @@ self.addEventListener('push', (ev) => {
     icon: 'icono-192.png',
     badge: 'icono-192.png',
     tag: d.tag || undefined,
-    data: { url: './#/avisos' }
+    // Los avisos de pedidos abren Reponer, donde se manda en un toque.
+    data: { url: d.tipo === 'pedido' ? './#/reponer' : './#/avisos' }
   }))
 })
 
 self.addEventListener('notificationclick', (ev) => {
   ev.notification.close()
   ev.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ventanas) => {
-    for (const v of ventanas) if ('focus' in v) return v.focus()
-    return self.clients.openWindow((ev.notification.data && ev.notification.data.url) || './')
+    const url = (ev.notification.data && ev.notification.data.url) || './'
+    for (const v of ventanas) if ('focus' in v) { if (v.navigate && url !== './') v.navigate(url).catch(() => {}); return v.focus() }
+    return self.clients.openWindow(url)
   }))
 })

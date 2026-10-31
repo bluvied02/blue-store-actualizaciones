@@ -485,7 +485,7 @@ async function secAvisos () {
   for (const a of data) {
     const d = isoLocal(new Date(a.creado))
     if (d !== dia) { dia = d; actual = el('div', { clase: 'lista' }); bloques.push(el('h3', {}, fechaCorta(d)), el('div', { clase: 'tarjeta sin-relleno' }, actual)) }
-    actual.append(el('div', { clase: 'item' },
+    actual.append(el('div', { clase: 'item' + (a.tipo === 'pedido' ? ' tocable' : ''), onclick: a.tipo === 'pedido' ? () => ir('reponer') : null },
       el('span', { clase: 'chip ' + (tono[a.tipo] || 'info'), estilo: { padding: '6px' } }, icono(ico[a.tipo] || 'avisos')),
       el('div', { clase: 'cuerpo' }, el('b', { estilo: { whiteSpace: 'normal' } }, a.titulo), el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, (a.nombre || '') + ' · ' + hora(a.creado) + (a.texto ? ' · ' + a.texto : '')))))
   }
