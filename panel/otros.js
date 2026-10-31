@@ -23,14 +23,26 @@ async function secReponer () {
       if (!filas.length) continue
       alguno = true
       const texto = () => 'Pedido ' + S.negocio + ' (' + nombreSucursal(S.sucursal) + '):\n' + g.filas.filter((f) => cant(f) > 0).map((f) => unidades(cant(f)) + ' x ' + f.descripcion).join('\n')
+      // Todo termina en un pedido guardado en la caja: queda en camino, cuenta
+      // para el tope y se compara al recibir.
+      const guardarEnCaja = (enviado) => mandarOrden(S.sucursal, 'pedido_guardar', { proveedorId: g.proveedorId, enviado, filas: g.filas.map((f) => ({ productoId: f.productoId, cantidad: cant(f), sugerido: f.sugerido })) }, { texto: 'Pedido a ' + g.nombre })
+      const mandarWhatsApp = () => {
+        window.open(linkWhatsApp(g.telefono, texto()), '_blank')
+        if (!g.proveedorId) return
+        abrirHoja({
+          titulo: '¿Se mandó el pedido?',
+          cuerpo: el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Si lo mandaste por WhatsApp a ' + g.nombre + ', confirmalo así queda guardado y como enviado en la caja.'),
+          botones: [{ texto: 'Sí, quedó enviado', primario: true, alTocar: (cerrar) => { cerrar(); guardarEnCaja(true) } }]
+        })
+      }
       zona.append(el('div', { clase: 'tarjeta sin-relleno' },
         el('div', { clase: 'tarjeta-cab', estilo: { padding: '12px 16px 4px' } },
           el('div', {}, el('h2', { estilo: { margin: 0 } }, g.nombre), el('div', { clase: 'sub' }, g.filas.length + ' productos' + (g.telefono ? ' · ' + g.telefono : ' · sin teléfono'))),
           el('div', { clase: 'chips' },
-            el('a', { clase: 'btn primario chico', href: '#', onclick: (ev) => { ev.preventDefault(); window.open(linkWhatsApp(g.telefono, texto()), '_blank') } }, icono('mensaje'), 'WhatsApp'),
+            el('a', { clase: 'btn primario chico', href: '#', onclick: (ev) => { ev.preventDefault(); mandarWhatsApp() } }, icono('mensaje'), 'WhatsApp'),
             el('button', { clase: 'btn chico', onclick: async () => { try { await navigator.clipboard.writeText(texto()); toast('Pedido copiado', 'ok') } catch (e) { toast('No se pudo copiar', 'mal') } } }, 'Copiar'),
             // Si ya hay un pedido armado de ese proveedor, la caja lo actualiza (no hace otro).
-            E.vista === 'pedido_sugerido' && g.proveedorId ? el('button', { clase: 'btn chico', onclick: () => mandarOrden(S.sucursal, 'pedido_guardar', { proveedorId: g.proveedorId, filas: g.filas.map((f) => ({ productoId: f.productoId, cantidad: cant(f), sugerido: f.sugerido })) }, { texto: 'Pedido a ' + g.nombre }) }, g.borrador ? 'Actualizar ' + g.borrador : 'Guardar pedido') : null)),
+            g.proveedorId ? el('button', { clase: 'btn chico', onclick: () => guardarEnCaja(false) }, g.borrador ? 'Actualizar ' + g.borrador : 'Guardar pedido') : null)),
         el('div', { clase: 'lista' }, filas.map((f) => {
           const inp = el('input', { type: 'text', inputmode: 'decimal', valor: unidades(cant(f)), estilo: { width: '76px', textAlign: 'right', minHeight: '40px', padding: '8px 10px' } })
           inp.addEventListener('input', () => { const n = aMilesimas(inp.value); if (Number.isFinite(n)) E.ajustes[clave(f)] = Math.max(0, n) })
@@ -139,19 +151,49 @@ async function secPedidosCompra (E, pestanas) {
         cuerpo: el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'No se borra: queda como cancelado.'),
         botones: [{ texto: 'Cancelar pedido', peligro: true, alTocar: (cerrar) => { cerrar(); mandarOrden(S.sucursal, 'pedido_estado', { id: x.id, estado: 'cancelado' }) } }]
       })
+      // "No tengo de 2 L, te mando 1,5": el pedido mandado se ajusta a lo que
+      // confirmo el proveedor. Sigue enviado.
+      const ajustar = async () => {
+        const lineas = x.filas.map((f) => ({ productoId: f.productoId, descripcion: f.descripcion, pedido: f.cantidad, cantidad: f.cantidad }))
+        const zonaLineas = el('div', { clase: 'lista' })
+        const pintarLineas = () => poner(zonaLineas, lineas.map((l) => {
+          const inp = el('input', { type: 'text', inputmode: 'decimal', valor: unidades(l.cantidad), estilo: { width: '76px', textAlign: 'right', minHeight: '40px', padding: '8px 10px' } })
+          inp.addEventListener('input', () => { const n = aMilesimas(inp.value); if (Number.isFinite(n)) l.cantidad = Math.max(0, n) })
+          return el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', {}, l.descripcion), el('div', { clase: 'sub' }, l.pedido ? 'pediste ' + unidades(l.pedido) : 'nuevo')), inp)
+        }))
+        pintarLineas()
+        const catalogo = await leerCatalogo(S.sucursal).catch(() => [])
+        const sumar = (prod) => {
+          if (lineas.some((l) => l.productoId === prod.id)) return toast('Ya está en el pedido', '', 2)
+          const bulto = Number(prod.bulto) > 1 ? Number(prod.bulto) : 1
+          lineas.push({ productoId: prod.id, descripcion: prod.descripcion, pedido: 0, cantidad: bulto * 1000 })
+          pintarLineas()
+        }
+        abrirHoja({
+          titulo: 'Ajustar ' + x.numero + ' a lo que confirmó',
+          completa: true,
+          cuerpo: el('div', {},
+            el('p', { clase: 'sub', estilo: { whiteSpace: 'normal', margin: '0 0 8px' } }, 'Poné lo que ' + x.proveedorNombre + ' dijo que manda. En 0, no viene. Sigue como enviado.'),
+            zonaLineas,
+            el('p', { clase: 'sub', estilo: { margin: '12px 0 6px' } }, 'Lo que manda en cambio:'),
+            buscadorParaAgregar(catalogo, sumar)),
+          botones: [{ texto: 'Guardar ajuste', primario: true, alTocar: (cerrar) => { cerrar(); mandarOrden(S.sucursal, 'pedido_ajustar', { id: x.id, filas: lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad })) }, { texto: 'Ajustar ' + x.numero }) } }]
+        })
+      }
       // Llego: se abre Recibir con lo pedido cargado, para que entre el stock y
       // se compare con lo que vino.
       const recibir = () => ir('recibir', { pedidoId: x.id })
       return el('div', { clase: 'tarjeta sin-relleno' },
         el('div', { clase: 'tarjeta-cab', estilo: { padding: '12px 16px 4px' } },
           el('div', {}, el('h2', { estilo: { margin: 0 } }, x.proveedorNombre),
-            el('div', { clase: 'sub' }, x.numero + ' · ' + (x.restoDe ? 'lo que faltó de una entrega' : x.automatico ? 'lo armó el sistema' : 'armado a mano') + ' · ' + fecha(x.creadoEn) + (x.enviadoEn && !x.restoDe ? ' · enviado ' + fecha(x.enviadoEn) : '') + (p.telefonos[x.proveedorId] ? '' : ' · sin teléfono')),
+            el('div', { clase: 'sub' }, x.numero + ' · ' + (x.restoDe ? 'lo que faltó de una entrega' : x.automatico ? 'lo armó el sistema' : 'armado a mano') + ' · ' + fecha(x.creadoEn) + (x.enviadoEn && !x.restoDe ? ' · enviado ' + fecha(x.enviadoEn) : '') + (x.ajustadoEn ? ' · ajustado' : '') + (p.telefonos[x.proveedorId] ? '' : ' · sin teléfono')),
             x.atrasado ? el('div', { clase: 'sub', estilo: { whiteSpace: 'normal', color: 'var(--rojo)' } }, 'Atrasado: ya no cuenta como en camino. Si llegó, recibilo; si no viene, cancelalo.') : null),
           el('div', { clase: 'chips' },
             editable ? el('button', { clase: 'btn primario chico', onclick: mandar }, icono('mensaje'), 'WhatsApp') : null,
             editable ? el('button', { clase: 'btn chico', onclick: () => { if (!cambiado()) return toast('No cambiaste nada', '', 2); guardar().then(() => toast('Cambios mandados a la caja', 'ok')) } }, 'Guardar') : null,
             editable ? el('button', { clase: 'btn chico', onclick: recalcular }, 'Recalcular') : null,
             x.estado === 'enviado' && seccionPermitida('recibir') && puede('recibir') ? el('button', { clase: 'btn primario chico', onclick: recibir }, 'Llegó: recibir') : null,
+            x.estado === 'enviado' ? el('button', { clase: 'btn chico', onclick: ajustar }, 'Ajustar') : null,
             el('button', { clase: 'btn chico', onclick: cancelar }, 'Cancelar'))),
         el('div', { clase: 'lista' }, (editable ? todas() : x.filas).map((f) => {
           if (!editable) return el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', {}, f.descripcion)), el('b', { clase: 'num' }, unidades(f.cantidad)))

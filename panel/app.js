@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.19'
+const VERSION_APP = '13.20'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -403,7 +403,7 @@ const NOMBRE_ORDEN = {
   transferencia_salida: 'Pasar a otra sucursal', conteo: 'Conteo de stock', recepcion: 'Mercadería recibida',
   producto_foto: 'Foto del producto', venta_celular: 'Venta', modo_emergencia: 'Modo emergencia', encargo_guardar: 'Encargo', encargo_estado: 'Encargo',
   mayorista_guardar: 'Presupuesto mayorista', mayorista_estado: 'Presupuesto mayorista', mayorista_venta: 'Venta mayorista',
-  pedido_guardar: 'Pedido a proveedor', pedido_estado: 'Pedido a proveedor', pedido_recalcular: 'Recalcular pedido',
+  pedido_guardar: 'Pedido a proveedor', pedido_estado: 'Pedido a proveedor', pedido_recalcular: 'Recalcular pedido', pedido_ajustar: 'Ajustar pedido mandado',
   horario_guardar: 'Horario', valor_hora: 'Valor hora', fichaje_corregir: 'Turno corregido', fichaje_manual: 'Día a mano', fichaje_config: 'Fichaje',
   sueldo_registrar: 'Sueldo', sueldo_anular: 'Anular movimiento', sueldo_perdonar: 'Faltante',
   vencimiento_guardar: 'Vencimiento', vencimiento_resolver: 'Vencimiento', vencimiento_borrar: 'Vencimiento',
