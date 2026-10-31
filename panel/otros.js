@@ -146,11 +146,18 @@ async function secPedidosCompra (E, pestanas) {
           botones: [{ texto: 'Sí, quedó enviado', primario: true, alTocar: (cerrar) => { cerrar(); mandarOrden(S.sucursal, 'pedido_estado', { id: x.id, estado: 'enviado' }, { texto: 'Pedido ' + x.numero + ' enviado' }) } }]
         })
       }
-      const cancelar = () => abrirHoja({
-        titulo: 'Cancelar el pedido ' + x.numero,
-        cuerpo: el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'No se borra: queda como cancelado.'),
-        botones: [{ texto: 'Cancelar pedido', peligro: true, alTocar: (cerrar) => { cerrar(); mandarOrden(S.sucursal, 'pedido_estado', { id: x.id, estado: 'cancelado' }) } }]
-      })
+      const cancelar = () => {
+        const motivo = el('input', { type: 'text', placeholder: 'Ej: no tenía nada, lo pedí a otro' })
+        abrirHoja({
+          titulo: 'Cancelar el pedido ' + x.numero,
+          cuerpo: el('div', {}, el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'No se borra: queda como cancelado, con el motivo, y se puede deshacer en la caja.'), el('label', { clase: 'campo' }, '¿Por qué se cancela?', motivo)),
+          botones: [{ texto: 'Cancelar pedido', peligro: true, alTocar: (cerrar) => {
+            if (!motivo.value.trim()) return toast('Poné el motivo', 'mal')
+            cerrar()
+            mandarOrden(S.sucursal, 'pedido_estado', { id: x.id, estado: 'cancelado', motivo: motivo.value.trim() })
+          } }]
+        })
+      }
       // "No tengo de 2 L, te mando 1,5": el pedido mandado se ajusta a lo que
       // confirmo el proveedor. Sigue enviado.
       const ajustar = async () => {
