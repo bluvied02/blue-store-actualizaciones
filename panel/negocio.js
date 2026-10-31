@@ -378,10 +378,16 @@ async function reporteHistorial (E, ids, segPeriodo, segSuc) {
 
 // --- CLIENTES Y CUENTA CORRIENTE -------------------------------------------------
 
+// Dias desde la compra impaga mas vieja (null si no debe).
+const diasDeuda = (c) => c.saldo > 0 && c.deudaDesde ? Math.floor((Date.now() - new Date(c.deudaDesde).getTime()) / 86400000) : null
+const DIAS_DEUDA_VIEJA = 30
+
 function itemCliente (c, alTocar) {
+  const dias = diasDeuda(c)
   return el('div', { clase: 'item tocable' + (c.activo === false ? ' inactivo' : ''), onclick: alTocar },
     el('div', { clase: 'cuerpo' }, el('b', {}, c.nombre),
-      el('div', { clase: 'sub' }, [c.telefono, c.ultimaCompra ? 'compró ' + hace(c.ultimaCompra) : 'sin compras a cuenta'].filter(Boolean).join(' · '))),
+      el('div', { clase: 'sub' }, [c.telefono, c.ultimaCompra ? 'compró ' + hace(c.ultimaCompra) : 'sin compras a cuenta', c.empleado ? 'empleado' : ''].filter(Boolean).join(' · ')),
+      dias != null && dias >= DIAS_DEUDA_VIEJA ? el('div', { clase: 'sub ' + (dias >= DIAS_DEUDA_VIEJA * 2 ? 'rojo' : 'ambar') }, 'debe hace ' + dias + ' días') : null),
     el('div', { clase: 'fin' },
       el('b', { clase: 'num ' + (c.saldo > 0 ? 'rojo' : c.saldo < 0 ? 'verde' : '') }, c.saldo < 0 ? plata(-c.saldo) + ' a favor' : plata(c.saldo)),
       c.limite && c.saldo > c.limite ? el('div', { clase: 'sub rojo' }, 'pasó el límite') : el('div', { clase: 'sub' }, c.saldo > 0 ? 'debe' : 'al día')))
@@ -398,11 +404,12 @@ async function secClientes () {
   const zona = el('div', { clase: 'lista' })
   const filtros = el('div', { clase: 'filtros' })
   const pintar = () => {
-    const filas = lista.filter((c) => (E.filtro === 'deben' ? c.saldo > 0 : E.filtro === 'limite' ? c.limite && c.saldo > c.limite : c.activo !== false) && (!E.busca || coincide(c.nombre + ' ' + c.telefono + ' ' + c.documento, E.busca)))
+    const filas = lista.filter((c) => (E.filtro === 'deben' ? c.saldo > 0 : E.filtro === 'limite' ? c.limite && c.saldo > c.limite : E.filtro === 'viejos' ? diasDeuda(c) >= DIAS_DEUDA_VIEJA : c.activo !== false) && (!E.busca || coincide(c.nombre + ' ' + c.telefono + ' ' + c.documento, E.busca)))
+      .sort((a, b) => E.filtro === 'viejos' ? diasDeuda(b) - diasDeuda(a) : 0)
     poner(zona, filas.length ? filas.map((c) => itemCliente(c, () => hojaCliente(c))) : vacio(lista.length ? (E.filtro === 'deben' && !E.busca ? 'Nadie debe nada.' : 'Nadie coincide.') : 'Todavía no hay clientes con cuenta corriente.', 'clientes',
       el('button', { clase: 'btn primario', onclick: () => hojaClienteEditar(null, E.busca) }, icono('sumar'), 'Nuevo cliente')))
   }
-  const pintarFiltros = () => poner(filtros, [['deben', 'Deben', deben.length], ['todos', 'Todos', lista.filter((c) => c.activo !== false).length], ['limite', 'Pasaron el límite', lista.filter((c) => c.limite && c.saldo > c.limite).length]]
+  const pintarFiltros = () => poner(filtros, [['deben', 'Deben', deben.length], ['todos', 'Todos', lista.filter((c) => c.activo !== false).length], ['viejos', 'Hace +' + DIAS_DEUDA_VIEJA + ' días', lista.filter((c) => diasDeuda(c) >= DIAS_DEUDA_VIEJA).length], ['limite', 'Pasaron el límite', lista.filter((c) => c.limite && c.saldo > c.limite).length]]
     .map(([id, t, n]) => el('button', { clase: 'filtro' + (E.filtro === id ? ' activo' : ''), onclick: () => { E.filtro = id; pintarFiltros(); pintar() } }, t, el('span', { clase: 'n' }, String(n)))))
   busca.addEventListener('input', () => { E.busca = busca.value; if (E.busca && E.filtro === 'deben') { E.filtro = 'todos'; pintarFiltros() } pintar() })
   pintarFiltros()
@@ -530,6 +537,7 @@ function hojaClienteEditar (c, nombreInicial) {
       el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Teléfono', tel), el('label', { clase: 'campo' }, 'DNI / CUIT', doc)),
       el('label', { clase: 'campo' }, 'Dirección o nota', nota),
       el('label', { clase: 'campo' }, 'Límite de deuda ($)', limite),
+      c ? null : el('p', { clase: 'sub' }, 'Vacío: lleva el límite para clientes nuevos de Configuración (si cargaste uno).'),
       c ? null : el('label', { clase: 'campo' }, 'Deuda de antes ($)', inicial)),
     botones: [{ texto: 'Guardar', primario: true, alTocar: async () => {
       if (!nombre.value.trim()) return toast('Falta el nombre', 'mal')
@@ -537,7 +545,7 @@ function hojaClienteEditar (c, nombreInicial) {
       if (!Number.isFinite(lim) || lim < 0) return toast('El límite no es válido', 'mal')
       const ini = inicial.value.trim() ? aCentavos(inicial.value) : 0
       if (!Number.isFinite(ini)) return toast('La deuda de antes no es válida', 'mal')
-      const cliente = { id: c ? c.id : undefined, nombre: nombre.value.trim(), telefono: tel.value.trim(), documento: doc.value.trim(), nota: nota.value.trim(), limite: lim, saldoInicial: c ? undefined : ini }
+      const cliente = { id: c ? c.id : undefined, nombre: nombre.value.trim(), telefono: tel.value.trim(), documento: doc.value.trim(), nota: nota.value.trim(), limite: !c && !limite.value.trim() ? undefined : lim, saldoInicial: c ? undefined : ini }
       cerrarHoja(c ? 2 : 1)
       await mandarOrden(suc, 'cliente_guardar', { cliente }, { texto: 'Cliente ' + cliente.nombre, alTerminar: refrescarSeccion })
     } }]

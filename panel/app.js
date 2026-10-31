@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.21'
+const VERSION_APP = '13.22'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
