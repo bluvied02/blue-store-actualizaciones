@@ -62,7 +62,8 @@ async function secContar () {
   if (!S.sucursal) return pintarSeccion('contar', cabecera('Contar stock'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'stock')))
   const suc = S.sucursal
   if (esEmpleado() && !(await estadoTurno()).puede) return pintarSeccion('contar', cabecera('Contar stock'), avisoSinTurno())
-  const lista = await leerCatalogo(suc)
+  const [lista, hoyD] = await Promise.all([leerCatalogo(suc), leerDatos('contar_hoy').catch(() => null)])
+  const paraHoy = datosDe(hoyD)
   const L = listaEscaneada('bs.contar.' + suc, () => ({ lineas: [], nota: '' }))
   const C = L.datos
   const zona = el('div', { clase: 'lista' })
@@ -114,6 +115,11 @@ async function secContar () {
     cabecera('Contar stock', nombreSucursal(suc) + ' · escaneá lo que hay en la góndola'),
     el('button', { clase: 'btn primario ancho grande', estilo: { marginBottom: '10px' }, onclick: escanear }, icono('escanear'), 'Escanear y contar'),
     buscadorParaAgregar(lista, (p) => { sumarALinea(C.lineas, p); pintar() }),
+    // Los 20 de hoy: tocar uno lo suma al conteo para escribir cuántos hay.
+    paraHoy && paraHoy.filas && paraHoy.filas.length ? [el('h3', {}, 'Para contar hoy (' + (paraHoy.filas.length - paraHoy.hechos) + ' de ' + paraHoy.filas.length + ')'),
+      el('div', { clase: 'tarjeta sin-relleno' }, el('div', { clase: 'lista' }, paraHoy.filas.map((f) => el('div', { clase: 'item' + (f.hecho ? ' inactivo' : ' tocable'), onclick: f.hecho ? null : () => { const l = sumarALinea(C.lineas, { id: f.productoId, descripcion: f.descripcion, codigos: [f.codigo], stock: f.stock }); l.cantidad = 0; pintar(); toast(f.descripcion + ': escribí cuántos hay', '', 2) } },
+        el('div', { clase: 'cuerpo' }, el('b', {}, f.descripcion), el('div', { clase: 'sub' }, f.porque + ' · el sistema dice ' + unidades(f.stock))),
+        el('div', { clase: 'fin' }, f.hecho ? el('span', { clase: 'sub verde' }, '✓ contado') : el('span', { clase: 'sub' }, 'contar'))))))] : null,
     el('h3', {}, 'Contado'),
     el('div', { clase: 'tarjeta sin-relleno' }, zona),
     resumen,
