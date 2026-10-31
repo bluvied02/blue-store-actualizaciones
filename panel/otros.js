@@ -122,7 +122,7 @@ async function secPedidosCompra (E, pestanas) {
         const linea1 = f.stock != null
           ? ['hay ' + unidades(f.stock), f.vendidas != null ? 'vendió ' + unidades(f.vendidas) + ' en 30 días' : null, f.alcanzaDias != null ? 'alcanza ' + String(f.alcanzaDias).replace('.', ',') + ' d' : null].filter(Boolean).join(' · ')
           : (f.codigo || 'sin código')
-        const linea2 = [!f.sugerido ? 'agregado a mano' : f.sugerido !== f.cantidad ? 'sugerido ' + unidades(f.sugerido) : null, f.enCamino > 0 ? unidades(f.enCamino) + ' en camino' : null, f.unidadesPorBulto > 1 ? 'caja de ' + f.unidadesPorBulto : null].filter(Boolean).join(' · ')
+        const linea2 = [!f.sugerido ? 'agregado a mano' : f.sugerido !== f.cantidad ? 'sugerido ' + unidades(f.sugerido) : null, f.diasSinStock > 0 ? f.diasSinStock + (f.diasSinStock === 1 ? ' día' : ' días') + ' sin stock (no cuentan)' : null, f.enCamino > 0 ? unidades(f.enCamino) + ' en camino' : null, f.unidadesPorBulto > 1 ? 'caja de ' + f.unidadesPorBulto : null].filter(Boolean).join(' · ')
         return [el('div', { clase: 'sub', estilo: Object.assign({ whiteSpace: 'normal' }, f.stock != null && f.stock <= 0 ? { color: 'var(--rojo)' } : null) }, linea1), linea2 ? el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, linea2) : null]
       }
       const mandar = async () => {
