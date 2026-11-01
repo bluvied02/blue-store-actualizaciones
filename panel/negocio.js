@@ -24,6 +24,8 @@ function itemVenta (v, alTocar, productoId) {
 
 function hojaVenta (v, sucursalId) {
   const suc = sucursalId || S.sucursal
+  // Una caja nueva dice de que turno es cada venta (ab) y el renglon de cada producto.
+  const cajaNueva = !!(v.i.length && v.i[0].length >= 5)
   abrirHoja({
     titulo: 'Venta ' + v.n,
     cuerpo: el('div', {},
@@ -34,8 +36,56 @@ function hojaVenta (v, sucursalId) {
         el('div', { clase: 'fin' }, el('b', { clase: 'num' }, plata(it[2])))))),
       v.r ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Recargo tarjeta'), el('b', { clase: 'num' }, plata(v.r))) : null,
       el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Cómo pagó'), el('b', {}, v.m.map((m) => NOMBRE_MEDIO[m] || m).join(' + '))),
-      el('div', { clase: 'fila' }, el('b', {}, 'Total'), el('b', { clase: 'num', estilo: { fontSize: '22px' } }, plata(v.t)))),
-    botones: v.a ? [] : [{ texto: 'Anular venta', peligro: true, alTocar: () => hojaAnularVenta(v, suc) }]
+      el('div', { clase: 'fila' }, el('b', {}, 'Total'), el('b', { clase: 'num', estilo: { fontSize: '22px' } }, plata(v.t))),
+      // De un turno cerrado no se anula (la plata saldria del cajon de hoy sin
+      // quedar anotada): se hace una devolucion. Se dice antes de tocar.
+      cajaNueva && !v.a && !v.dv && !v.ab ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal', marginTop: '10px' } }, 'Es de un turno que ya cerró: no se anula, se hace una devolución (sale del turno de hoy).') : null),
+    botones: v.a || v.dv ? [] : [
+      // Una caja vieja no dice de que turno es: se deja anular como antes.
+      v.ab || !cajaNueva ? { texto: 'Anular venta', peligro: true, alTocar: () => hojaAnularVenta(v, suc) } : null,
+      cajaNueva ? { texto: 'Devolver productos', alTocar: () => hojaDevolver(v, suc) } : null
+    ].filter(Boolean)
+  })
+}
+
+// Devolver algunos productos (o todos) de una venta, tambien de un turno cerrado.
+function hojaDevolver (v, suc) {
+  const lineas = v.i.filter((it) => it[1] > 0 && it[4] != null).map((it) => ({ descripcion: it[0], max: it[1], linea: it[4], cantidad: 0, precio: it[1] ? Math.round(it[2] * 1000 / it[1]) : 0 }))
+  const zona = el('div', { clase: 'lista' })
+  const total = el('b', { clase: 'num' })
+  const pintar = () => {
+    poner(zona, lineas.map((l) => el('div', { clase: 'item' },
+      el('div', { clase: 'cuerpo' }, el('b', {}, l.descripcion), el('div', { clase: 'sub' }, 'llevó ' + unidades(l.max) + ' · ' + plata(l.precio) + ' c/u')),
+      el('div', { clase: 'fin' }, campoCantidad(l, () => { l.cantidad = Math.min(Math.max(0, l.cantidad), l.max); pintar() })))))
+    total.textContent = plata(lineas.reduce((s, l) => s + Math.round(l.cantidad * l.precio / 1000), 0))
+  }
+  pintar()
+  const aCuenta = v.m.includes('cuenta_corriente')
+  const medio = el('select', {}, [['efectivo', 'Le devuelvo efectivo'], ['transferencia', 'Le devuelvo por transferencia'], ['mercado_pago', 'Le devuelvo por Mercado Pago']].concat(aCuenta ? [['cuenta_corriente', 'Le bajo la deuda de la cuenta']] : []).map(([id, t]) => el('option', { valor: id }, t)))
+  if (aCuenta) medio.value = 'cuenta_corriente'
+  const enCajon = el('input', { type: 'checkbox' })
+  const zonaCajon = el('label', { clase: 'fila', estilo: { gap: '8px', alignItems: 'center', whiteSpace: 'normal', marginTop: '6px' } }, enCajon, 'La plata la saqué del cajón del local (si no, es de tu bolsillo y no toca el cajón)')
+  const pintarCajon = () => { zonaCajon.style.display = medio.value === 'efectivo' ? '' : 'none' }
+  medio.addEventListener('change', pintarCajon)
+  pintarCajon()
+  const motivo = el('input', { type: 'text', placeholder: 'Ej: vino vencido, se equivocó de sabor' })
+  abrirHoja({
+    titulo: 'Devolver de ' + v.n,
+    completa: true,
+    cuerpo: el('div', {},
+      el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Poné cuántos devuelve de cada uno: vuelven al stock y se resta de lo vendido hoy.'),
+      zona,
+      el('div', { clase: 'fila', estilo: { justifyContent: 'space-between', margin: '8px 2px' } }, el('span', { clase: 'sub' }, 'Se devuelve'), total),
+      el('label', { clase: 'campo' }, 'Cómo', medio), zonaCajon,
+      (v.m.includes('mercado_pago') || v.m.includes('qr')) ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'El QR de Mercado Pago no se devuelve solo: devolvelo desde la app de Mercado Pago.') : null,
+      el('label', { clase: 'campo' }, 'Motivo', motivo)),
+    botones: [{ texto: 'Devolver', primario: true, alTocar: async () => {
+      const elegidas = lineas.filter((l) => l.cantidad > 0)
+      if (!elegidas.length) return toast('Poné cuántos devuelve', 'mal')
+      if (!motivo.value.trim()) return toast('Poné el motivo', 'mal')
+      cerrarHoja(2)
+      await mandarOrden(suc, 'devolucion', { ventaId: v.id, lineas: elegidas.map((l) => ({ linea: l.linea, cantidad: l.cantidad })), medio: medio.value, motivo: motivo.value.trim(), enCajon: medio.value === 'efectivo' && enCajon.checked }, { texto: 'Devolución de ' + v.n, alTerminar: refrescarSeccion })
+    } }]
   })
 }
 
@@ -45,6 +95,9 @@ function hojaAnularVenta (v, suc) {
     titulo: 'Anular ' + v.n,
     cuerpo: el('div', {},
       el('div', { clase: 'aviso alerta' }, el('b', {}, 'No se borra: queda anulada con el motivo'), 'Los productos vuelven al stock' + (v.m.includes('cuenta_corriente') ? ' y baja la deuda del cliente' : '') + '. En la caja queda registrado quién la anuló.'),
+      // Lo que pasa con la plata: antes no se decia.
+      v.m.includes('efectivo') ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Fue en efectivo: esa plata sale de lo que tiene que haber en el cajón del turno. Si no se la devolvés al cliente desde el cajón, al cajero le va a sobrar.') : null,
+      (v.m.includes('mercado_pago') || v.m.includes('qr')) ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'El cobro de Mercado Pago no se devuelve solo: devolvelo desde la app de Mercado Pago.') : null,
       el('label', { clase: 'campo' }, 'Motivo', motivo)),
     botones: [{ texto: 'Anular', peligro: true, alTocar: async () => {
       if (!motivo.value.trim()) return toast('Poné el motivo', 'mal')
@@ -539,7 +592,12 @@ function hojaClienteEditar (c, nombreInicial) {
       el('label', { clase: 'campo' }, 'Límite de deuda ($)', limite),
       c ? null : el('p', { clase: 'sub' }, 'Vacío: lleva el límite para clientes nuevos de Configuración (si cargaste uno).'),
       c ? null : el('label', { clase: 'campo' }, 'Deuda de antes ($)', inicial)),
-    botones: [{ texto: 'Guardar', primario: true, alTocar: async () => {
+    botones: [c && c.activo !== false && !(c.saldo > 0) ? { texto: 'Dar de baja', peligro: true, alTocar: async () => {
+      // Un cliente que ya no viene, sin deuda: deja de aparecer (no se borra nada).
+      if (!confirm('¿Dar de baja a ' + c.nombre + '? No se borra: deja de aparecer en la lista y en la caja.')) return
+      cerrarHoja(2)
+      await mandarOrden(suc, 'cliente_guardar', { cliente: { id: c.id, nombre: c.nombre, telefono: c.telefono, documento: c.documento, nota: c.nota, limite: c.limite || 0, activo: false } }, { texto: 'Baja de ' + c.nombre, alTerminar: refrescarSeccion })
+    } } : null, { texto: 'Guardar', primario: true, alTocar: async () => {
       if (!nombre.value.trim()) return toast('Falta el nombre', 'mal')
       const lim = limite.value.trim() ? aCentavos(limite.value) : 0
       if (!Number.isFinite(lim) || lim < 0) return toast('El límite no es válido', 'mal')
@@ -548,7 +606,7 @@ function hojaClienteEditar (c, nombreInicial) {
       const cliente = { id: c ? c.id : undefined, nombre: nombre.value.trim(), telefono: tel.value.trim(), documento: doc.value.trim(), nota: nota.value.trim(), limite: !c && !limite.value.trim() ? undefined : lim, saldoInicial: c ? undefined : ini }
       cerrarHoja(c ? 2 : 1)
       await mandarOrden(suc, 'cliente_guardar', { cliente }, { texto: 'Cliente ' + cliente.nombre, alTerminar: refrescarSeccion })
-    } }]
+    } }].filter(Boolean)
   })
 }
 
@@ -578,13 +636,24 @@ async function secCaja () {
             movs.length ? el('div', { clase: 'lista' }, movs.map((m) => el('div', { clase: 'item' },
               el('div', { clase: 'cuerpo' }, el('b', {}, m.texto || m.tipo), el('div', { clase: 'sub' }, hora(m.ts) + ' · ' + ({ gasto: 'Gasto', retiro: 'Retiro', ingreso: 'Ingreso', cobranza: 'Cobro de cuenta' }[m.tipo] || m.tipo) + (m.usuario ? ' · ' + m.usuario : '') + (m.categoria ? ' · ' + m.categoria : ''))),
               el('div', { clase: 'fin' }, el('b', { clase: 'num ' + (m.importe < 0 ? 'rojo' : 'verde') }, (m.importe < 0 ? '−' : '+') + plata(Math.abs(m.importe)).replace('−', '')))))) : el('p', { clase: 'sub', estilo: { padding: '0 16px' } }, 'Sin gastos, retiros, ingresos ni cobros en este turno.'))))
+  const emerg = await estadoTurno().catch(() => ({}))
   pintarSeccion('caja',
     cabecera('Caja', nombreSucursal(S.sucursal)),
-    // Si la compu no anda, el dueño deja vender desde el celular aunque nadie haya abierto el turno.
-    el('button', { clase: 'btn ancho', estilo: { marginBottom: '10px' }, onclick: async () => {
-      if (!confirm('¿Poner el modo emergencia en ' + nombreSucursal(S.sucursal) + '?\n\nDurante 8 horas los empleados con usuario del celular pueden vender y contar aunque no tengan el turno abierto en la compu. Las ventas entran a la caja cuando vuelva a andar.')) return
-      await mandarOrden(S.sucursal, 'modo_emergencia', { horas: 8 }, { texto: 'Modo emergencia' })
-    } }, icono('faltantes'), 'La compu no anda: modo emergencia'),
+    // Si la compu no anda, el dueño deja vender desde el celular aunque nadie
+    // haya abierto el turno. Se ve si esta puesto, hasta cuando, y se saca.
+    emerg.emergencia
+      ? el('div', { clase: 'aviso alerta' }, el('b', {}, 'Modo emergencia puesto hasta las ' + hora(emerg.emergenciaHasta)),
+        'Los empleados pueden vender y contar desde el celular sin el turno abierto.',
+        el('div', { estilo: { marginTop: '8px' } }, el('button', { clase: 'btn chico primario', onclick: async () => {
+          if (!confirm('¿Ya anda la compu? Se saca el modo emergencia y los empleados vuelven a necesitar el turno abierto para usar el celular.')) return
+          await mandarOrden(S.sucursal, 'modo_emergencia', { horas: 0 }, { texto: 'Sacar modo emergencia', alTerminar: refrescarSeccion })
+          refrescarSeccion()
+        } }, 'Ya anda la compu: sacarlo')))
+      : el('button', { clase: 'btn ancho', estilo: { marginBottom: '10px' }, onclick: async () => {
+        if (!confirm('¿Poner el modo emergencia en ' + nombreSucursal(S.sucursal) + '?\n\nDurante 8 horas los empleados con usuario del celular pueden vender y contar aunque no tengan el turno abierto en la compu. Las ventas entran a la caja cuando vuelva a andar, con su día y su hora, y el efectivo queda aparte del cajón.')) return
+        await mandarOrden(S.sucursal, 'modo_emergencia', { horas: 8 }, { texto: 'Modo emergencia' })
+        refrescarSeccion()
+      } }, icono('faltantes'), 'La compu no anda: modo emergencia'),
     turno,
     el('p', { clase: 'sub' }, 'Los gastos, retiros e ingresos de la caja se cargan en el local, donde está la plata. El que está en el mostrador no ve estos totales (caja ciega).'),
     el('div', { clase: 'tarjeta-cab', estilo: { marginTop: '16px' } }, el('h2', {}, 'Cierres anteriores'), el('button', { clase: 'btn chico', onclick: () => ir('cierres') }, 'Ver todos')),
@@ -639,9 +708,30 @@ async function secGastos () {
         d.fijos.map((f) => el('div', { clase: 'fila' }, el('div', { clase: 'izq' }, el('b', {}, f.nombre), el('div', { clase: 'sub' }, f.estado === 'pagado' ? 'Pagado · ' + plata(f.pagado) : (f.estado === 'vencido' ? 'Venció el ' : 'Vence el ') + fechaCorta(f.vence) + (f.importe ? ' · ' + plata(f.importe) : ''))),
           el('span', { clase: 'chip ' + (f.estado === 'pagado' ? 'ok' : f.estado === 'vencido' ? 'mal' : 'alerta') }, f.estado === 'pagado' ? 'Pagado' : f.estado === 'vencido' ? 'Vencido' : 'Pendiente')))) : null),
     el('h3', {}, 'Los gastos del mes'),
-    el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((g) => el('div', { clase: 'item' + (g.anulado ? ' inactivo' : '') },
-      el('div', { clase: 'cuerpo' }, el('b', {}, g.detalle), el('div', { clase: 'sub' }, fechaCorta(g.fecha) + ' · ' + g.categoria + ' · ' + g.medio + (g.usuario ? ' · ' + g.usuario : ''))),
+    el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((g) => el('div', { clase: 'item' + (g.anulado ? ' inactivo' : ''), onclick: () => hojaDetalleGasto(g) },
+      el('div', { clase: 'cuerpo' }, el('b', {}, g.detalle), el('div', { clase: 'sub' }, fechaCorta(g.fecha) + ' · ' + g.categoria + ' · ' + g.medio + (g.usuario ? ' · ' + g.usuario : '') + (g.anulado ? ' · borrado' : ''))),
       el('div', { clase: 'fin' }, el('b', { clase: 'num' }, g.anulado ? el('s', {}, plata(g.importe)) : plata(g.importe)))))) : vacio('Todavía no hay gastos este mes.', 'gastos')))
+}
+
+function hojaDetalleGasto (g) {
+  const suc = S.sucursal
+  abrirHoja({
+    titulo: g.detalle,
+    cuerpo: el('div', {},
+      el('div', { clase: 'fila' }, el('span', {}, 'Fecha'), el('b', {}, fechaCorta(g.fecha))),
+      el('div', { clase: 'fila' }, el('span', {}, 'Categoría'), el('b', {}, g.categoria)),
+      el('div', { clase: 'fila' }, el('span', {}, 'Cómo se pagó'), el('b', {}, g.medio)),
+      el('div', { clase: 'fila' }, el('span', {}, 'Importe'), el('b', {}, plata(g.importe))),
+      g.usuario ? el('div', { clase: 'fila' }, el('span', {}, 'Lo cargó'), el('b', {}, g.usuario)) : null,
+      g.anulado ? el('p', { clase: 'sub' }, 'Borrado: ' + (g.motivoAnulacion || 'sin detalle')) : null,
+      !g.anulado && g.origen === 'caja' ? el('p', { clase: 'sub' }, g.cajaAbierta ? 'Salió de la caja del turno abierto: al borrarlo, esa plata vuelve a contar en el cajón.' : 'Salió de la caja de un turno ya cerrado: el arqueo de ese turno queda como estaba.') : null),
+    botones: g.anulado || !g.id ? [] : [{ texto: 'Borrar gasto', peligro: true, alTocar: () => {
+      const razon = prompt('¿Por qué se borra el gasto? (ej: se cargó dos veces)')
+      if (!razon || !razon.trim()) return
+      cerrarHoja()
+      mandarOrden(suc, 'gasto_anular', { id: g.id, motivo: razon.trim() }, { texto: 'Gasto borrado', alTerminar: refrescarSeccion })
+    } }]
+  })
 }
 
 function hojaGasto (d) {
@@ -717,7 +807,9 @@ async function hojaProveedor (p) {
         el('div', {}, el('div', { clase: 'r' }, 'Última compra'), el('div', { clase: 'v', estilo: { fontSize: '14px' } }, p.ultimaCompra ? fechaCorta(isoLocal(new Date(p.ultimaCompra))) : '—'))),
       el('div', { clase: 'acciones-grandes' },
         el('button', { clase: 'btn primario grande', onclick: () => hojaDeudaNueva(p.id) }, icono('sumar'), 'Cargar deuda'),
-        el('button', { clase: 'btn grande', onclick: () => { cerrarHoja(); ir('reponer') } }, icono('reponer'), 'Hacer pedido')),
+        // El pedido de ESTE proveedor (antes abria Reponer en general).
+        el('button', { clase: 'btn grande', onclick: () => { cerrarHoja(); luegoDeAtras(() => hojaPedidoNuevo(p.id, p.nombre)) } }, icono('reponer'), 'Hacer pedido')),
+      p.diasVisita ? el('div', { clase: 'sub', estilo: { whiteSpace: 'normal', marginBottom: '8px' } }, (p.diasVisita.length ? 'Pasa los ' + p.diasVisita.map((d) => DIAS[d]).join(', ') : 'Sin días de visita') + ' · entrega en ' + (p.diasEntrega || 0) + (p.diasEntrega === 1 ? ' día' : ' días') + (p.pedidoMinimo ? ' · pedido mínimo ' + plata(p.pedidoMinimo) : '') + (p.horaLimite ? ' · pedir antes de las ' + p.horaLimite : '')) : null,
       el('div', { clase: 'lista', estilo: { margin: '0 -16px' } },
         p.telefono ? el('a', { clase: 'item', href: 'tel:' + p.telefono }, icono('telefono'), el('div', { clase: 'cuerpo' }, el('b', {}, p.telefono), el('div', { clase: 'sub' }, 'Llamar')), icono('flecha')) : null,
         p.telefono ? el('a', { clase: 'item', href: linkWhatsApp(p.telefono), target: '_blank', rel: 'noreferrer' }, icono('mensaje'), el('div', { clase: 'cuerpo' }, el('b', {}, 'WhatsApp')), icono('flecha')) : null,
@@ -735,15 +827,32 @@ function hojaProveedorEditar (p, nombreInicial) {
   const nombre = el('input', { type: 'text', valor: p ? p.nombre : (nombreInicial || '') })
   const tel = el('input', { type: 'tel', valor: p ? p.telefono || '' : '', placeholder: 'WhatsApp para los pedidos' })
   const cuit = el('input', { type: 'text', inputmode: 'numeric', valor: p ? p.cuit || '' : '', placeholder: '11 números (opcional)' })
+  // Lo que hace que el pedido se arme solo el dia que pasa (antes, solo en la compu).
+  const visita = new Set((p && p.diasVisita) || [])
+  const chipsDias = el('div', { clase: 'chips' })
+  const pintarDias = () => poner(chipsDias, [1, 2, 3, 4, 5, 6, 0].map((d) => el('button', { clase: 'filtro' + (visita.has(d) ? ' activo' : ''), onclick: () => { if (visita.has(d)) visita.delete(d); else visita.add(d); pintarDias() } }, DIAS[d])))
+  pintarDias()
+  const entrega = el('input', { type: 'number', min: '0', max: '30', valor: p && p.diasEntrega != null ? String(p.diasEntrega) : '' , placeholder: 'Ej: 1' })
+  const minimo = el('input', { type: 'text', inputmode: 'decimal', valor: p && p.pedidoMinimo ? plataExacta(p.pedidoMinimo) : '', placeholder: 'Sin mínimo' })
+  const limite = el('input', { type: 'time', valor: p && p.horaLimite ? p.horaLimite : '' })
   abrirHoja({
     titulo: p ? 'Editar proveedor' : 'Proveedor nuevo',
-    cuerpo: el('div', {}, el('label', { clase: 'campo' }, 'Nombre', nombre), el('label', { clase: 'campo' }, 'Teléfono', tel), el('label', { clase: 'campo' }, 'CUIT', cuit)),
+    completa: true,
+    cuerpo: el('div', {}, el('label', { clase: 'campo' }, 'Nombre', nombre), el('label', { clase: 'campo' }, 'Teléfono', tel), el('label', { clase: 'campo' }, 'CUIT', cuit),
+      el('div', { clase: 'campo' }, 'Qué días pasa (o se le pide)', chipsDias),
+      el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Tarda en entregar (días)', entrega), el('label', { clase: 'campo' }, 'Pedido mínimo ($)', minimo)),
+      el('label', { clase: 'campo' }, 'Hay que pedirle antes de las', limite),
+      el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Con los días cargados, el pedido se arma solo el día antes de que pase.')),
     botones: [{ texto: 'Guardar', primario: true, alTocar: async () => {
       if (!nombre.value.trim()) return toast('Falta el nombre', 'mal')
       const c = cuit.value.replace(/[^0-9]/g, '')
       if (c && c.length !== 11) return toast('El CUIT tiene 11 números', 'mal')
+      const mi = minimo.value.trim() ? aCentavos(minimo.value) : 0
+      if (!Number.isFinite(mi) || mi < 0) return toast('El pedido mínimo no es válido', 'mal')
+      const datos = { id: p ? p.id : undefined, nombre: nombre.value.trim(), telefono: tel.value.trim(), cuit: c, diasVisita: [...visita], pedidoMinimo: mi, horaLimite: limite.value || '' }
+      if (entrega.value.trim()) datos.diasEntrega = Number(entrega.value)
       cerrarHoja(p ? 2 : 1)
-      await mandarOrden(S.sucursal, 'proveedor_guardar', { proveedor: { id: p ? p.id : undefined, nombre: nombre.value.trim(), telefono: tel.value.trim(), cuit: c } }, { texto: 'Proveedor ' + nombre.value.trim(), alTerminar: refrescarSeccion })
+      await mandarOrden(S.sucursal, 'proveedor_guardar', { proveedor: datos }, { texto: 'Proveedor ' + nombre.value.trim(), alTerminar: refrescarSeccion })
     } }]
   })
 }
@@ -774,7 +883,15 @@ async function secAPagar () {
     }),
     !d.pendientes.length ? el('div', { clase: 'tarjeta' }, vacio('No les debés nada a los proveedores.', 'apagar')) : null,
     d.calendario.length ? el('div', { clase: 'tarjeta', estilo: { marginTop: '12px' } }, el('h2', {}, 'Qué días pagar'),
-      ranking(d.calendario.map((x) => ({ n: fechaCorta(x.fecha) + ' · ' + x.proveedores.slice(0, 2).join(', '), texto: plata(x.total), v: x.total })))) : null)
+      ranking(d.calendario.map((x) => ({ n: fechaCorta(x.fecha) + ' · ' + x.proveedores.slice(0, 2).join(', '), texto: plata(x.total), v: x.total })))) : null,
+    // Un pago mal cargado se anula (antes, solo en la compu).
+    (d.pagos || []).length ? [el('h3', {}, 'Últimos pagos'), el('div', { clase: 'tarjeta sin-relleno' }, el('div', { clase: 'lista' }, d.pagos.map((x) => el('div', { clase: 'item' },
+      el('div', { clase: 'cuerpo' }, el('b', {}, x.proveedor + (x.comprobante ? ' · ' + x.comprobante : '')), el('div', { clase: 'sub' }, fechaCorta(x.fecha) + ' · ' + (NOMBRE_MEDIO[x.medio] || x.medio))),
+      el('div', { clase: 'fin pila' }, el('b', { clase: 'num' }, plata(x.importe)), el('button', { clase: 'btn chico', onclick: () => {
+        const motivo = prompt('¿Por qué se anula el pago de ' + plata(x.importe) + ' a ' + x.proveedor + '? La deuda vuelve a quedar.')
+        if (!motivo || !motivo.trim()) return
+        mandarOrden(S.sucursal, 'deuda_pago_anular', { deudaId: x.deudaId, pagoId: x.pagoId, motivo: motivo.trim() }, { texto: 'Anular pago a ' + x.proveedor, alTerminar: refrescarSeccion })
+      } }, 'Anular'))))))] : null)
 }
 
 async function hojaDeudaNueva (proveedorId) {

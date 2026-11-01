@@ -225,6 +225,8 @@ async function secVencimientos () {
   const d = datosDe(await leerDatos('vencimientos'))
   if (!d) return pintarSeccion('vencimientos', cabecera('Vencimientos', nombreSucursal(S.sucursal)), el('div', { clase: 'tarjeta' }, vacio('La caja todavía no subió los vencimientos. Aparecen cuando se actualiza a la versión nueva.', 'reloj')))
   const E = S.vto = Object.assign({ ver: 'urgentes', busca: '' }, S.vto || {})
+  // El encargado recorre la gondola: ve y resuelve las partidas, sin lo que cuestan.
+  const conPlata = S.rol === 'duenio'
   const busca = el('input', { type: 'search', placeholder: 'Buscar producto o lote…', valor: E.busca })
   const zona = el('div', { clase: 'lista' })
   const filtros = {
@@ -238,20 +240,21 @@ async function secVencimientos () {
     const lista = base.filter((p) => !E.busca || coincide(p.descripcion + ' ' + (p.lote || '') + ' ' + (p.codigo || ''), E.busca))
     poner(zona, lista.length ? lista.map((p) => el('div', { clase: 'item tocable', onclick: () => hojaPartida(p) },
       el('div', { clase: 'cuerpo' }, el('b', {}, p.descripcion), el('div', { clase: 'sub' }, [unidades(p.cantidad) + ' u.', 'vence ' + fechaCorta(p.fecha), p.dias < 0 ? 'hace ' + (-p.dias) + ' días' : p.dias === 0 ? 'hoy' : 'en ' + p.dias + ' días', p.lote ? 'lote ' + p.lote : ''].filter(Boolean).join(' · '))),
-      el('div', { clase: 'fin' }, el('span', { clase: 'chip ' + ESTADO_VTO[p.estado][0] }, ESTADO_VTO[p.estado][1]), el('div', { clase: 'sub' }, plata(p.valorCosto))))) : vacio(E.ver === 'resueltos' ? 'No hay partidas resueltas.' : 'No hay nada para mostrar acá.', 'reloj'))
+      el('div', { clase: 'fin' }, el('span', { clase: 'chip ' + ESTADO_VTO[p.estado][0] }, ESTADO_VTO[p.estado][1]), conPlata ? el('div', { clase: 'sub' }, plata(p.valorCosto)) : null))) : vacio(E.ver === 'resueltos' ? 'No hay partidas resueltas.' : 'No hay nada para mostrar acá.', 'reloj'))
   }
   busca.addEventListener('input', () => { E.busca = busca.value; pintar() })
   pintar()
   pintarSeccion('vencimientos',
     cabecera('Vencimientos', nombreSucursal(S.sucursal) + ' · ' + d.partidas + ' partidas', el('button', { clase: 'btn primario', onclick: () => hojaPartida(null) }, icono('sumar'), 'Nueva')),
-    el('div', { clase: 'kpis' },
+    conPlata ? el('div', { clase: 'kpis' },
       kpi('Vencido', plata(d.plataVencida), d.vencidos + ' partidas', { clase: d.vencidos ? 'mal' : '' }),
       kpi('Vence esta semana', plata(d.plataUrgente), d.urgentes + ' partidas'),
-      kpi('En riesgo (30 días)', plata(d.plataEnRiesgo), 'al costo', { clase: 'principal' })),
+      kpi('En riesgo (30 días)', plata(d.plataEnRiesgo), 'al costo', { clase: 'principal' }))
+      : el('div', { clase: 'kpis' }, kpi('Vencidas', String(d.vencidos || 0), 'partidas', { clase: d.vencidos ? 'mal' : '' }), kpi('Vencen esta semana', String(d.urgentes || 0), 'partidas', { clase: 'principal' })),
     el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, [['urgentes', 'Urgentes'], ['vencidos', 'Vencidos'], ['mes', '30 días'], ['todos', 'Todos'], ['resueltos', 'Resueltos']].map(([id, t]) => el('button', { clase: E.ver === id ? 'activo' : '', onclick: () => { E.ver = id; render() } }, t))),
     el('div', { clase: 'buscador' }, icono('buscar'), busca),
     el('div', { clase: 'tarjeta sin-relleno' }, zona),
-    d.enRiesgo.length ? el('div', { clase: 'tarjeta' }, el('h2', {}, 'Lo que más plata tiene en riesgo'), ranking(d.enRiesgo.map((x) => ({ n: x.descripcion, texto: plata(x.valorCosto), sub: unidades(x.cantidad) + ' u. · desde ' + fechaCorta(x.primera), v: x.valorCosto })))) : null)
+    conPlata && (d.enRiesgo || []).length ? el('div', { clase: 'tarjeta' }, el('h2', {}, 'Lo que más plata tiene en riesgo'), ranking(d.enRiesgo.map((x) => ({ n: x.descripcion, texto: plata(x.valorCosto), sub: unidades(x.cantidad) + ' u. · desde ' + fechaCorta(x.primera), v: x.valorCosto })))) : null)
 }
 
 // Una partida (o una nueva si p es null).
@@ -269,14 +272,14 @@ async function hojaPartida (p) {
     cuerpo: el('div', {},
       fila('Vence', fechaCorta(p.fecha) + (p.dias < 0 ? ' (hace ' + (-p.dias) + ' días)' : ' (en ' + p.dias + ' días)')),
       fila('Cantidad', unidades(p.cantidad) + ' u.'),
-      fila('Plata en juego (al costo)', plata(p.valorCosto)),
+      S.rol === 'duenio' ? fila('Plata en juego (al costo)', plata(p.valorCosto)) : null,
       fila('Stock del producto', unidades(p.stockActual)),
       p.lote ? fila('Lote', p.lote) : null, p.nota ? fila('Nota', p.nota) : null,
       p.resuelto ? el('p', { clase: 'sub' }, 'Resuelta: ' + (p.accion || '')) : el('div', { clase: 'chips', estilo: { marginTop: '12px' } },
         el('button', { clase: 'btn primario', onclick: resolver('retirado', 'Retirar') }, 'Retirar de la gondola'),
         el('button', { clase: 'btn', onclick: resolver('vendido', 'Se vendió') }, 'Se vendió antes'),
         el('button', { clase: 'btn', onclick: () => { cerrarHoja(); hojaPartidaEditar(p) } }, 'Corregir'),
-        el('button', { clase: 'btn peligro', onclick: () => { if (confirm('¿Borrar esta partida? No toca el stock.')) { cerrarHoja(); mandarOrden(suc, 'vencimiento_borrar', { id: p.id }, { texto: 'Borrar partida', alTerminar: refrescarSeccion }) } } }, 'Borrar')))
+        S.rol !== 'duenio' ? null : el('button', { clase: 'btn peligro', onclick: () => { if (confirm('¿Borrar esta partida? No toca el stock.')) { cerrarHoja(); mandarOrden(suc, 'vencimiento_borrar', { id: p.id }, { texto: 'Borrar partida', alTerminar: refrescarSeccion }) } } }, 'Borrar')))
   })
 }
 
@@ -301,9 +304,16 @@ function hojaPartidaEditar (p) {
 async function hojaPartidaNueva () {
   const lista = await leerCatalogo(S.sucursal)
   let elegido = null
-  const busca = el('input', { type: 'search', placeholder: 'Buscar producto o escanear…' })
+  const busca = el('input', { type: 'search', placeholder: 'Buscar producto…' })
   const resultados = el('div', { clase: 'lista' })
   const elegidoTxt = el('div', { clase: 'sub' }, 'Todavía no elegiste el producto')
+  const escanear = el('button', { clase: 'btn ancho', estilo: { margin: '0 0 8px' }, onclick: async () => {
+    const c = await leerCodigo({ titulo: 'Producto que vence' })
+    if (!c) return
+    const x = lista.find((y) => (y.codigos || []).includes(c))
+    if (x) { elegido = x; elegidoTxt.textContent = x.descripcion }
+    else toast('Ese código no está en ' + nombreSucursal(S.sucursal), 'mal')
+  } }, icono('escanear'), 'Escanear el producto')
   const fecha = el('input', { type: 'date' })
   const cant = el('input', { type: 'text', inputmode: 'decimal', valor: '1' })
   const lote = el('input', { type: 'text', placeholder: 'Opcional' })
@@ -317,7 +327,7 @@ async function hojaPartidaNueva () {
   abrirHoja({
     titulo: 'Partida nueva',
     completa: true,
-    cuerpo: el('div', {}, el('div', { clase: 'campo' }, 'Producto', el('div', { clase: 'buscador' }, icono('buscar'), busca), resultados, elegidoTxt), el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Vence', fecha), el('label', { clase: 'campo' }, 'Cantidad', cant)), el('label', { clase: 'campo' }, 'Lote', lote)),
+    cuerpo: el('div', {}, escanear, el('div', { clase: 'campo' }, 'Producto', el('div', { clase: 'buscador' }, icono('buscar'), busca), resultados, elegidoTxt), el('div', { clase: 'dos' }, el('label', { clase: 'campo' }, 'Vence', fecha), el('label', { clase: 'campo' }, 'Cantidad', cant)), el('label', { clase: 'campo' }, 'Lote', lote)),
     botones: [{ texto: 'Guardar', primario: true, alTocar: async () => {
       if (!elegido) return toast('Elegí el producto', 'mal')
       if (!fecha.value) return toast('Poné la fecha de vencimiento', 'mal')

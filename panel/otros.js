@@ -224,9 +224,64 @@ async function secPedidosCompra (E, pestanas) {
     }
   }
   pintarSeccion('reponer',
-    cabecera('Reponer', nombreSucursal(S.sucursal) + ' · pedidos a proveedores'),
+    cabecera('Reponer', nombreSucursal(S.sucursal) + ' · pedidos a proveedores', el('button', { clase: 'btn primario', onclick: () => hojaPedidoNuevo() }, icono('sumar'), 'Pedido nuevo')),
     pestanas,
     zona)
+}
+
+// Un pedido desde cero a un proveedor (uno que no salio en el sugerido, o
+// para agregarle cosas antes del dia de visita). Si ya hay uno armado de ese
+// proveedor, la caja le suma a ese (no hace otro).
+async function hojaPedidoNuevo (proveedorId, nombreProveedor) {
+  const suc = S.sucursal
+  const [cat, provs] = await Promise.all([leerCatalogo(suc).catch(() => []), proveedorId ? Promise.resolve(null) : leerDatos('proveedores').catch(() => ({}))])
+  const lista = (datosDe(provs || {}) || []).slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+  const prov = el('select', {}, el('option', { valor: '' }, 'Elegí el proveedor…'), lista.map((x) => el('option', { valor: x.id }, x.nombre)))
+  const lineas = []
+  const zona = el('div', { clase: 'lista' })
+  const pintar = () => poner(zona, lineas.length ? lineas.map((l, i) => el('div', { clase: 'item' },
+    el('div', { clase: 'cuerpo' }, el('b', {}, l.descripcion), el('div', { clase: 'sub' }, 'hay ' + unidades(l.stock) + (l.bulto > 1 ? ' · caja de ' + l.bulto : ''))),
+    el('div', { clase: 'fin pila' }, campoCantidad(l, pintar), el('button', { clase: 'btn chico', onclick: () => { lineas.splice(i, 1); pintar() } }, 'Sacar'))))
+    : vacio('Agregá lo que le vas a pedir.', 'reponer'))
+  const agregar = (p) => {
+    if (lineas.some((l) => l.productoId === p.id)) return toast('Ya está en el pedido', '', 2)
+    const bulto = Number(p.bulto) > 1 ? Number(p.bulto) : 1
+    lineas.unshift({ productoId: p.id, descripcion: p.descripcion, stock: p.stock || 0, bulto, cantidad: bulto * 1000 })
+    pintar()
+  }
+  // Primero lo de ese proveedor (lo que mas se vende).
+  const delProveedor = () => cat.filter((p) => p.activo !== false && p.proveedorId === (proveedorId || prov.value))
+  pintar()
+  abrirHoja({
+    titulo: 'Pedido nuevo' + (nombreProveedor ? ' a ' + nombreProveedor : ''),
+    completa: true,
+    cuerpo: el('div', {},
+      proveedorId ? null : el('label', { clase: 'campo' }, 'Proveedor', prov),
+      el('button', { clase: 'btn ancho', estilo: { margin: '0 0 8px' }, onclick: async () => {
+        const c = await leerCodigo({ titulo: 'Producto para el pedido' })
+        if (!c) return
+        const p = cat.find((x) => (x.codigos || []).includes(c))
+        if (p) agregar(p)
+        else toast('Ese código no está en el catálogo', 'mal')
+      } }, icono('escanear'), 'Escanear producto'),
+      buscadorParaAgregar(cat, agregar),
+      el('button', { clase: 'btn chico', estilo: { margin: '8px 0' }, onclick: () => {
+        const sugeridos = delProveedor().filter((p) => p.minimo > 0 ? p.stock < p.minimo : p.stock <= 0).sort((a, b) => b.vendido30 - a.vendido30).slice(0, 40)
+        if (!sugeridos.length) return toast('De ese proveedor no falta nada (stock bajo el mínimo o en cero)', '', 3)
+        for (const p of sugeridos) if (!lineas.some((l) => l.productoId === p.id)) lineas.push({ productoId: p.id, descripcion: p.descripcion, stock: p.stock || 0, bulto: Number(p.bulto) > 1 ? Number(p.bulto) : 1, cantidad: (Number(p.bulto) > 1 ? Number(p.bulto) : 1) * 1000 })
+        pintar()
+      } }, 'Agregar lo que le falta de ese proveedor'),
+      el('div', { clase: 'tarjeta sin-relleno' }, zona)),
+    botones: [{ texto: 'Guardar pedido', primario: true, alTocar: async (cerrar) => {
+      const provId = proveedorId || prov.value
+      if (!provId) return toast('Elegí el proveedor', 'mal')
+      const filas = lineas.filter((l) => l.cantidad > 0).map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, sugerido: 0 }))
+      if (!filas.length) return toast('Agregá al menos un producto', 'mal')
+      cerrar()
+      await mandarOrden(suc, 'pedido_guardar', { proveedorId: provId, filas }, { texto: 'Pedido a ' + (nombreProveedor || (prov.selectedOptions[0] || {}).textContent || 'proveedor'), alTerminar: () => { if (S.seccion === 'reponer') refrescarSeccion() } })
+      toast('Cuando la caja lo guarde aparece en Reponer → Pedidos, para mandarlo por WhatsApp.', '', 5)
+    } }]
+  })
 }
 
 // --- FALTANTES ------------------------------------------------------------------------
@@ -525,7 +580,9 @@ async function panelNotificaciones () {
   const estado = el('p', { clase: 'tenue' })
   const boton = el('button', { clase: 'btn primario' })
   const pintar = (sub) => {
-    estado.textContent = sub ? '✓ Te llegan: el resumen de ayer cada mañana, faltante al cerrar la caja, ventas anuladas (y si alguien anula muchas), empleado que no llegó, caja cerrada o sin conexión, pedidos de anulación y pagos a proveedores del día.' : 'Activalas para enterarte cuando pasa algo importante, aunque no tengas la app abierta.'
+    estado.textContent = sub
+      ? (esEncargado() ? '✓ Te llegan los avisos del local: pedidos a proveedores, lo que hay que reponer, empleado que no llegó y problemas de la caja.' : '✓ Te llegan: el resumen de ayer cada mañana, faltante al cerrar la caja, ventas anuladas (y si alguien anula muchas), empleado que no llegó, caja cerrada o sin conexión, pedidos de anulación y pagos a proveedores del día.')
+      : 'Activalas para enterarte cuando pasa algo importante, aunque no tengas la app abierta.'
     boton.textContent = sub ? 'Desactivar' : 'Activar notificaciones'
     boton.className = 'btn' + (sub ? '' : ' primario')
   }
@@ -570,14 +627,145 @@ function secAjustes () {
       el('p', { clase: 'tenue', estilo: { margin: 0 } }, /iphone|ipad/i.test(navigator.userAgent)
         ? 'En Safari: Compartir → "Agregar a inicio". Queda un ícono y se abre a pantalla completa, con la cámara y las notificaciones.'
         : 'En Chrome: menú ⋮ → "Instalar aplicación" o "Agregar a la pantalla principal".')),
+    esEmpleado() ? null : tarjetaBloqueo(),
     el('div', { clase: 'tarjeta' },
-      el('button', { clase: 'btn peligro ancho', onclick: async () => { if (!confirm('¿Salir de la cuenta en este dispositivo?')) return; await S.sb.auth.signOut(); pantallaEntrar() } }, icono('salir'), 'Salir')))
+      el('button', { clase: 'btn peligro ancho', onclick: async () => {
+        const quedan = S.cola.length + (S.fallidas || []).length
+        if (!confirm((quedan ? 'Quedan ' + quedan + (quedan === 1 ? ' cosa sin mandar: si salís, se borra.\n\n' : ' cosas sin mandar: si salís, se borran.\n\n') : '') + '¿Salir de la cuenta en este dispositivo? Se apagan las notificaciones y se borra lo guardado de esta cuenta.')) return
+        await salirDelTodo()
+        pantallaEntrar()
+      } }, icono('salir'), 'Salir')))
 }
+
+// Pedir un PIN para abrir la app: si el celular se pierde, no se ve nada sin el.
+function tarjetaBloqueo () {
+  const b = leerLocal('bs.bloqueo', null)
+  const activar = () => {
+    const pin = el('input', { type: 'password', inputmode: 'numeric', maxlength: '8', placeholder: '4 a 8 números' })
+    const otra = el('input', { type: 'password', inputmode: 'numeric', maxlength: '8', placeholder: 'Otra vez' })
+    const minutos = el('select', {}, [[1, 'Al minuto'], [5, 'A los 5 minutos'], [15, 'A los 15 minutos'], [60, 'A la hora']].map(([v, t]) => el('option', { valor: String(v) }, t)))
+    minutos.value = '5'
+    abrirHoja({
+      titulo: 'PIN para abrir la app',
+      cuerpo: el('div', {},
+        el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Lo pide al abrir la app y al volver a ella después de un rato. Si te lo olvidás, entrás de nuevo con tu mail y contraseña. No es el PIN de la caja: puede ser otro.'),
+        el('label', { clase: 'campo' }, 'PIN', pin), el('label', { clase: 'campo' }, 'Repetilo', otra),
+        el('label', { clase: 'campo' }, 'Pedirlo de nuevo', minutos)),
+      botones: [{ texto: 'Guardar', primario: true, alTocar: async () => {
+        if (!/^\d{4,8}$/.test(pin.value.trim())) return toast('El PIN tiene que tener de 4 a 8 números', 'mal')
+        if (pin.value.trim() !== otra.value.trim()) return toast('Los dos PIN no son iguales', 'mal')
+        const sal = uuid()
+        guardarLocal('bs.bloqueo', { huella: await huellaPin(pin.value.trim(), sal), sal, minutos: Number(minutos.value) })
+        cerrarHoja()
+        toast('Listo: la app pide el PIN para abrirse', 'ok')
+        secAjustes()
+      } }]
+    })
+  }
+  return el('div', { clase: 'tarjeta' },
+    el('h2', {}, 'PIN para abrir la app'),
+    el('p', { clase: 'tenue', estilo: { margin: '0 0 10px' } }, b ? '✓ La app pide el PIN al abrirse. Si perdés el celular, en la caja (Configuración → Ver desde el celular) podés cerrar la sesión a distancia.' : 'Si perdés el celular o te lo roban, sin el PIN no se ve nada. También podés cerrar la sesión a distancia desde la caja (Configuración → Ver desde el celular).'),
+    b ? el('button', { clase: 'btn ancho', onclick: () => { if (!confirm('¿Sacar el PIN? La app se va a abrir sin pedirlo.')) return; guardarLocal('bs.bloqueo', ''); try { localStorage.removeItem(conEspacio('bs.bloqueo')) } catch (e) {} secAjustes() } }, 'Sacar el PIN')
+      : el('button', { clase: 'btn primario ancho', onclick: activar }, 'Poner un PIN'))
+}
+
+// --- LO QUE MANDE ------------------------------------------------------------------------
+//
+// Todo lo que salio de este celular: lo que no se pudo mandar (se reintenta o
+// se borra), lo que espera a la caja y lo que la caja aplico o rechazo en los
+// ultimos 7 dias, con el motivo. Lo rechazado de una lista (un conteo, una
+// recepcion, una venta, un pase) se vuelve a cargar para corregirlo y mandarlo
+// de nuevo: antes, la lista ya se habia borrado y se perdia.
+
+const SE_VUELVE_A_CARGAR = { conteo: 'contar', recepcion: 'recibir', venta_celular: 'vender', transferencia_salida: 'pasar' }
+
+async function volverACargar (o) {
+  const suc = o.sucursal_id
+  const d = o.datos || {}
+  const cat = await leerCatalogo(suc).catch(() => [])
+  const porId = new Map(cat.map((p) => [p.id, p]))
+  const linea = (id, extra) => { const p = porId.get(id) || {}; return Object.assign({ productoId: id, descripcion: p.descripcion || 'Producto', codigo: (p.codigos || [])[0] || '', stock: p.stock || 0, ts: new Date().toISOString() }, extra) }
+  const sumar = (lineas, nuevas) => { for (const l of nuevas) if (l.productoId && !lineas.some((x) => x.productoId === l.productoId)) lineas.push(l) }
+  if (o.tipo === 'transferencia_salida') {
+    const clave = 'bs.pasar.' + suc
+    const lineas = leerLocal(clave, []) || []
+    sumar(lineas, (d.items || []).map((it) => linea(it.productoId, { cantidad: it.cantidad })))
+    guardarLocal(clave, lineas)
+    S.pasar = null
+  } else {
+    const clave = { conteo: 'bs.contar.', recepcion: 'bs.recibir.', venta_celular: 'bs.vender.' }[o.tipo] + suc
+    const L = leerLocal(clave, null) || { lineas: [] }
+    L.lineas = L.lineas || []
+    if (o.tipo === 'conteo') sumar(L.lineas, (d.items || []).map((it) => linea(it.productoId, { cantidad: it.cantidad, ts: it.ts || new Date().toISOString() })))
+    if (o.tipo === 'venta_celular') sumar(L.lineas, (d.items || []).map((it) => linea(it.productoId, { cantidad: it.cantidad, precioUnit: (porId.get(it.productoId) || {}).precio || it.precioUnit, rubroId: (porId.get(it.productoId) || {}).rubroId || null })))
+    if (o.tipo === 'recepcion') {
+      L.proveedorId = L.proveedorId || d.proveedorId || ''
+      L.numero = L.numero || d.numero || ''
+      sumar(L.lineas, (d.lineas || []).map((l) => l.nuevo
+        ? { productoId: 'nuevo:' + (l.nuevo.codigo || l.nuevo.descripcion), nuevo: l.nuevo, descripcion: l.nuevo.descripcion, codigo: l.nuevo.codigo || '', stock: 0, cantidad: l.cantidad, costoUnit: l.costoUnit, vence: l.vence || '', unidadesPorBulto: 1, ts: new Date().toISOString() }
+        : linea(l.productoId, { cantidad: l.cantidad, costoUnit: l.costoUnit, vence: l.vence || '', unidadesPorBulto: (porId.get(l.productoId) || {}).bulto || 1 })))
+    }
+    guardarLocal(clave, L)
+  }
+  if (S.listas) S.listas = {}
+  if (suc !== S.sucursal) cambiarSucursalSinPintar(suc)
+  toast('Lo cargué de nuevo: corregí lo que haga falta y mandalo', 'ok', 4)
+  ir(SE_VUELVE_A_CARGAR[o.tipo])
+}
+
+function secMandado () {
+  for (const o of S.hechas || []) o.visto = true
+  DB.set('hechas', S.hechas || [])
+  const chip = (texto, clase) => el('span', { clase: 'chip ' + clase }, texto)
+  const fila = (o, estado, botones) => el('div', { clase: 'item', estilo: { flexWrap: 'wrap' } },
+    el('div', { clase: 'cuerpo' },
+      el('b', {}, o.texto),
+      el('div', { clase: 'sub' }, nombreSucursal(o.sucursal_id) + ' · ' + fechaHora(o.creado)),
+      o.error ? el('div', { clase: 'sub rojo', estilo: { whiteSpace: 'normal' } }, o.error) : o.mensaje ? el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, o.mensaje) : null),
+    el('div', { clase: 'fin' }, estado),
+    botones && botones.length ? el('div', { clase: 'fila', estilo: { width: '100%', gap: '8px', marginTop: '6px', flexWrap: 'wrap' } }, botones) : null)
+  const reintentar = async (o) => {
+    S.fallidas = (S.fallidas || []).filter((x) => x.id !== o.id)
+    await guardarFallidas()
+    S.cola.push(Object.assign({}, o, { error: undefined, fallo: undefined }))
+    await guardarCola()
+    await vaciarCola()
+    secMandado()
+  }
+  const borrar = async (o) => {
+    if (!confirm('¿Borrar "' + o.texto + '"? No se manda más.')) return
+    S.fallidas = (S.fallidas || []).filter((x) => x.id !== o.id)
+    await guardarFallidas()
+    secMandado()
+  }
+  const deNuevo = (o) => mandarOrden(o.sucursal_id, o.tipo, o.datos, { texto: o.texto }).then(() => secMandado())
+  const fallidas = (S.fallidas || []).map((o) => fila(o, chip('No se mandó', 'mal'), [
+    el('button', { clase: 'btn chico primario', onclick: () => reintentar(o) }, 'Reintentar'),
+    SE_VUELVE_A_CARGAR[o.tipo] ? el('button', { clase: 'btn chico', onclick: async () => { S.fallidas = S.fallidas.filter((x) => x.id !== o.id); await guardarFallidas(); volverACargar(o) } }, 'Volver a cargar') : null,
+    el('button', { clase: 'btn chico', onclick: () => borrar(o) }, 'Borrar')]))
+  const cola = S.cola.map((o) => fila(o, chip('Sin enviar', 'alerta')))
+  const esperan = [...S.esperando.values()].map((o) => fila(o, chip('Esperando la caja', 'alerta')))
+  const hechas = (S.hechas || []).filter((o) => !o.silencioso)
+  const malas = hechas.filter((o) => o.estado !== 'aplicada')
+  const buenas = hechas.filter((o) => o.estado === 'aplicada')
+  pintarSeccion('mandado',
+    cabecera('Lo que mandé', 'Desde este celular · los últimos ' + DIAS_HECHAS + ' días'),
+    fallidas.length ? [el('h3', {}, 'No se pudieron mandar'), el('div', { clase: 'tarjeta sin-relleno' }, el('div', { clase: 'lista' }, fallidas))] : null,
+    malas.length ? [el('h3', {}, 'La caja no lo aplicó'), el('div', { clase: 'tarjeta sin-relleno' }, el('div', { clase: 'lista' }, malas.map((o) => fila(o, chip('✗ No entró', 'mal'), [
+      SE_VUELVE_A_CARGAR[o.tipo] ? el('button', { clase: 'btn chico primario', onclick: () => volverACargar(o) }, 'Volver a cargar y corregir') : null,
+      el('button', { clase: 'btn chico', onclick: () => deNuevo(o) }, 'Mandar de nuevo igual')]))))] : null,
+    cola.length || esperan.length ? [el('h3', {}, 'En camino'), el('div', { clase: 'tarjeta sin-relleno' }, el('div', { clase: 'lista' }, cola, esperan))] : null,
+    el('h3', {}, 'Aplicado en la caja'),
+    el('div', { clase: 'tarjeta sin-relleno' }, buenas.length ? el('div', { clase: 'lista' }, buenas.slice(0, 80).map((o) => fila(o, chip('✓', 'ok')))) : vacio('Todavía no hay nada aplicado en estos días.', 'nube')),
+    el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Si algo no entró, el motivo está debajo. Las listas (conteos, recepciones, ventas y pases) se pueden volver a cargar para corregirlas y mandarlas de nuevo.'))
+}
+
+seccion('mandado', { nombre: 'Lo que mandé', icono: 'historial', grupo: 'control', fn: secMandado })
 
 // --- MAS (celular) ---------------------------------------------------------------------------
 
 function secMas () {
-  const ids = ['metricas', 'reportes', 'clientes', 'encargos', 'mayorista', 'caja', 'gastos', 'contar', 'recibir', 'stock', 'perdidas', 'pasar', 'proveedores', 'personal', 'vencimientos', 'envases', 'rubrosganancia', 'medios', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'historial', 'avisos', 'ajustes']
+  const ids = ['metricas', 'reportes', 'clientes', 'encargos', 'mayorista', 'caja', 'gastos', 'contar', 'recibir', 'stock', 'perdidas', 'pasar', 'proveedores', 'personal', 'vencimientos', 'envases', 'rubrosganancia', 'medios', 'apagar', 'reponer', 'faltantes', 'promos', 'cierres', 'cierresemana', 'cierremes', 'historial', 'avisos', 'mandado', 'ajustes']
   pintarSeccion('mas',
     cabecera('Más', S.negocio + (esEncargado() ? ' · encargado' : '')),
     el('div', { clase: 'mas-grilla' }, ids.filter((id) => SECCIONES[id] && seccionPermitida(id)).map((id) => el('button', { clase: 'acceso', onclick: () => ir(id) },

@@ -8,16 +8,23 @@
 // comparten dominio): al actualizarse, cada una borra solo los suyos.
 const ESPACIO = /\/paneles\//.test(self.registration.scope) ? new URL(self.registration.scope).pathname : ''
 const PREFIJO = ESPACIO ? 'cliente|' + ESPACIO + '|v' : 'bs-panel-v'
-const VERSION = PREFIJO + '13-26'
-const APP = ['./', 'index.html', 'estilos.css?v=13.26', 'app.js?v=13.26', 'lector.js?v=13.26', 'productos.js?v=13.26', 'perdidas.js?v=13.26', 'negocio.js?v=13.26', 'promociones.js?v=13.26', 'local.js?v=13.26', 'otros.js?v=13.26', 'personal.js?v=13.26', 'configuracion.js?v=13.26', 'cierres.js?v=13.26', 'mayorista-calculo.js?v=13.26', 'mayorista.js?v=13.26', 'metricas-calculo.js?v=13.26', 'metricas.js?v=13.26', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
-const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js']
+const VERSION = PREFIJO + '13-27'
+const APP = ['./', 'index.html', 'estilos.css?v=13.27', 'app.js?v=13.27', 'lector.js?v=13.27', 'productos.js?v=13.27', 'perdidas.js?v=13.27', 'negocio.js?v=13.27', 'promociones.js?v=13.27', 'local.js?v=13.27', 'otros.js?v=13.27', 'personal.js?v=13.27', 'configuracion.js?v=13.27', 'cierres.js?v=13.27', 'mayorista-calculo.js?v=13.27', 'mayorista.js?v=13.27', 'metricas-calculo.js?v=13.27', 'metricas.js?v=13.27', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+// Las librerias van en un cache aparte que no se borra al actualizar la app:
+// el lector de codigos del iPhone (ZXing) se bajaba la primera vez y despues
+// de cada version nueva se perdia, y sin internet la camara no leia.
+const LIBRERIAS = ['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.min.js', 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js']
+const CACHE_LIBRERIAS = PREFIJO.replace(/v$/, '') + 'librerias'
 
 self.addEventListener('install', (ev) => {
-  ev.waitUntil(caches.open(VERSION).then((c) => Promise.all(APP.concat(LIBRERIAS).map((u) => c.add(u).catch(() => null)))).then(() => self.skipWaiting()))
+  ev.waitUntil(Promise.all([
+    caches.open(VERSION).then((c) => Promise.all(APP.map((u) => c.add(u).catch(() => null)))),
+    caches.open(CACHE_LIBRERIAS).then((c) => Promise.all(LIBRERIAS.map((u) => c.match(u).then((ya) => ya || c.add(u).catch(() => null)))))
+  ]).then(() => self.skipWaiting()))
 })
 
 self.addEventListener('activate', (ev) => {
-  ev.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith(PREFIJO) && k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()))
+  ev.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k.startsWith(PREFIJO) && k !== VERSION && k !== CACHE_LIBRERIAS).map((k) => caches.delete(k)))).then(() => self.clients.claim()))
 })
 
 self.addEventListener('fetch', (ev) => {
@@ -27,7 +34,7 @@ self.addEventListener('fetch', (ev) => {
   // Las librerias (con version en la direccion): de lo guardado, y si no, de internet.
   if (url.hostname === 'cdn.jsdelivr.net') {
     ev.respondWith(caches.match(req).then((r) => r || fetch(req).then((resp) => {
-      if (resp.ok) { const copia = resp.clone(); caches.open(VERSION).then((c) => c.put(req, copia)) }
+      if (resp.ok) { const copia = resp.clone(); caches.open(CACHE_LIBRERIAS).then((c) => c.put(req, copia)) }
       return resp
     })))
     return

@@ -11,6 +11,13 @@ async function secPerdidas () {
   const elegirMes = el('input', { type: 'month', valor: mes, max: hoyCaja.slice(0, 7) })
   elegirMes.addEventListener('change', () => { S.perdidasMes = elegirMes.value; render() })
   const registrar = () => hojaRegistrarPerdida()
+  // El encargado registra lo que se tira, pero no ve lo que cuesta.
+  if (S.rol !== 'duenio') {
+    return pintarSeccion('perdidas',
+      cabecera('Pérdidas', nombreSucursal(S.sucursal) + ' · mercadería tirada, vencida o rota', el('button', { clase: 'btn primario', onclick: registrar }, icono('sumar'), 'Registrar pérdida')),
+      el('div', { clase: 'tarjeta' }, vacio('Cada pérdida descuenta el producto del stock. La lista con lo que costó la ve el dueño.', 'perdidas',
+        el('button', { clase: 'btn primario', onclick: registrar }, icono('sumar'), 'Registrar pérdida'))))
+  }
   pintarSeccion('perdidas',
     cabecera('Pérdidas', nombreSucursal(S.sucursal) + ' · mercadería tirada, vencida o rota',
       el('button', { clase: 'btn primario', onclick: registrar }, icono('sumar'), 'Registrar pérdida')),
@@ -35,7 +42,8 @@ async function secPerdidas () {
 
 async function hojaRegistrarPerdida () {
   const suc = S.sucursal
-  const productos = (await leerCatalogo(suc)).filter((p) => p.activo !== false && p.stock > 0)
+  // Todos los activos: aunque el sistema diga 0 o negativo, lo que se tira estaba.
+  const productos = (await leerCatalogo(suc)).filter((p) => p.activo !== false)
   const buscar = el('input', { type: 'search', placeholder: 'Buscar producto o código…' })
   const resultados = el('div', { clase: 'lista' })
   const elegido = el('div', { clase: 'sub' }, 'Elegí un producto de la lista')
@@ -44,24 +52,33 @@ async function hojaRegistrarPerdida () {
     .map(([id, nombre]) => el('option', { valor: id }, nombre)))
   const nota = el('input', { type: 'text', maxlength: '160', placeholder: 'Ej.: frutillas con hongos' })
   let producto = null
+  const elegir = (p) => {
+    producto = p
+    elegido.textContent = p.descripcion + ' · stock ' + unidades(p.stock)
+    buscar.value = ''
+    poner(resultados)
+    cantidad.focus()
+  }
   const pintar = () => {
     const q = buscar.value.trim()
-    const lista = (q ? productos.filter((p) => coincide(p.descripcion + ' ' + (p.codigos || []).join(' '), q)) : productos).slice(0, 25)
-    poner(resultados, lista.length ? lista.map((p) => el('button', { clase: 'item', onclick: () => {
-      producto = p
-      elegido.textContent = p.descripcion + ' · stock ' + unidades(p.stock)
-      buscar.value = ''
-      poner(resultados)
-      cantidad.focus()
-    } }, el('div', { clase: 'cuerpo' }, el('b', {}, p.descripcion), el('div', { clase: 'sub' }, (p.codigos || [])[0] || 'sin código')),
-    el('b', { clase: 'num' }, unidades(p.stock)))) : vacio('No hay productos con stock que coincidan.', 'buscar'))
+    const lista = (q ? productos.filter((p) => coincide(p.descripcion + ' ' + (p.codigos || []).join(' '), q)) : productos.filter((p) => p.stock > 0)).slice(0, 25)
+    poner(resultados, lista.length ? lista.map((p) => el('button', { clase: 'item', onclick: () => elegir(p) }, el('div', { clase: 'cuerpo' }, el('b', {}, p.descripcion), el('div', { clase: 'sub' }, (p.codigos || [])[0] || 'sin código')),
+    el('b', { clase: 'num' }, unidades(p.stock)))) : vacio('No hay productos que coincidan.', 'buscar'))
   }
+  const escanear = el('button', { clase: 'btn ancho', estilo: { margin: '0 0 8px' }, onclick: async () => {
+    const c = await leerCodigo({ titulo: 'Producto que se tira' })
+    if (!c) return
+    const p = productos.find((x) => (x.codigos || []).includes(c))
+    if (p) elegir(p)
+    else toast('Ese código no está en ' + nombreSucursal(suc), 'mal')
+  } }, icono('escanear'), 'Escanear el producto')
   buscar.addEventListener('input', pintar)
   pintar()
   abrirHoja({
     titulo: 'Registrar pérdida',
     cuerpo: el('div', {},
       el('p', { clase: 'sub' }, 'Cargá cada producto descartado por separado. La caja descuenta el stock cuando recibe la orden.'),
+      escanear,
       el('label', { clase: 'campo' }, 'Producto', buscar),
       el('div', { clase: 'tarjeta sin-relleno', estilo: { maxHeight: '180px', overflowY: 'auto' } }, resultados),
       elegido,
