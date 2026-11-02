@@ -673,12 +673,32 @@ async function secVender () {
   const datos = t.datos || {}
   const L = listaEscaneada('bs.vender.' + suc, () => ({ lineas: [] }))
   const V = L.datos
+  if (!V.envases) V.envases = {}
   const zona = el('div', { clase: 'lista' })
   const totalNodo = el('div', {})
+  const envasesNodo = el('div', {})
+  // Envases retornables con deposito (los pone el dueño en Configuración de la caja).
+  const tiposEnvase = (datos.envases || []).filter((x) => x.deposito > 0)
+  const depositoEnvases = () => tiposEnvase.reduce((s, x) => s + (V.envases[x.id] || 0) * x.deposito, 0)
+  const tarjetaEnvases = () => el('div', { clase: 'tarjeta' },
+    el('b', {}, 'Envases retornables'),
+    el('div', { clase: 'sub', estilo: { whiteSpace: 'normal', marginBottom: '6px' } }, 'Si se lleva el envase sin traer uno, deja el depósito en efectivo y le mandás el vale con el ticket.'),
+    tiposEnvase.map((x) => {
+      const n = V.envases[x.id] || 0
+      const cambiar = (d) => { V.envases[x.id] = Math.max(0, n + d); pintar() }
+      return el('div', { clase: 'fila', estilo: { justifyContent: 'space-between', gap: '8px', padding: '4px 0' } },
+        el('div', {}, el('div', {}, x.nombre), el('div', { clase: 'sub' }, plata(x.deposito) + ' de depósito')),
+        el('div', { clase: 'fila', estilo: { gap: '6px', alignItems: 'center' } },
+          el('button', { clase: 'btn chico', onclick: () => cambiar(-1) }, '−'),
+          el('b', { clase: 'num', estilo: { minWidth: '22px', textAlign: 'center' } }, String(n)),
+          el('button', { clase: 'btn chico', onclick: () => cambiar(1) }, '+')))
+    }))
 
   const pintar = () => {
     L.guardar()
     const c = cuentaVenta(V.lineas, datos)
+    const deposito = depositoEnvases()
+    poner(envasesNodo, tiposEnvase.length && V.lineas.length ? tarjetaEnvases() : null)
     poner(zona, V.lineas.length ? V.lineas.map((l, i) => el('div', { clase: 'item' },
       el('div', { clase: 'cuerpo' },
         el('b', {}, l.descripcion),
@@ -692,6 +712,7 @@ async function secVender () {
         el('div', { clase: 'sub' }, 'Total'),
         el('div', { clase: 'num venta-total', estilo: { fontSize: '40px', fontWeight: '800' } }, plata(c.total)),
         c.ahorro ? el('div', { clase: 'sub verde' }, 'Ahorra ' + plata(c.ahorro) + ' con promos') : null,
+        deposito ? el('div', { clase: 'sub' }, '+ ' + plata(deposito) + ' de depósito de envases') : null,
         el('button', { clase: 'btn primario ancho grande venta-cobrar', estilo: { marginTop: '10px' }, onclick: () => cobrar(c.total) }, 'Cobrar'))
       : null)
   }
@@ -706,45 +727,92 @@ async function secVender () {
     // Dos toques a "Cobrar" abrian dos ventanas: confirmando las dos, eran dos ventas.
     if (document.querySelector('.hoja-cobrar')) return
     const recargos = datos.recargos || {}
+    // El deposito de los envases va en efectivo y aparte de la venta (como en la caja).
+    const deposito = depositoEnvases()
+    const envases = tiposEnvase.filter((x) => V.envases[x.id] > 0).map((x) => ({ tipoId: x.id, nombre: x.nombre, cantidad: V.envases[x.id], importe: V.envases[x.id] * x.deposito }))
+    // Fiar lo hacen el dueño y el encargado (el empleado no ve los clientes).
+    const medios = esEmpleado() ? MEDIOS_CELULAR : MEDIOS_CELULAR.concat([['cuenta_corriente', 'A cuenta (fiado)']])
     let medio = 'efectivo'
+    let clientes = null
+    let cliente = null
     const conCuanto = el('input', { type: 'text', inputmode: 'decimal', placeholder: 'Con cuánto paga (opcional)' })
+    const entrega = el('input', { type: 'text', inputmode: 'decimal', placeholder: 'Opcional' })
+    const buscaCliente = el('input', { type: 'search', placeholder: 'Nombre o teléfono…' })
     const detalle = el('div', {})
     const botones = el('div', { clase: 'chips', estilo: { flexWrap: 'wrap' } })
+    const montoDe = (campo) => { const n = aCentavos(campo.value); return Number.isFinite(n) && n > 0 ? n : 0 }
     const aCobrar = () => total + (recargos[medio] ? Math.round(total * recargos[medio] / 10000) : 0)
+    // Lo que deja ahora en efectivo un fiado (nunca mas que la venta).
+    const dejaAhora = () => Math.min(montoDe(entrega), total)
+    const zonaFiado = () => {
+      if (!clientes) {
+        leerDatos('clientes').then((x) => { clientes = (datosDe(x) || []).filter((c) => c.activo !== false && c.aCuenta !== false); pintarCobro() }).catch(() => { clientes = []; pintarCobro() })
+        return el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Cargando los clientes…')
+      }
+      if (cliente) {
+        const va = total - dejaAhora()
+        const pasa = cliente.disponible != null && va > cliente.disponible
+        return el('div', {},
+          el('div', { clase: 'item' },
+            el('div', { clase: 'cuerpo' }, el('b', {}, cliente.nombre), el('div', { clase: 'sub' }, 'Debe ' + plata(cliente.saldo) + (cliente.disponible != null ? ' · puede llevar ' + plata(Math.max(cliente.disponible, 0)) : ''))),
+            el('button', { clase: 'btn chico', onclick: () => { cliente = null; pintarCobro() } }, 'Cambiar')),
+          el('label', { clase: 'campo' }, 'Deja ahora en efectivo', entrega),
+          pasa ? el('div', { clase: 'aviso alerta' }, el('b', {}, 'Se pasa del límite'), 'Puede llevar a cuenta hasta ' + plata(Math.max(cliente.disponible, 0)) + '. La caja no la va a cargar.') : null,
+          el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, plata(va) + ' a su cuenta' + (dejaAhora() ? ' · deja ' + plata(dejaAhora()) : '')))
+      }
+      const filas = clientes.filter((c) => !buscaCliente.value.trim() || coincide(c.nombre + ' ' + (c.telefono || ''), buscaCliente.value)).slice(0, 8)
+      return el('div', {},
+        el('label', { clase: 'campo' }, 'A la cuenta de', buscaCliente),
+        el('div', { clase: 'lista', estilo: { margin: '0 -16px' } }, filas.length
+          ? filas.map((c) => el('button', { clase: 'item', onclick: () => { cliente = c; pintarCobro() } }, el('div', { clase: 'cuerpo' }, el('b', {}, c.nombre), el('div', { clase: 'sub' }, 'Debe ' + plata(c.saldo))), icono('flecha')))
+          : vacio(clientes.length ? 'Nadie coincide.' : 'No hay clientes con cuenta corriente. Se dan de alta en Clientes.')))
+    }
     const pintarCobro = () => {
-      poner(botones, MEDIOS_CELULAR.map(([id, nombre]) => el('button', { clase: 'btn' + (medio === id ? ' primario' : ''), onclick: () => { medio = id; pintarCobro() } }, nombre)))
+      poner(botones, medios.map(([id, nombre]) => el('button', { clase: 'btn' + (medio === id ? ' primario' : ''), onclick: () => { medio = id; pintarCobro() } }, nombre)))
       const paga = aCentavos(conCuanto.value)
+      const enMano = medio === 'efectivo' ? aCobrar() + deposito : 0
       poner(detalle,
-        el('div', { clase: 'num venta-total', estilo: { fontSize: '34px', fontWeight: '800', textAlign: 'center', margin: '10px 0' } }, plata(aCobrar())),
+        el('div', { clase: 'num venta-total', estilo: { fontSize: '34px', fontWeight: '800', textAlign: 'center', margin: '10px 0' } }, plata(medio === 'efectivo' ? enMano : aCobrar())),
         recargos[medio] ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Con recargo de ' + pct(recargos[medio])) : null,
+        deposito ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, medio === 'efectivo' ? 'Incluye ' + plata(deposito) + ' de depósito de envases' : '+ ' + plata(deposito) + ' de depósito de envases, en efectivo') : null,
         medio === 'efectivo' ? el('label', { clase: 'campo' }, 'Con cuánto paga', conCuanto) : null,
-        medio === 'efectivo' && Number.isFinite(paga) && paga > aCobrar() ? el('div', { clase: 'aviso info' }, el('b', {}, 'Vuelto: ' + plata(paga - aCobrar()))) : null,
+        medio === 'efectivo' && Number.isFinite(paga) && paga > enMano ? el('div', { clase: 'aviso info' }, el('b', {}, 'Vuelto: ' + plata(paga - enMano))) : null,
         medio === 'transferencia' ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Cobrá cuando te muestre el comprobante.') : null,
-        medio === 'mercado_pago' ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Cobrá cuando veas el pago aprobado.') : null)
+        medio === 'mercado_pago' ? el('div', { clase: 'sub', estilo: { textAlign: 'center' } }, 'Cobrá cuando veas el pago aprobado.') : null,
+        medio === 'cuenta_corriente' ? zonaFiado() : null)
     }
     conCuanto.addEventListener('input', pintarCobro)
+    entrega.addEventListener('change', pintarCobro)
+    buscaCliente.addEventListener('input', () => { pintarCobro(); buscaCliente.focus() })
     pintarCobro()
     abrirHoja({
       titulo: 'Cobrar',
       clase: 'hoja-cobrar',
       cuerpo: el('div', {}, botones, detalle),
       botones: [{ texto: 'Listo, cobrado', primario: true, alTocar: async (cerrar, boton) => {
+        if (medio === 'cuenta_corriente' && !cliente) return toast('Elegí a la cuenta de quién va', 'mal')
         if (boton) boton.disabled = true
         const paga = aCentavos(conCuanto.value)
         const vendido = V.lineas.map((l) => ({ descripcion: l.descripcion, cantidad: l.cantidad, precioUnit: l.precioUnit }))
         const cobrado = aCobrar()
+        const fiado = medio === 'cuenta_corriente' ? { cliente: cliente.nombre, deja: dejaAhora() } : null
+        const vale = envases.length ? numeroValeCelular() : null
         cerrarHoja()
         await mandarOrden(suc, 'venta_celular', {
           items: V.lineas.map((l) => ({ productoId: l.productoId, cantidad: l.cantidad, precioUnit: l.precioUnit })),
           medio, total, ts: new Date().toISOString(),
-          efectivoRecibido: medio === 'efectivo' && Number.isFinite(paga) ? paga : 0
+          efectivoRecibido: medio === 'efectivo' && Number.isFinite(paga) ? paga : 0,
+          clienteId: fiado ? cliente.id : undefined,
+          entrega: fiado ? fiado.deja : undefined,
+          envases: vale ? envases.map((x) => ({ tipoId: x.tipoId, cantidad: x.cantidad })) : undefined,
+          valeNumero: vale || undefined
         }, { texto: 'Venta ' + plata(cobrado), callado: true })
         // Sin caja abierta la venta espera: se dice (antes parecia que ya estaba).
         toast(datos.cajaAbierta === false ? 'Venta guardada (' + plata(cobrado) + '). La caja está cerrada: entra cuando la abran.' : 'Venta guardada (' + plata(cobrado) + '). Se carga en la caja sola.', 'ok', 5)
         L.nueva()
         S.listas['bs.vender.' + suc] = null
         refrescarSeccion()
-        luegoDeAtras(() => hojaTicket(vendido, cobrado, medio))
+        luegoDeAtras(() => hojaTicket(vendido, cobrado, medio, { fiado, envases, vale, deposito }))
       } }]
     })
   }
@@ -771,20 +839,33 @@ async function secVender () {
     el('button', { clase: 'btn primario ancho grande', estilo: { marginBottom: '10px' }, onclick: escanear }, icono('escanear'), 'Escanear productos'),
     buscadorParaAgregar(lista.filter((p) => p.precio > 0), (p) => { agregar(p); pintar() }),
     el('div', { clase: 'tarjeta sin-relleno' }, zona),
+    envasesNodo,
     totalNodo,
     V.lineas.length ? el('button', { clase: 'btn ancho', estilo: { marginTop: '8px' }, onclick: () => { if (!confirm('¿Borrar esta venta?')) return; L.nueva(); S.listas['bs.vender.' + suc] = null; refrescarSeccion() } }, 'Borrar y empezar de nuevo') : null)
 }
 
+// El vale de envases de una venta del celular: el numero lo pone el celular
+// (asi va en el ticket enseguida) y la caja lo busca igual que los suyos.
+function numeroValeCelular () {
+  const letras = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  const r = crypto.getRandomValues(new Uint8Array(6))
+  return 'C' + Array.from(r, (n) => letras[n % letras.length]).join('')
+}
+
 // Despues de cobrar: el comprobante para el cliente por WhatsApp (o copiarlo).
-function hojaTicket (lineas, total, medio) {
+// extra: el fiado ({ cliente, deja }) y los envases con su vale.
+function hojaTicket (lineas, total, medio, extra = {}) {
+  const env = extra.vale ? '\n\nDepósito de envases ' + plata(extra.deposito) + ' (' + extra.envases.map((x) => x.cantidad + ' x ' + x.nombre).join(', ') + ')\nVale ' + extra.vale + ': traé el envase y este mensaje y te devolvemos el depósito.' : ''
+  const pago = extra.fiado ? 'A cuenta de ' + extra.fiado.cliente + (extra.fiado.deja ? ' · dejó ' + plata(extra.fiado.deja) + ' en efectivo' : '') : (NOMBRE_MEDIO[medio] || medio)
   const texto = S.negocio + ' · ' + nombreSucursal(S.sucursal) + '\n' + fechaHora(new Date().toISOString()) + '\n\n' +
     lineas.map((l) => unidades(l.cantidad) + ' x ' + l.descripcion + ' ' + plata(Math.round(l.cantidad * l.precioUnit / 1000))).join('\n') +
-    '\n\nTotal ' + plata(total) + ' (' + (NOMBRE_MEDIO[medio] || medio) + ')\n¡Gracias por tu compra!'
+    '\n\nTotal ' + plata(total) + ' (' + pago + ')' + env + '\n¡Gracias por tu compra!'
   abrirHoja({
     titulo: 'Venta guardada',
     cuerpo: el('div', {},
       el('div', { clase: 'num venta-total', estilo: { fontSize: '30px', fontWeight: '800', textAlign: 'center', margin: '6px 0 12px' } }, plata(total)),
-      el('p', { clase: 'sub', estilo: { whiteSpace: 'normal', textAlign: 'center' } }, 'Si el cliente quiere el comprobante, mandáselo.'),
+      extra.vale ? el('div', { clase: 'aviso info' }, el('b', {}, 'Vale de envases ' + extra.vale), 'Depósito de ' + plata(extra.deposito) + ' en efectivo. Mandale el ticket: con el envase y el vale le devuelven la plata en la caja.') : null,
+      el('p', { clase: 'sub', estilo: { whiteSpace: 'normal', textAlign: 'center' } }, extra.vale ? 'El vale va en el ticket.' : 'Si el cliente quiere el comprobante, mandáselo.'),
       el('a', { clase: 'btn primario ancho grande', href: 'https://wa.me/?text=' + encodeURIComponent(texto), target: '_blank', rel: 'noreferrer' }, icono('mensaje'), 'Mandar el ticket por WhatsApp'),
       el('button', { clase: 'btn ancho', estilo: { marginTop: '8px' }, onclick: async () => { try { await navigator.clipboard.writeText(texto); toast('Ticket copiado', 'ok') } catch (e) { toast('No se pudo copiar', 'mal') } } }, 'Copiar el ticket')),
     botones: [{ texto: 'Listo', primario: true, alTocar: (cerrar) => cerrar() }],

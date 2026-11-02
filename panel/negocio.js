@@ -439,7 +439,7 @@ function itemCliente (c, alTocar) {
   const dias = diasDeuda(c)
   return el('div', { clase: 'item tocable' + (c.activo === false ? ' inactivo' : ''), onclick: alTocar },
     el('div', { clase: 'cuerpo' }, el('b', {}, c.nombre),
-      el('div', { clase: 'sub' }, [c.telefono, c.ultimaCompra ? 'compró ' + hace(c.ultimaCompra) : 'sin compras a cuenta', c.empleado ? 'empleado' : ''].filter(Boolean).join(' · ')),
+      el('div', { clase: 'sub' }, [c.telefono, c.ultimaCompra ? 'compró ' + hace(c.ultimaCompra) : 'sin compras a cuenta', c.empleado ? 'empleado' : '', c.puntos ? c.puntos + ' puntos' : ''].filter(Boolean).join(' · ')),
       dias != null && dias >= DIAS_DEUDA_VIEJA ? el('div', { clase: 'sub ' + (dias >= DIAS_DEUDA_VIEJA * 2 ? 'rojo' : 'ambar') }, 'debe hace ' + dias + ' días') : null),
     el('div', { clase: 'fin' },
       el('b', { clase: 'num ' + (c.saldo > 0 ? 'rojo' : c.saldo < 0 ? 'verde' : '') }, c.saldo < 0 ? plata(-c.saldo) + ' a favor' : plata(c.saldo)),
@@ -505,7 +505,8 @@ function hojaCliente (c) {
       el('div', { clase: 'contador' },
         el('div', { clase: 'sub' }, c.saldo < 0 ? 'Tiene a favor' : 'Saldo'),
         el('div', { clase: 'v ' + (c.saldo > 0 ? 'rojo' : c.saldo < 0 ? 'verde' : '') }, plata(Math.abs(c.saldo))),
-        c.limite ? el('div', { clase: 'sub' }, 'Límite ' + plata(c.limite) + ' · ' + (disponible >= 0 ? 'le quedan ' + plata(disponible) : 'pasado por ' + plata(-disponible))) : null),
+        c.limite ? el('div', { clase: 'sub' }, 'Límite ' + plata(c.limite) + ' · ' + (disponible >= 0 ? 'le quedan ' + plata(disponible) : 'pasado por ' + plata(-disponible))) : null,
+        c.puntos ? el('div', { clase: 'sub' }, 'Tiene ' + c.puntos + ' puntos para usar') : null),
       el('div', { clase: 'acciones-grandes' },
         el('button', { clase: 'btn primario grande', onclick: () => hojaPagoCliente(c, suc) }, icono('gastos'), 'Registrar pago'),
         el('button', { clase: 'btn grande', onclick: () => hojaDeudaCliente(c, suc) }, icono('sumar'), 'Nueva deuda')),
@@ -520,11 +521,13 @@ function hojaCliente (c) {
         c.nota ? el('div', { clase: 'item' }, el('div', { clase: 'cuerpo' }, el('b', { estilo: { whiteSpace: 'normal' } }, c.nota), el('div', { clase: 'sub' }, 'Nota / dirección'))) : null,
         el('button', { clase: 'item', onclick: () => hojaClienteEditar(c) }, icono('editar'), el('div', { clase: 'cuerpo' }, el('b', {}, 'Editar datos')), icono('flecha'))),
       el('h3', {}, 'Movimientos'),
-      c.movimientos.length ? el('div', { clase: 'lista', estilo: { margin: '0 -16px' } }, c.movimientos.map((m) => el('div', { clase: 'item' + (m.anulada ? ' inactivo' : '') },
+      c.movimientos.length ? el('div', { clase: 'lista', estilo: { margin: '0 -16px' } }, c.movimientos.map((m) => el('div', { clase: 'item' + (m.anulada || m.anulado ? ' inactivo' : '') },
         el('div', { clase: 'cuerpo' },
-          el('b', {}, m.nombreTipo + (m.numero ? ' · ' + m.numero : '') + (m.anulada ? ' (anulada)' : '')),
+          el('b', {}, m.nombreTipo + (m.numero ? ' · ' + m.numero : '') + (m.anulada ? ' (anulada)' : m.anulado ? ' (anulado)' : '')),
           el('div', { clase: 'sub' }, fechaHora(m.ts) + [m.medio, m.motivo, m.usuario].filter(Boolean).map((x) => ' · ' + x).join('')),
-          m.items && m.items.length ? el('div', { clase: 'sub' }, m.items.map((it) => unidades(it[1]) + ' × ' + it[0]).join(' · ')) : null),
+          m.items && m.items.length ? el('div', { clase: 'sub' }, m.items.map((it) => unidades(it[1]) + ' × ' + it[0]).join(' · ')) : null,
+          // Un pago cargado mal lo anula el dueño (antes habia que compensarlo con "Nueva deuda").
+          m.anulable && m.id && !esEncargado() && !esEmpleado() ? el('button', { clase: 'btn chico', estilo: { marginTop: '6px' }, onclick: () => hojaAnularPagoCliente(c, m, suc) }, 'Anular este pago') : null),
         el('div', { clase: 'fin' }, el('b', { clase: 'num ' + (m.importe < 0 ? 'verde' : '') }, (m.importe < 0 ? '−' : '+') + plata(Math.abs(m.importe)).replace('−', '')), el('div', { clase: 'sub num' }, 'saldo ' + plata(m.saldo)))))) : vacio('Sin movimientos todavía.'))
   })
 }
@@ -552,6 +555,21 @@ function hojaPagoCliente (c, suc) {
       if (aFavor && !confirm('Paga ' + plata(n) + ' y debe ' + plata(Math.max(c.saldo, 0)) + '. ¿Le queda ' + plata(n - Math.max(c.saldo, 0)) + ' a favor?')) return
       cerrarHoja(2)
       await mandarOrden(suc, 'cliente_pago', { clienteId: c.id, importe: n, medio: medio.value, nota: nota.value.trim(), aFavor }, { texto: 'Pago de ' + c.nombre, alTerminar: refrescarSeccion })
+    } }]
+  })
+}
+
+function hojaAnularPagoCliente (c, m, suc) {
+  const motivo = el('input', { type: 'text', maxlength: '200', placeholder: 'Ej: se lo cargué a otro cliente' })
+  abrirHoja({
+    titulo: 'Anular el pago de ' + plata(Math.abs(m.importe)),
+    cuerpo: el('div', {},
+      el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, c.nombre + ' vuelve a deber esos ' + plata(Math.abs(m.importe)) + '. Si el pago entró en el turno que está abierto en la caja, sale de lo que tiene que haber en el cajón.'),
+      el('label', { clase: 'campo' }, 'Por qué se anula', motivo)),
+    botones: [{ texto: 'Anular pago', peligro: true, alTocar: async () => {
+      if (!motivo.value.trim()) return toast('Contá por qué se anula', 'mal')
+      cerrarHoja(2)
+      await mandarOrden(suc, 'cliente_pago_anular', { movimientoId: m.id, motivo: motivo.value.trim() }, { texto: 'Anular pago de ' + c.nombre, alTerminar: refrescarSeccion })
     } }]
   })
 }
@@ -859,9 +877,39 @@ function hojaProveedorEditar (p, nombreInicial) {
 
 function itemDeuda (d) {
   const cuando = d.dias < 0 ? el('span', { clase: 'rojo' }, 'venció hace ' + (-d.dias) + (d.dias === -1 ? ' día' : ' días')) : d.dias === 0 ? el('span', { clase: 'ambar' }, 'vence hoy') : el('span', {}, 'vence ' + fechaCorta(d.vence))
+  const pr = d.productos
   return el('div', { clase: 'item' },
-    el('div', { clase: 'cuerpo' }, el('b', {}, d.proveedor + (d.comprobante ? ' · ' + d.comprobante : '')), el('div', { clase: 'sub' }, cuando, d.pagado ? ' · pagaste ' + plata(d.pagado) : '')),
+    el('div', { clase: 'cuerpo', onclick: () => hojaDetalleDeuda(d) }, el('b', {}, d.proveedor + (d.comprobante ? ' · ' + d.comprobante : '')), el('div', { clase: 'sub' }, cuando, d.pagado ? ' · pagaste ' + plata(d.pagado) : ''),
+      pr && pr.lineas.length ? el('div', { clase: 'sub' }, pr.cantidad + (pr.cantidad === 1 ? ' producto: ' : ' productos: ') + pr.lineas.slice(0, 2).map((l) => l.c + ' ' + l.d).join(' · ') + (pr.cantidad > 2 ? ' · y ' + (pr.cantidad - 2) + ' más' : '')) : null),
     el('div', { clase: 'fin' }, el('b', { clase: 'num' }, plata(d.saldo)), el('button', { clase: 'btn chico' + (d.dias <= 0 ? ' primario' : ''), estilo: { marginTop: '4px' }, onclick: () => hojaPagarDeuda(d) }, 'Pagar')))
+}
+
+// Tocar una boleta: el detalle con los productos que trajo.
+function hojaDetalleDeuda (d) {
+  const pr = d.productos
+  const fila = (a, b) => el('div', { clase: 'fila' }, el('span', {}, a), el('b', {}, b))
+  abrirHoja({
+    titulo: d.proveedor + (d.comprobante ? ' · ' + d.comprobante : ''),
+    cuerpo: el('div', {},
+      fila('Fecha', fechaCorta(d.fecha)),
+      fila('Hay que pagarla', fechaCorta(d.vence)),
+      fila('Importe', plata(d.importe)),
+      d.pagado ? fila('Pagado', plata(d.pagado)) : null,
+      fila('Falta pagar', plata(d.saldo)),
+      d.aFavor ? el('p', { clase: 'sub' }, 'Tenés ' + plata(d.aFavor) + ' a favor con ' + d.proveedor + ' (mercadería devuelta). Se descuenta desde la caja: A pagar → la boleta → Usar a favor.') : null,
+      d.detalle ? el('p', { clase: 'sub' }, d.detalle) : null,
+      pr
+        ? el('div', {},
+          el('h3', { estilo: { margin: '14px 0 6px' } }, 'Productos de la boleta (' + pr.cantidad + ')'),
+          el('div', { clase: 'lista', estilo: { margin: '0 -16px' } }, pr.lineas.map((l) => el('div', { clase: 'item' },
+            el('div', { clase: 'cuerpo' }, el('b', {}, l.d), el('div', { clase: 'sub' }, l.c + ' unidades')),
+            el('div', { clase: 'fin' }, el('b', { clase: 'num' }, l.s == null ? 'sin costo' : plata(l.s)))))),
+          pr.cantidad > pr.lineas.length ? el('p', { clase: 'sub' }, 'Y ' + (pr.cantidad - pr.lineas.length) + ' más: miralos en la caja.') : null,
+          fila('Suma de los productos', plata(pr.total)),
+          pr.totalBoleta != null && pr.totalBoleta !== pr.total ? el('p', { clase: 'sub' }, 'La boleta dice ' + plata(pr.totalBoleta) + ' (impuestos, flete o algo sin costo).') : null)
+        : el('p', { clase: 'sub' }, 'Esta boleta se cargó a mano, sin unirla a la mercadería recibida: no tiene la lista de productos.')),
+    botones: d.saldo > 0 ? [{ texto: 'Pagar', primario: true, alTocar: () => { cerrarHoja(); hojaPagarDeuda(d) } }] : []
+  })
 }
 
 async function secAPagar () {
