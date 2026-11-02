@@ -504,6 +504,7 @@ function itemEncargo (x, suc) {
     el('span', { clase: 'ico', estilo: { color: 'var(--texto3)' } }, icono('pedidos')),
     el('div', { clase: 'cuerpo' },
       el('b', {}, x.numero + ' · ' + x.cliente.nombre),
+      x.desdeTienda ? el('div', {}, el('span', { clase: 'chip ok' }, 'Tienda online')) : null,
       el('div', { clase: 'sub' + (tarde ? ' rojo' : ''), estilo: { whiteSpace: 'normal' } }, (x.entrega === 'envio' ? 'Envío a ' + x.cliente.direccion : 'Retira') + ' · ' + cuandoEncargo(x.para)),
       el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, x.items.map((it) => unidades(it.cantidad) + ' ' + it.descripcion).join(' · ')),
       x.nota ? el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, x.nota) : null),

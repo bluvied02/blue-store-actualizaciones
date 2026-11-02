@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.28'
+const VERSION_APP = '13.29'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -411,7 +411,7 @@ const NOMBRE_ORDEN = {
   cierre_semana_previsualizar: 'Calcular cierre semanal', cierre_semana_mercadopago: 'Mercado Pago', cierre_mes_previsualizar: 'Calcular cierre mensual',
   ventas_dia: 'Ventas de un día',
   producto: 'Cambio de producto', stock: 'Ajuste de stock', stock_negativos_cero: 'Negativos puestos en cero', perdida_registrar: 'Pérdida registrada', perdida_anular: 'Pérdida anulada', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
-  promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', anulacion_rechazar: 'No anular',
+  promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', devolver_mp: 'Devolver por Mercado Pago', anulacion_rechazar: 'No anular',
   cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto', gasto_anular: 'Gasto borrado',
   proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor',
   transferencia_salida: 'Pasar a otra sucursal', conteo: 'Conteo de stock', recepcion: 'Mercadería recibida',

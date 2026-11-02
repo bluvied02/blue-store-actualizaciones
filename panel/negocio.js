@@ -37,6 +37,12 @@ function hojaVenta (v, sucursalId) {
       v.r ? el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Recargo tarjeta'), el('b', { clase: 'num' }, plata(v.r))) : null,
       el('div', { clase: 'fila' }, el('span', { clase: 'tenue' }, 'Cómo pagó'), el('b', {}, v.m.map((m) => NOMBRE_MEDIO[m] || m).join(' + '))),
       el('div', { clase: 'fila' }, el('b', {}, 'Total'), el('b', { clase: 'num', estilo: { fontSize: '22px' } }, plata(v.t))),
+      // Anulada con lo del QR sin devolver: la caja lo devuelve en Mercado Pago.
+      v.a && v.qr && !esEncargado() && !esEmpleado() ? el('button', { clase: 'btn', estilo: { width: '100%', marginTop: '10px' }, onclick: async () => {
+        if (!confirm('¿Devolverle ' + plata(v.qr) + ' por Mercado Pago? Sale de la cuenta del negocio.')) return
+        cerrarHoja()
+        await mandarOrden(suc, 'devolver_mp', { ventaId: v.id }, { texto: 'Devolver por Mercado Pago ' + v.n, alTerminar: refrescarSeccion })
+      } }, 'Devolver ' + plata(v.qr) + ' por Mercado Pago') : null,
       // De un turno cerrado no se anula (la plata saldria del cajon de hoy sin
       // quedar anotada): se hace una devolucion. Se dice antes de tocar.
       cajaNueva && !v.a && !v.dv && !v.ab ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal', marginTop: '10px' } }, 'Es de un turno que ya cerró: no se anula, se hace una devolución (sale del turno de hoy).') : null),
@@ -69,6 +75,14 @@ function hojaDevolver (v, suc) {
   medio.addEventListener('change', pintarCajon)
   pintarCajon()
   const motivo = el('input', { type: 'text', placeholder: 'Ej: vino vencido, se equivocó de sabor' })
+  // Cobrada con el QR del sistema: la caja se lo devuelve en Mercado Pago.
+  const devolverMP = el('input', { type: 'checkbox', checked: true })
+  const zonaMP = v.qr
+    ? el('label', { clase: 'fila', estilo: { gap: '8px', alignItems: 'center', whiteSpace: 'normal', marginTop: '6px' } }, devolverMP, 'Que la caja se lo devuelva ahora en Mercado Pago (sale de la cuenta del negocio)')
+    : el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'No se cobró con el QR de la caja: devolvelo desde la app de Mercado Pago.')
+  const pintarMP = () => { zonaMP.style.display = medio.value === 'mercado_pago' ? '' : 'none' }
+  medio.addEventListener('change', pintarMP)
+  pintarMP()
   abrirHoja({
     titulo: 'Devolver de ' + v.n,
     completa: true,
@@ -76,33 +90,36 @@ function hojaDevolver (v, suc) {
       el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Poné cuántos devuelve de cada uno: vuelven al stock y se resta de lo vendido hoy.'),
       zona,
       el('div', { clase: 'fila', estilo: { justifyContent: 'space-between', margin: '8px 2px' } }, el('span', { clase: 'sub' }, 'Se devuelve'), total),
-      el('label', { clase: 'campo' }, 'Cómo', medio), zonaCajon,
-      (v.m.includes('mercado_pago') || v.m.includes('qr')) ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'El QR de Mercado Pago no se devuelve solo: devolvelo desde la app de Mercado Pago.') : null,
+      el('label', { clase: 'campo' }, 'Cómo', medio), zonaCajon, zonaMP,
       el('label', { clase: 'campo' }, 'Motivo', motivo)),
     botones: [{ texto: 'Devolver', primario: true, alTocar: async () => {
       const elegidas = lineas.filter((l) => l.cantidad > 0)
       if (!elegidas.length) return toast('Poné cuántos devuelve', 'mal')
       if (!motivo.value.trim()) return toast('Poné el motivo', 'mal')
       cerrarHoja(2)
-      await mandarOrden(suc, 'devolucion', { ventaId: v.id, lineas: elegidas.map((l) => ({ linea: l.linea, cantidad: l.cantidad })), medio: medio.value, motivo: motivo.value.trim(), enCajon: medio.value === 'efectivo' && enCajon.checked }, { texto: 'Devolución de ' + v.n, alTerminar: refrescarSeccion })
+      await mandarOrden(suc, 'devolucion', { ventaId: v.id, lineas: elegidas.map((l) => ({ linea: l.linea, cantidad: l.cantidad })), medio: medio.value, motivo: motivo.value.trim(), enCajon: medio.value === 'efectivo' && enCajon.checked, devolverMP: medio.value === 'mercado_pago' && !!v.qr && devolverMP.checked }, { texto: 'Devolución de ' + v.n, alTerminar: refrescarSeccion })
     } }]
   })
 }
 
 function hojaAnularVenta (v, suc) {
   const motivo = el('input', { type: 'text', placeholder: 'Ej: se cobró dos veces, el cliente devolvió todo' })
+  const devolverMP = el('input', { type: 'checkbox', checked: true })
   abrirHoja({
     titulo: 'Anular ' + v.n,
     cuerpo: el('div', {},
       el('div', { clase: 'aviso alerta' }, el('b', {}, 'No se borra: queda anulada con el motivo'), 'Los productos vuelven al stock' + (v.m.includes('cuenta_corriente') ? ' y baja la deuda del cliente' : '') + '. En la caja queda registrado quién la anuló.'),
       // Lo que pasa con la plata: antes no se decia.
       v.m.includes('efectivo') ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Fue en efectivo: esa plata sale de lo que tiene que haber en el cajón del turno. Si no se la devolvés al cliente desde el cajón, al cajero le va a sobrar.') : null,
-      (v.m.includes('mercado_pago') || v.m.includes('qr')) ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'El cobro de Mercado Pago no se devuelve solo: devolvelo desde la app de Mercado Pago.') : null,
+      // Con el QR de la caja, la caja se lo devuelve; si no, desde la app.
+      v.qr
+        ? el('label', { clase: 'fila', estilo: { gap: '8px', alignItems: 'center', whiteSpace: 'normal', margin: '6px 0' } }, devolverMP, 'Devolverle ' + plata(v.qr) + ' en Mercado Pago (lo hace la caja; sale de la cuenta del negocio). Destildalo si ya se lo devolviste.')
+        : (v.m.includes('mercado_pago') || v.m.includes('qr')) ? el('p', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'No se cobró con el QR de la caja: devolvelo desde la app de Mercado Pago.') : null,
       el('label', { clase: 'campo' }, 'Motivo', motivo)),
     botones: [{ texto: 'Anular', peligro: true, alTocar: async () => {
       if (!motivo.value.trim()) return toast('Poné el motivo', 'mal')
       cerrarHoja(2)
-      await mandarOrden(suc, 'anular_venta', { ventaId: v.id, motivo: motivo.value.trim() }, { texto: 'Anular ' + v.n, alTerminar: refrescarSeccion })
+      await mandarOrden(suc, 'anular_venta', { ventaId: v.id, motivo: motivo.value.trim(), devolverMP: !!v.qr && devolverMP.checked }, { texto: 'Anular ' + v.n, alTerminar: refrescarSeccion })
     } }]
   })
 }

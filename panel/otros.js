@@ -530,8 +530,8 @@ async function secAvisos () {
   const anul = await leerDatos('anulaciones').catch(() => ({}))
   guardarLocal('bs.avisosVistos', new Date().toISOString())
   contarAvisos()
-  const tono = { cierre: 'mal', anulacion: 'alerta', pedido_anulacion: 'alerta', personal: 'mal', caja: 'mal', pago: 'alerta', resumen: 'info', sistema: 'alerta', descuento: 'alerta', reponer: 'info', pedido: 'info', gasto: 'alerta', stock: 'alerta', deuda: 'alerta' }
-  const ico = { cierre: 'caja', anulacion: 'ventas', pedido_anulacion: 'ventas', personal: 'clientes', caja: 'caja', pago: 'apagar', resumen: 'reportes', sistema: 'nube', descuento: 'ventas', reponer: 'reponer', pedido: 'reponer', gasto: 'caja', stock: 'stock', deuda: 'clientes' }
+  const tono = { cierre: 'mal', anulacion: 'alerta', pedido_anulacion: 'alerta', personal: 'mal', caja: 'mal', pago: 'alerta', resumen: 'info', sistema: 'alerta', descuento: 'alerta', reponer: 'info', pedido: 'info', gasto: 'alerta', stock: 'alerta', deuda: 'alerta', encargo: 'ok' }
+  const ico = { cierre: 'caja', anulacion: 'ventas', pedido_anulacion: 'ventas', personal: 'clientes', caja: 'caja', pago: 'apagar', resumen: 'reportes', sistema: 'nube', descuento: 'ventas', reponer: 'reponer', pedido: 'reponer', gasto: 'caja', stock: 'stock', deuda: 'clientes', encargo: 'pedidos' }
   const pedidos = []
   for (const [id, f] of Object.entries(anul)) for (const p of f.datos || []) pedidos.push(Object.assign({ sucursalId: id, sucursal: f.nombre }, p))
   const bloques = []
@@ -540,7 +540,8 @@ async function secAvisos () {
   for (const a of data) {
     const d = isoLocal(new Date(a.creado))
     if (d !== dia) { dia = d; actual = el('div', { clase: 'lista' }); bloques.push(el('h3', {}, fechaCorta(d)), el('div', { clase: 'tarjeta sin-relleno' }, actual)) }
-    actual.append(el('div', { clase: 'item' + (a.tipo === 'pedido' ? ' tocable' : ''), onclick: a.tipo === 'pedido' ? () => ir('reponer') : null },
+    const va = a.tipo === 'pedido' ? 'reponer' : a.tipo === 'encargo' ? 'encargos' : ''
+    actual.append(el('div', { clase: 'item' + (va ? ' tocable' : ''), onclick: va ? () => ir(va) : null },
       el('span', { clase: 'chip ' + (tono[a.tipo] || 'info'), estilo: { padding: '6px' } }, icono(ico[a.tipo] || 'avisos')),
       el('div', { clase: 'cuerpo' }, el('b', { estilo: { whiteSpace: 'normal' } }, a.titulo), el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, (a.nombre || '') + ' · ' + hora(a.creado) + (a.texto ? ' · ' + a.texto : '')))))
   }
