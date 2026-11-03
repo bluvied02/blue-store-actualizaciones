@@ -33,8 +33,9 @@ async function secPerdidas () {
         clase: 'item tocable' + (p.anulada ? ' inactivo' : ''), onclick: () => hojaDetallePerdida(p, d.motivos)
       },
       el('div', { clase: 'cuerpo' }, el('b', {}, p.descripcion),
-        el('div', { clase: 'sub' }, fechaCorta(p.dia) + ' · ' + (d.motivos[p.motivo] || p.motivo) + ' · ' + unidades(p.cantidad) + ' u.' + (p.anulada ? ' · anulada' : '')),
-        p.nota ? el('div', { clase: 'sub' }, p.nota) : null),
+        el('div', { clase: 'sub' }, fechaCorta(p.dia) + (p.ts ? ' ' + hora(p.ts) : '') + ' · ' + (d.motivos[p.motivo] || p.motivo) + ' · ' + unidades(p.cantidad) + ' u.' + (p.anulada ? ' · anulada' : '')),
+        el('div', { clase: 'sub' }, [p.quien || p.usuario, p.desde].filter(Boolean).join(' · ')),
+        p.nota ? el('div', { clase: 'sub' }, '“' + p.nota + '”') : null),
       el('div', { clase: 'fin' }, el('b', { clase: 'num' }, p.anulada ? 'Anulada' : plata(p.valorCosto))))))
         : vacio('No hay pérdidas registradas en este mes.', 'perdidas'))
         : vacio('La caja todavía no subió las pérdidas. Aparecen cuando reciba la actualización.', 'perdidas')))
@@ -50,7 +51,7 @@ async function hojaRegistrarPerdida () {
   const cantidad = el('input', { type: 'text', inputmode: 'decimal', placeholder: 'Ej.: 2 o 0,500' })
   const motivo = el('select', {}, [['podrido', 'En mal estado / podrido'], ['vencido', 'Vencido'], ['roto', 'Roto'], ['otro', 'Otro motivo']]
     .map(([id, nombre]) => el('option', { valor: id }, nombre)))
-  const nota = el('input', { type: 'text', maxlength: '160', placeholder: 'Ej.: frutillas con hongos' })
+  const nota = el('input', { type: 'text', maxlength: '160', placeholder: 'Ej.: se cayó del estante, vino roto' })
   let producto = null
   const elegir = (p) => {
     producto = p
@@ -84,11 +85,12 @@ async function hojaRegistrarPerdida () {
       elegido,
       el('label', { clase: 'campo' }, 'Cantidad', cantidad),
       el('label', { clase: 'campo' }, 'Motivo', motivo),
-      el('label', { clase: 'campo' }, 'Detalle (opcional)', nota)),
+      el('label', { clase: 'campo' }, 'Cómo pasó', nota)),
     botones: [{ texto: 'Descontar del stock', primario: true, alTocar: async () => {
       if (!producto) return toast('Elegí el producto', 'mal')
       const n = aMilesimas(cantidad.value)
       if (!Number.isSafeInteger(n) || n <= 0) return toast('Escribí una cantidad mayor a cero', 'mal')
+      if (nota.value.trim().length < 4) return toast('Contá cómo pasó', 'mal')
       cerrarHoja()
       await mandarOrden(suc, 'perdida_registrar', { productoId: producto.id, cantidad: n, motivo: motivo.value, nota: nota.value.trim() },
         { texto: 'Pérdida de ' + producto.descripcion, alTerminar: refrescarSeccion })
@@ -101,12 +103,14 @@ function hojaDetallePerdida (p, motivos) {
   abrirHoja({
     titulo: p.descripcion,
     cuerpo: el('div', {},
-      el('div', { clase: 'fila' }, el('span', {}, 'Fecha'), el('b', {}, fechaCorta(p.dia))),
+      el('div', { clase: 'fila' }, el('span', {}, 'Cuándo'), el('b', {}, fechaCorta(p.dia) + (p.ts ? ' · ' + hora(p.ts) + ' h' : ''))),
+      el('div', { clase: 'fila' }, el('span', {}, 'La cargó'), el('b', {}, p.quien || p.usuario || '—')),
+      el('div', { clase: 'fila' }, el('span', {}, 'Desde'), el('b', {}, p.desde || '—')),
       el('div', { clase: 'fila' }, el('span', {}, 'Motivo'), el('b', {}, motivos[p.motivo] || p.motivo)),
       el('div', { clase: 'fila' }, el('span', {}, 'Cantidad'), el('b', {}, unidades(p.cantidad))),
       el('div', { clase: 'fila' }, el('span', {}, 'Valor al costo'), el('b', {}, plata(p.valorCosto))),
-      p.nota ? el('p', { clase: 'sub' }, p.nota) : null,
-      p.anulada ? el('p', { clase: 'sub' }, 'Anulada: ' + (p.motivoAnulacion || 'sin detalle')) : null),
+      el('div', { clase: 'fila' }, el('span', {}, 'Cómo pasó'), el('b', { estilo: { whiteSpace: 'normal', textAlign: 'right' } }, p.nota || '—')),
+      p.anulada ? el('p', { clase: 'sub' }, 'Anulada' + (p.anuladaPorNombre ? ' por ' + p.anuladaPorNombre : '') + ': ' + (p.motivoAnulacion || 'sin detalle')) : null),
     botones: p.anulada || p.origenVencimientoId ? [] : [{ texto: 'Anular pérdida', peligro: true, alTocar: () => {
       const razon = prompt('¿Por qué se anula la pérdida? La cantidad volverá al stock.')
       if (!razon || !razon.trim()) return
