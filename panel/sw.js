@@ -9,7 +9,7 @@
 const ESPACIO = /\/paneles\//.test(self.registration.scope) ? new URL(self.registration.scope).pathname : ''
 const PREFIJO = ESPACIO ? 'cliente|' + ESPACIO + '|v' : 'bs-panel-v'
 const VERSION = PREFIJO + '13-27'
-const APP = ['./', 'index.html', 'estilos.css?v=13.29', 'app.js?v=13.29', 'lector.js?v=13.29', 'productos.js?v=13.29', 'perdidas.js?v=13.29', 'negocio.js?v=13.29', 'promociones.js?v=13.29', 'local.js?v=13.29', 'otros.js?v=13.29', 'personal.js?v=13.29', 'configuracion.js?v=13.29', 'cierres.js?v=13.29', 'mayorista-calculo.js?v=13.29', 'mayorista.js?v=13.29', 'metricas-calculo.js?v=13.29', 'metricas.js?v=13.29', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
+const APP = ['./', 'index.html', 'estilos.css?v=13.30', 'app.js?v=13.30', 'lector.js?v=13.30', 'productos.js?v=13.30', 'perdidas.js?v=13.30', 'negocio.js?v=13.30', 'promociones.js?v=13.30', 'local.js?v=13.30', 'otros.js?v=13.30', 'personal.js?v=13.30', 'configuracion.js?v=13.30', 'cierres.js?v=13.30', 'mayorista-calculo.js?v=13.30', 'mayorista.js?v=13.30', 'metricas-calculo.js?v=13.30', 'metricas.js?v=13.30', 'manifest.webmanifest', 'icono-192.png', 'icono-512.png']
 // Las librerias van en un cache aparte que no se borra al actualizar la app:
 // el lector de codigos del iPhone (ZXing) se bajaba la primera vez y despues
 // de cada version nueva se perdia, y sin internet la camara no leia.

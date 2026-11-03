@@ -62,14 +62,16 @@ async function secMetricas () {
   const suc = el('select', { onchange: (ev) => otra({ sucursal: ev.target.value }) }, el('option', { valor: 'todas' }, 'Todas las sucursales'), S.sucursales.map((s) => el('option', { valor: s.id }, s.nombre)))
   suc.value = E.sucursal
   const neta = el('label', { clase: 'fila sub', estilo: { gap: '6px', alignItems: 'center', margin: '6px 2px 10px' } },
-    el('input', { type: 'checkbox', checked: E.neta, onchange: (ev) => otra({ neta: ev.target.checked }) }), 'Ganancia neta (sin comisiones de los medios de pago)')
+    el('input', { type: 'checkbox', checked: E.neta, onchange: (ev) => otra({ neta: ev.target.checked }) }), 'Ganancia neta (sin comisiones ni gastos)')
 
   const comparar = (a, b) => delta(a, b, per.contra === 'ayer' ? 'ayer' : 'antes')
   const kpis = el('div', { clase: 'kpis' },
     kpi('Ventas', plata(act.ventas), comparar(act.ventas, ant.ventas), { clase: 'principal' }),
     kpi(E.neta ? 'Ganancia neta' : 'Ganancia', plata(gan(act)), comparar(gan(act), gan(ant))),
     kpi('Cantidad de ventas', String(act.cantidad), comparar(act.cantidad, ant.cantidad)),
-    kpi('Ticket promedio', plata(act.ticketPromedio), comparar(act.ticketPromedio, ant.ticketPromedio)))
+    kpi('Ticket promedio', plata(act.ticketPromedio), comparar(act.ticketPromedio, ant.ticketPromedio)),
+    // Los gastos del periodo (alquiler, sueldos, luz, la caja; sin pagos a proveedores).
+    act.gastos || ant.gastos ? kpi('Gastos', plata(act.gastos), comparar(act.gastos, ant.gastos), { alTocar: () => ir('gastos') }) : null)
 
   const series = [{ campo: 'total', clase: 'serie-1' }, { campo: 'ganancia', clase: 'serie-2' }]
   const detalleHora = el('div', { clase: 'sub', estilo: { whiteSpace: 'normal', padding: '6px 2px 0' } })

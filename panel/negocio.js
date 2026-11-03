@@ -725,16 +725,42 @@ function itemCierre (c) {
 
 // --- GASTOS ----------------------------------------------------------------------
 
+// Los meses que se pueden mirar: este y los 12 anteriores ('AAAA-MM').
+function mesesGastos () {
+  const h = hoyISO()
+  const lista = []
+  let a = Number(h.slice(0, 4))
+  let m = Number(h.slice(5, 7))
+  for (let i = 0; i < 13; i++) {
+    lista.push(a + '-' + String(m).padStart(2, '0'))
+    m--
+    if (!m) { m = 12; a-- }
+  }
+  return lista
+}
+
 async function secGastos () {
   if (!S.sucursal) return pintarSeccion('gastos', cabecera('Gastos'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'gastos')))
-  const d = datosDe(await leerDatos('gastos'))
-  if (!d) return pintarSeccion('gastos', cabecera('Gastos', nombreSucursal(S.sucursal)), el('div', { clase: 'tarjeta' }, vacio('La caja todavía no subió los gastos. Aparecen después de actualizarla a la versión 0.11.', 'gastos')))
+  // Este mes viene en 'gastos'; los anteriores, uno por clave ('gastos_mes:AAAA-MM').
+  const meses = mesesGastos()
+  if (!meses.includes(S.gastosMes)) S.gastosMes = meses[0]
+  const esteMes = S.gastosMes === meses[0]
+  const nombreMes = (x) => new Date(Number(x.slice(0, 4)), Number(x.slice(5, 7)) - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+  const elegir = el('select', { onchange: (ev) => { S.gastosMes = ev.target.value; refrescarSeccion() } }, meses.map((x, i) => el('option', { valor: x }, i ? nombreMes(x) : 'Este mes (' + nombreMes(x) + ')')))
+  elegir.value = S.gastosMes
+  const actual = datosDe(await leerDatos('gastos'))
+  const d = esteMes ? actual : datosDe(await leerDatos('gastos_mes:' + S.gastosMes).catch(() => ({})))
+  if (!d) {
+    return pintarSeccion('gastos', cabecera('Gastos', nombreSucursal(S.sucursal)), el('label', { clase: 'campo' }, elegir),
+      el('div', { clase: 'tarjeta' }, vacio(esteMes ? 'La caja todavía no subió los gastos. Aparecen después de actualizarla a la versión 0.11.' : 'Sin gastos en ' + nombreMes(S.gastosMes) + '. Si había, la caja los sube en unos minutos (necesita la versión 0.77 o más nueva).', 'gastos')))
+  }
   const pendientes = (d.fijos || []).filter((f) => f.estado !== 'pagado')
   pintarSeccion('gastos',
-    cabecera('Gastos', nombreSucursal(S.sucursal) + ' · ' + d.mes, el('button', { clase: 'btn primario', onclick: () => hojaGasto(d) }, icono('sumar'), 'Cargar gasto')),
+    cabecera('Gastos', nombreSucursal(S.sucursal) + ' · ' + nombreMes(S.gastosMes), el('button', { clase: 'btn primario', onclick: () => hojaGasto(actual || d) }, icono('sumar'), 'Cargar gasto')),
+    el('label', { clase: 'campo' }, elegir),
     el('div', { clase: 'kpis' },
-      kpi('Gastos del mes', plata(d.total), delta(d.total, d.totalAnterior || null, 'mes pasado', true), { clase: 'principal' }),
-      kpi('Hoy', plata(d.hoy)),
+      kpi(esteMes ? 'Gastos del mes' : 'Gastos de ' + nombreMes(S.gastosMes).split(' ')[0], plata(d.total), delta(d.total, d.totalAnterior || null, 'mes anterior', true), { clase: 'principal' }),
+      esteMes ? kpi('Hoy', plata(d.hoy)) : kpi('Cantidad', String(d.cantidad || 0)),
       kpi('Fijos por pagar', String(pendientes.length), pendientes.length ? pendientes.map((f) => f.nombre).slice(0, 2).join(', ') : 'todos pagados', { clase: pendientes.some((f) => f.estado === 'vencido') ? 'mal' : '' })),
     el('div', { clase: 'grilla' },
       el('div', { clase: 'tarjeta' }, el('h2', {}, 'Por categoría'),
@@ -742,7 +768,7 @@ async function secGastos () {
       pendientes.length || (d.fijos || []).length ? el('div', { clase: 'tarjeta' }, el('h2', {}, 'Gastos fijos del mes'),
         d.fijos.map((f) => el('div', { clase: 'fila' }, el('div', { clase: 'izq' }, el('b', {}, f.nombre), el('div', { clase: 'sub' }, f.estado === 'pagado' ? 'Pagado · ' + plata(f.pagado) : (f.estado === 'vencido' ? 'Venció el ' : 'Vence el ') + fechaCorta(f.vence) + (f.importe ? ' · ' + plata(f.importe) : ''))),
           el('span', { clase: 'chip ' + (f.estado === 'pagado' ? 'ok' : f.estado === 'vencido' ? 'mal' : 'alerta') }, f.estado === 'pagado' ? 'Pagado' : f.estado === 'vencido' ? 'Vencido' : 'Pendiente')))) : null),
-    el('h3', {}, 'Los gastos del mes'),
+    el('h3', {}, esteMes ? 'Los gastos del mes' : 'Los gastos de ' + nombreMes(S.gastosMes)),
     el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((g) => el('div', { clase: 'item' + (g.anulado ? ' inactivo' : ''), onclick: () => hojaDetalleGasto(g) },
       el('div', { clase: 'cuerpo' }, el('b', {}, g.detalle), el('div', { clase: 'sub' }, fechaCorta(g.fecha) + ' · ' + g.categoria + ' · ' + g.medio + (g.usuario ? ' · ' + g.usuario : '') + (g.anulado ? ' · borrado' : ''))),
       el('div', { clase: 'fin' }, el('b', { clase: 'num' }, g.anulado ? el('s', {}, plata(g.importe)) : plata(g.importe)))))) : vacio('Todavía no hay gastos este mes.', 'gastos')))

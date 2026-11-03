@@ -11,7 +11,10 @@
 //     u: unidades, c: costo de lo vendido, sc: lineas sin costo, com: comisiones,
 //     h: { hora: [total, ventas, costo] }, m: { medio: [importe, ventas, comision] },
 //     may: [total, ventas, costo] (lo mayorista, que tambien esta en t),
-//     p: [[clave, descripcion, familia, unidades, importe, costo, sinCosto]] }
+//     p: [[clave, descripcion, familia, unidades, importe, costo, sinCosto]],
+//     g: gastos del dia (alquiler, sueldos, luz, la caja), gm: lo pagado a
+//     proveedores cargado como gasto (no se resta: ya esta en el costo) }
+// Un dia puede no tener ventas y si gastos. Las cajas viejas no mandan g.
 // Importes en centavos, unidades en milesimas.
 ;(function (raiz) {
   const NOMBRE_MEDIO = { efectivo: 'Efectivo', mercado_pago: 'Mercado Pago', debito: 'Débito', credito: 'Crédito', transferencia: 'Transferencia', qr: 'QR', cuenta_corriente: 'Cuenta corriente' }
@@ -61,7 +64,7 @@
     const { desde, hasta, sucursales } = opciones
     const corte = Number(opciones.horaCorte == null ? 5 : opciones.horaCorte)
     const elegidos = (dias || []).filter((x) => x && (!desde || x.d >= desde) && (!hasta || x.d <= hasta) && (!sucursales || !sucursales.length || sucursales.includes(x.s)))
-    const r = { ventas: 0, cantidad: 0, unidades: 0, costo: 0, comisiones: 0, lineasSinCosto: 0, mayorista: { total: 0, cantidad: 0, costo: 0 } }
+    const r = { ventas: 0, cantidad: 0, unidades: 0, costo: 0, comisiones: 0, gastos: 0, pagosMercaderia: 0, lineasSinCosto: 0, mayorista: { total: 0, cantidad: 0, costo: 0 } }
     const horas = Array.from({ length: 24 }, (_, i) => { const hora = (corte + i) % 24; return { hora, total: 0, cantidad: 0, costo: 0 } })
     const porHora = {}
     for (const h of horas) porHora[h.hora] = h
@@ -75,6 +78,8 @@
       r.unidades += x.u || 0
       r.costo += x.c || 0
       r.comisiones += x.com || 0
+      r.gastos += x.g || 0
+      r.pagosMercaderia += x.gm || 0
       r.lineasSinCosto += x.sc || 0
       if (x.may) { r.mayorista.total += x.may[0] || 0; r.mayorista.cantidad += x.may[1] || 0; r.mayorista.costo += x.may[2] || 0 }
       const dd = porDia[x.d] || (porDia[x.d] = { dia: x.d, total: 0, cantidad: 0, costo: 0 })
@@ -111,7 +116,8 @@
       }
     }
     r.ganancia = r.ventas - r.costo
-    r.gananciaNeta = r.ganancia - r.comisiones
+    // Neta: lo que queda despues de comisiones y gastos (como el Dashboard).
+    r.gananciaNeta = r.ganancia - r.comisiones - r.gastos
     r.ticketPromedio = r.cantidad ? Math.round(r.ventas / r.cantidad) : 0
     r.mayorista.ganancia = r.mayorista.total - r.mayorista.costo
     r.mostrador = { total: r.ventas - r.mayorista.total, cantidad: r.cantidad - r.mayorista.cantidad, costo: r.costo - r.mayorista.costo }
