@@ -197,6 +197,7 @@ select.chip { appearance: none; padding-right: 13px; }
 .cargando { text-align: center; padding: 80px 20px; color: var(--tenue); }
 .mas-abajo { height: 1px; }
 .miga { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; }
+body.en-local .miga { margin: 10px 0 8px; }
 .miga button { border: 0; background: var(--tarjeta); border-radius: 50%; width: 36px; height: 36px; box-shadow: var(--sombra); font-size: 18px; }
 .miga h2 { margin: 0; font-size: 20px; }
 
@@ -260,6 +261,59 @@ select.chip { appearance: none; padding-right: 13px; }
 .slide .grande-ico { font-style: normal; font-size: 64px; flex: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,.2)); }
 .slide.marca-slide { background: radial-gradient(circle at 85% 50%, #1c7ed6 0, var(--azul) 35%, #04173f 100%); }
 .slide.marca-slide img { width: 128px; height: 128px; border-radius: 50%; padding: 0; background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+/* Recorre el local (prueba) */
+.entrar-local { margin-top: 14px; width: 100%; border: 0; border-radius: var(--radio); padding: 16px; display: flex; align-items: center; gap: 12px; text-align: left; color: #fff; background: linear-gradient(120deg, #2b2f3a, #3b4256 55%, #5c677d), #2b2f3a; box-shadow: var(--sombra); position: relative; overflow: hidden; }
+.entrar-local::after { content: '🛒🥤🍫🧃🍺'; position: absolute; right: 44px; bottom: -6px; font-size: 30px; opacity: .25; letter-spacing: 4px; }
+.entrar-local .txt { flex: 1; display: flex; flex-direction: column; gap: 3px; position: relative; z-index: 1; }
+.entrar-local b { font-size: 18px; }
+.entrar-local span { font-size: 13px; opacity: .85; }
+.entrar-local .flecha { font-size: 30px; font-weight: 300; }
+.pasillos { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; scrollbar-width: none; }
+.pasillos::-webkit-scrollbar { display: none; }
+.escena { position: relative; margin: 0 -16px; background: linear-gradient(#fdfdfd, #eef0f4 70%); border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde); overflow: hidden; }
+.techo { position: absolute; left: 0; right: 0; top: 0; height: 14px; background: repeating-linear-gradient(90deg, #e9ecef 0 120px, #fff 120px 200px); box-shadow: 0 2px 10px rgba(255,255,255,.9); }
+.piso { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; background: repeating-linear-gradient(90deg, #d9dde4 0 1px, transparent 1px 60px), linear-gradient(#e3e6ec, #cfd4dc); pointer-events: none; }
+.recorrido { position: relative; z-index: 1; display: flex; align-items: flex-end; gap: 34px; overflow-x: auto; padding: 30px 24px 18px; scroll-snap-type: x proximity; scrollbar-width: none; }
+.recorrido::-webkit-scrollbar { display: none; }
+.entrada { flex: none; width: 150px; align-self: stretch; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; text-align: center; color: var(--tenue); }
+.entrada span { font-size: 46px; }
+.entrada b { color: var(--texto); font-size: 17px; }
+.mueble { flex: none; scroll-snap-align: start; display: flex; flex-direction: column; align-items: stretch; }
+.cartel-pasillo { align-self: flex-start; margin-left: 14px; position: relative; margin-bottom: 10px; background: var(--c); color: #fff; font-weight: 900; font-size: 14px; letter-spacing: .04em; text-transform: uppercase; padding: 7px 16px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,.18); display: flex; gap: 6px; align-items: center; white-space: nowrap; }
+.cartel-pasillo::before, .cartel-pasillo::after { content: ''; position: absolute; top: -30px; width: 2px; height: 30px; background: #adb5bd; }
+.cartel-pasillo::before { left: 18px; } .cartel-pasillo::after { right: 18px; }
+.estantes { display: grid; grid-template-rows: repeat(3, 92px); grid-auto-flow: column; grid-auto-columns: 76px; column-gap: 4px; padding: 8px 10px 0; background: repeating-linear-gradient(to bottom, #f1f3f5 0 84px, #adb5bd 84px 92px), #f1f3f5; border: 8px solid #868e96; border-bottom-width: 14px; border-radius: 8px 8px 4px 4px; box-shadow: 0 10px 18px rgba(16,24,40,.18); min-width: 180px; }
+.heladera .estantes { background: repeating-linear-gradient(to bottom, rgba(231,245,255,.9) 0 84px, #ced4da 84px 92px), #e7f5ff; border-color: #343a40; border-top-width: 22px; position: relative; }
+.heladera .estantes::before { content: ''; position: absolute; left: 6px; right: 6px; top: -15px; height: 6px; border-radius: 3px; background: #a5d8ff; box-shadow: 0 0 12px #74c0fc; }
+.heladera .estantes::after { content: ''; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 20%, rgba(255,255,255,.45) 30%, transparent 40%, transparent 65%, rgba(255,255,255,.3) 72%, transparent 80%); pointer-events: none; }
+.freezer .estantes { background: repeating-linear-gradient(to bottom, #f3f9ff 0 84px, #b9d8f5 84px 92px), #f3f9ff; border-color: #1c7ed6; }
+.item { position: relative; border: 0; background: none; padding: 4px 2px 12px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 84px; transition: transform .15s; }
+.item-foto { width: 58px; height: 54px; display: flex; align-items: flex-end; justify-content: center; overflow: visible; }
+.item-foto img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0,0,0,.18)); }
+.item-foto .placa { border-radius: 8px; padding: 2px; }
+.item-foto .placa em { width: 34px; height: 34px; font-size: 20px; margin: 0; }
+.item-foto .placa span { display: none; }
+.precio-gondola { position: absolute; bottom: -1px; font-size: 10px; font-weight: 800; background: #ffe066; color: #212529; padding: 1px 5px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,.2); white-space: nowrap; }
+.precio-gondola.rojo { background: var(--oferta); color: #fff; }
+.item.elegido { transform: translateY(-8px) scale(1.12); z-index: 2; }
+.item.elegido .item-foto { filter: drop-shadow(0 0 6px var(--azul)); }
+.ver-todos { margin-top: 8px; align-self: flex-end; border: 0; background: none; color: var(--azul); font-weight: 700; }
+.bandeja { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 12; margin-top: 10px; background: var(--tarjeta); border-radius: 16px; box-shadow: 0 -4px 24px rgba(16,24,40,.18); padding: 8px 10px; display: flex; gap: 10px; align-items: center; min-height: 80px; }
+body.con-pie .bandeja { bottom: calc(80px + env(safe-area-inset-bottom)); }
+.bandeja-vacia { flex: 1; text-align: center; color: var(--tenue); font-weight: 600; }
+.bandeja-foto { width: 64px; height: 64px; flex: none; display: flex; align-items: center; justify-content: center; }
+.bandeja-foto img { max-width: 100%; max-height: 100%; width: auto; height: auto; object-fit: contain; }
+.bandeja-foto .placa em { width: 40px; height: 40px; font-size: 22px; margin: 0; }
+.bandeja-foto .placa span { display: none; }
+/* En el local: sin la franja de arriba, para que entren las gondolas enteras. */
+body.en-local .cab .franja { display: none; }
+.bandeja-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.bandeja-info b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.bandeja-precio .precio { font-size: 18px; font-weight: 800; }
+.bandeja-precio .antes { font-size: 11px; color: var(--tenue); text-decoration: line-through; }
+.bandeja .promo-txt { font-size: 11px; font-weight: 700; color: var(--oferta); }
+.ver-mas { align-self: flex-start; border: 0; background: none; padding: 0; color: var(--azul); font-weight: 700; font-size: 12px; }
+.bandeja-ctrl { width: 118px; flex: none; }
 /* Lo mas buscado (debajo del buscador) */
 .sugeridas { background: #fff; color: var(--texto); border-bottom: 1px solid var(--borde); box-shadow: 0 8px 18px rgba(16,24,40,.12); }
 .sugeridas .ancho { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-top: 10px; padding-bottom: 10px; scrollbar-width: none; }
@@ -271,7 +325,7 @@ select.chip { appearance: none; padding-right: 13px; }
 .wa-flota[hidden] { display: none; }
 body.con-pie .wa-flota { bottom: calc(84px + env(safe-area-inset-bottom)); padding: 10px; }
 body.con-pie .wa-flota span { display: none; }
-body.con-hoja .wa-flota { display: none; }
+body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
 .toast { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); background: #141a26; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 40; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
 </style>
 </head>
@@ -702,8 +756,10 @@ body.con-hoja .wa-flota { display: none; }
   function pintar () {
     tarjetasVivas.clear()
     const c = $('contenido')
+    document.body.classList.toggle('en-local', vista.tipo === 'local')
     if (vista.tipo === 'buscar') return c.replaceChildren(...pantallaBuscar())
     if (vista.tipo === 'lista') return c.replaceChildren(...pantallaLista())
+    if (vista.tipo === 'local') return poner(c, pantallaLocal())
     poner(c, pantallaInicio())
     banners()
   }
@@ -722,6 +778,9 @@ body.con-hoja .wa-flota { display: none; }
       enPromo().length ? el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' }) }, el('div', { clase: 'ico' }, '🔥'), el('span', {}, 'Ofertas')) : null,
       cats.map((k) => el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) }, el('div', { clase: 'ico' }, estiloCat(k).ico), el('span', {}, titulo(k))))))
     const top = masVendidos()
+    if (verLocal) partes.push(el('button', { clase: 'entrar-local', onclick: () => ir({ tipo: 'local' }) },
+      el('div', { clase: 'txt' }, el('b', {}, '🚶 Recorré el local'), el('span', {}, 'Caminá por las góndolas y elegí como si estuvieras ahí')),
+      el('span', { clase: 'flecha' }, '›')))
     partes.push(filaMomento())
     // Lo que ya compró en este celular (como "Volvé a comprar" de las tiendas grandes).
     const comprados = conHay(leer(CLAVE + '.comprados', []).map((id) => porId[id]))
@@ -963,6 +1022,88 @@ body.con-hoja .wa-flota { display: none; }
     pintar()
     pintarPie()
     abrirCarrito()
+  }
+
+  // ---------- Recorre el local (PRUEBA 06-11-2026) ----------
+  // Las gondolas y heladeras dibujadas: se desliza de costado como caminando,
+  // se toca un producto y abajo aparece para agregarlo. Por ahora solo con el
+  // link de prueba (&local=1); despues queda guardado en ese celular.
+  const verLocal = params.get('local') === '1' || leer(CLAVE + '.local', false)
+  if (params.get('local') === '1') guardar(CLAVE + '.local', true)
+  const tipoMueble = (k) => {
+    const n = normal(k)
+    if (/helad|congelad|hielo/.test(n)) return 'freezer'
+    if (/gaseos|bebida|agua|jugo(?! en sobre)|soda|energiz|isoton|cerveza|lacte|leche|yogur|fiambre|queso|trago|aperitiv|vino|fernet/.test(n)) return 'heladera'
+    return 'gondola'
+  }
+  function pantallaLocal () {
+    tarjetasVivas.clear()
+    const cats = categorias()
+    const bandeja = el('div', { clase: 'bandeja' }, el('div', { clase: 'bandeja-vacia' }, '👆 Tocá un producto de las góndolas'))
+    let elegido = null
+    const elegir = (p, nodo) => {
+      if (elegido) elegido.classList.remove('elegido')
+      elegido = nodo
+      nodo.classList.add('elegido')
+      const ctrl = control(p.id, p.hay)
+      ctrl.addEventListener('click', (ev) => {
+        const b = ev.target.closest('button')
+        if (b && (b.classList.contains('agregar') || b.getAttribute('aria-label') === 'Uno más')) volar(nodo.querySelector('img, .placa em'))
+      }, true)
+      poner(bandeja,
+        el('div', { clase: 'bandeja-foto' }, foto(p)),
+        el('div', { clase: 'bandeja-info' },
+          el('b', {}, titulo(p.nombre)),
+          el('div', { clase: 'bandeja-precio' }, bloquePrecio(p)),
+          textoPromo(p),
+          el('button', { clase: 'ver-mas', onclick: () => abrirFicha(p) }, 'Ver más')),
+        el('div', { clase: 'bandeja-ctrl' }, ctrl))
+    }
+    const muebles = cats.map((k) => {
+      const l = conHay(productos.filter((p) => p.categoria === k))
+        .sort((a, b) => ((rankDe[a.id] || 999) - (rankDe[b.id] || 999)) || (!!b.foto - !!a.foto))
+      if (!l.length) return null
+      const est = estiloCat(k)
+      const tipo = tipoMueble(k)
+      const max = 30
+      const items = l.slice(0, max).map((p) => {
+        const n = el('button', { clase: 'item' + (promoDe[p.id] ? ' con-promo' : ''), 'aria-label': titulo(p.nombre) },
+          el('div', { clase: 'item-foto' }, foto(p)),
+          el('span', { clase: 'precio-gondola' + (conPromo(p) || promoDe[p.id] ? ' rojo' : '') }, pesos(precioDe(p))))
+        n.addEventListener('click', () => elegir(p, n))
+        return n
+      })
+      return el('section', { clase: 'mueble ' + tipo, style: '--c:' + est.color, id: 'mueble-' + cats.indexOf(k) },
+        el('div', { clase: 'cartel-pasillo' }, el('span', {}, est.ico), titulo(k)),
+        el('div', { clase: 'estantes' }, items),
+        l.length > max ? el('button', { clase: 'ver-todos', onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) }, 'Ver los ' + l.length + ' ›') : null)
+    }).filter(Boolean)
+    const riel = el('div', { clase: 'recorrido' }, el('div', { clase: 'entrada' }, el('span', {}, '🚪'), el('b', {}, 'Bienvenido'), el('small', {}, 'Deslizá para recorrer →')), muebles)
+    const pasillos = el('div', { clase: 'pasillos' }, muebles.map((m) => el('button', { clase: 'chip', onclick: () => riel.scrollTo({ left: m.offsetLeft - 16, behavior: 'smooth' }) }, m.querySelector('.cartel-pasillo').textContent)))
+    return [
+      el('div', { clase: 'miga' }, el('button', { 'aria-label': 'Volver', onclick: () => ir({ tipo: 'inicio' }) }, '←'), el('h2', {}, '🚶 Recorré el local')),
+      pasillos,
+      el('div', { clase: 'escena' }, el('div', { clase: 'techo' }), riel, el('div', { clase: 'piso' })),
+      bandeja
+    ]
+  }
+  // El producto vuela hasta el carrito.
+  function volar (origen) {
+    const destino = $('carritoBtn')
+    if (!origen || !destino || !origen.animate) return
+    const a = origen.getBoundingClientRect()
+    const b = destino.getBoundingClientRect()
+    const copia = origen.cloneNode(true)
+    Object.assign(copia.style, { position: 'fixed', left: a.left + 'px', top: a.top + 'px', width: a.width + 'px', height: a.height + 'px', zIndex: 50, pointerEvents: 'none', margin: 0 })
+    document.body.append(copia)
+    copia.animate([
+      { transform: 'translate(0,0) scale(1)', opacity: 1 },
+      { transform: 'translate(' + (b.left - a.left) / 2 + 'px,' + ((b.top - a.top) / 2 - 80) + 'px) scale(.8)', opacity: 1, offset: 0.5 },
+      { transform: 'translate(' + (b.left + b.width / 2 - a.left - a.width / 2) + 'px,' + (b.top + b.height / 2 - a.top - a.height / 2) + 'px) scale(.2)', opacity: 0.4 }
+    ], { duration: 650, easing: 'cubic-bezier(.5,0,.6,1)' }).onfinish = () => {
+      copia.remove()
+      destino.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.25)' }, { transform: 'scale(1)' }], { duration: 300 })
+    }
   }
 
   // ---------- Para este momento ----------
