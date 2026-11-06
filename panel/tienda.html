@@ -27,6 +27,8 @@ img { display: block; }
 .cab .ancho { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 10px; padding-bottom: 10px; }
 .marca { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
 .logo { width: 34px; height: 34px; border-radius: 10px; background: var(--acento); color: var(--azul-osc); display: grid; place-items: center; font-weight: 900; font-size: 17px; flex: none; }
+.logo.con-img { width: 46px; height: 46px; border-radius: 50%; background: #fff; padding: 1px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+.logo.con-img img { width: 100%; height: 100%; border-radius: 50%; object-fit: contain; }
 .marca h1 { font-size: 18px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
 .marca .suc { font-size: 12px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .carrito-btn { position: relative; border: 0; background: rgba(255,255,255,.14); border-radius: 12px; width: 44px; height: 44px; display: grid; place-items: center; color: #fff; flex: none; }
@@ -411,7 +413,12 @@ select.chip { appearance: none; padding-right: 13px; }
     const nombre = nombreTienda()
     document.title = nombre + (datos.sucursal ? ' · ' + datos.sucursal : '')
     $('titulo').textContent = nombre
-    $('logo').textContent = (nombre.match(/\p{L}/u) || ['B'])[0].toUpperCase()
+    // El logo de la marca (el mismo icono del panel); si no carga, la inicial.
+    const ini = (nombre.match(/\p{L}/u) || ['B'])[0].toUpperCase()
+    const img = el('img', { src: 'icono-192.png', alt: nombre })
+    img.addEventListener('error', () => { $('logo').classList.remove('con-img'); $('logo').textContent = ini }, { once: true })
+    $('logo').classList.add('con-img')
+    $('logo').replaceChildren(img)
     // La direccion ya suele traer el nombre de la sucursal: no repetirlo.
     const dir = datos.direccion || ''
     const suc = datos.sucursal && !normal(dir).includes(normal(nombreSucursal())) ? nombreSucursal() : ''
