@@ -109,6 +109,19 @@ img { display: block; }
 .etq.promo { background: var(--oferta); }
 .prod .info { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .prod .precio { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.prod .antes, .ficha .antes { font-size: 12px; color: var(--tenue); text-decoration: line-through; line-height: 1; margin-bottom: -2px; }
+.precio .off { font-size: 13px; font-weight: 700; color: #00a650; margin-left: 6px; letter-spacing: 0; vertical-align: 3px; }
+.prod .llega { font-size: 12px; font-weight: 600; color: #00a650; }
+.linea .sub s { color: var(--tenue); }
+/* Cuadros por categoria */
+.cuadros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 760px) { .cuadros { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.cuadro { border: 0; border-radius: var(--radio); padding: 12px; min-height: 92px; display: flex; align-items: center; gap: 8px; text-align: left; color: #fff; background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 70%, #000)); box-shadow: var(--sombra); overflow: hidden; }
+.cuadro .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cuadro b { font-size: 15px; line-height: 1.15; }
+.cuadro span { font-size: 12px; font-weight: 700; opacity: .9; }
+.cuadro img { width: 64px; height: 64px; object-fit: contain; background: #fff; border-radius: 12px; padding: 4px; flex: none; }
+.cuadro em { font-style: normal; font-size: 34px; flex: none; }
 .prod .promo-txt { font-size: 12px; font-weight: 700; color: var(--oferta); }
 .prod .nom { font-size: 13px; color: #2b3343; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.7em; }
 .prod .poco { font-size: 11px; color: #9a5b13; font-weight: 600; display: flex; align-items: center; gap: 4px; }
@@ -439,6 +452,36 @@ select.chip { appearance: none; padding-right: 13px; }
     else if (combo) { const c = combos.find((x) => x.id === combo); if (c) setTimeout(() => abrirCombo(c), 50) }
   }
 
+  // Precio con la promo, cuando es por unidad y sin horario ("20% OFF",
+  // "$ 600 menos c/u", "a $ 3.900 c/u"). Los 6x5 y los de horario quedan como
+  // etiqueta: esos los calcula la caja al cobrar.
+  const pesosDe = (tx) => Math.round(Number(String(tx).replace(/\./g, '').replace(',', '.')) * 100)
+  function conPromo (p) {
+    const pr = promoDe[p.id]
+    if (!pr || pr.horas) return null
+    const e = pr.etiqueta || ''
+    let fin = 0
+    let m = e.match(/^(\d+(?:,\d+)?)% OFF$/)
+    if (m) fin = Math.round(p.precio * (1 - Number(m[1].replace(',', '.')) / 100))
+    else if ((m = e.match(/^\$ ?([\d.,]+) menos c\/u$/))) fin = p.precio - pesosDe(m[1])
+    else if ((m = e.match(/^a \$ ?([\d.,]+) c\/u$/))) fin = pesosDe(m[1])
+    if (!(fin > 0 && fin < p.precio)) return null
+    return { precio: fin, antes: p.precio, off: Math.round((1 - fin / p.precio) * 100) }
+  }
+  const precioDe = (p) => (conPromo(p) || p).precio
+  function bloquePrecio (p) {
+    const cp = conPromo(p)
+    if (!cp) return [el('div', { clase: 'precio' }, pesos(p.precio))]
+    return [el('div', { clase: 'antes' }, pesos(cp.antes)),
+      el('div', { clase: 'precio' }, pesos(cp.precio), cp.off >= 1 ? el('span', { clase: 'off' }, cp.off + '% OFF') : null)]
+  }
+  // Lo que vio y lo que compro antes (en este celular), para "Visto" y "Volvé a comprar".
+  function anotar (clave, ids, tope) {
+    const l = leer(CLAVE + clave, [])
+    const nueva = [...ids, ...l.filter((x) => !ids.includes(x))].slice(0, tope)
+    guardar(CLAVE + clave, nueva)
+  }
+
   // ---------- Carrito ----------
   const cuantos = (k) => carrito[k] || 0
   function cambiar (k, d) {
@@ -456,7 +499,7 @@ select.chip { appearance: none; padding-right: 13px; }
     const combo = comboDe(k)
     if (combo) return { k, c, nombre: combo.nombre, precio: combo.precio, foto: combo.foto, combo }
     const p = porId[k]
-    return p ? { k, c, nombre: p.nombre, precio: p.precio, foto: p.foto, p } : null
+    return p ? { k, c, nombre: p.nombre, precio: precioDe(p), lista: p.precio, foto: p.foto, p } : null
   }).filter(Boolean)
   const subtotal = () => lineas().reduce((s, x) => s + x.precio * x.c, 0)
   const unidades = () => lineas().reduce((s, x) => s + x.c, 0)
@@ -522,12 +565,15 @@ select.chip { appearance: none; padding-right: 13px; }
     const etqs = []
     if (rank && rank <= 10) etqs.push(el('span', { clase: 'etq top' }, rank === 1 ? 'N.º 1 más vendido' : 'Más vendido'))
     if (p.nuevo) etqs.push(el('span', { clase: 'etq nuevo' }, 'Nuevo'))
-    if (promo) etqs.push(el('span', { clase: 'etq promo' }, promo.etiqueta.length <= 14 ? promo.etiqueta : 'Promo'))
+    const cp = conPromo(p)
+    if (promo && !cp) etqs.push(el('span', { clase: 'etq promo' }, promo.etiqueta.length <= 14 ? promo.etiqueta : 'Promo'))
+    const llega = p.hay && t().demora && datos.pedidos && (abiertoAhora(t().horario) || { abierto: true }).abierto
     return el('article', { clase: 'prod' + (p.hay ? '' : ' agotado') },
       el('button', { clase: 'foto', 'aria-label': 'Ver ' + p.nombre, onclick: () => abrirFicha(p) }, foto(p), etqs.length ? el('div', { clase: 'etiquetas' }, etqs) : null),
       el('div', { clase: 'info' },
-        el('div', { clase: 'precio' }, pesos(p.precio)),
-        promo ? el('div', { clase: 'promo-txt' }, promo.etiqueta) : null,
+        bloquePrecio(p),
+        promo && !cp ? el('div', { clase: 'promo-txt' }, promo.etiqueta) : null,
+        llega ? el('div', { clase: 'llega' }, 'Llega en ~' + t().demora + ' min') : null,
         el('div', { clase: 'nom', title: p.nombre }, titulo(p.nombre)),
         p.poco ? el('div', { clase: 'poco' }, '¡Últimas unidades!') : null,
         control(p.id, p.hay)))
@@ -605,6 +651,9 @@ select.chip { appearance: none; padding-right: 13px; }
       enPromo().length ? el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' }) }, el('div', { clase: 'ico' }, '🔥'), el('span', {}, 'Ofertas')) : null,
       cats.map((k) => el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) }, el('div', { clase: 'ico' }, estiloCat(k).ico), el('span', {}, titulo(k))))))
     const top = masVendidos()
+    // Lo que ya compró en este celular (como "Volvé a comprar" de las tiendas grandes).
+    const comprados = conHay(leer(CLAVE + '.comprados', []).map((id) => porId[id]))
+    if (comprados.length >= 2) partes.push(seccion('🔁 Volvé a comprar', 'Lo que pediste antes', filaH(comprados.slice(0, 20))))
     if (top.length >= 4) partes.push(seccion('🔥 Lo más vendido', datos.sucursal ? 'Lo que más se lleva la gente en ' + nombreSucursal() + ' esta semana' : 'Lo que más se lleva la gente esta semana', filaH(top.slice(0, 20)), () => ir({ tipo: 'lista', top: true, titulo: 'Lo más vendido' })))
     if (combos.length) {
       const s = seccion('🎁 Combos', 'Más cosas, mejor precio', el('div', { clase: 'fila-combos' }, combos.slice(0, 10).map((c, i) => tarjetaCombo(c, i === 0))), combos.length > 2 ? () => ir({ tipo: 'lista', combos: true, titulo: 'Combos' }) : null)
@@ -613,6 +662,18 @@ select.chip { appearance: none; padding-right: 13px; }
     }
     const ofertas = enPromo()
     if (ofertas.length) partes.push(seccion('💥 Ofertas', 'Promos vigentes · se aplican al cobrar', filaH(ofertas.slice(0, 20)), () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' })))
+    // Cuadros por categoria con la foto de lo que mas se vende ahi.
+    const cuadros = cats.slice(0, 6).map((k) => {
+      const l = conHay(productos.filter((p) => p.categoria === k))
+      const conFoto = l.filter((p) => p.foto).sort((a, b) => (rankDe[a.id] || 999) - (rankDe[b.id] || 999))[0]
+      const desc = Math.max(0, ...l.map((p) => (conPromo(p) || { off: 0 }).off))
+      return el('button', { clase: 'cuadro', style: '--c:' + estiloCat(k).color, onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) },
+        el('div', { clase: 'txt' }, el('b', {}, titulo(k)), el('span', {}, desc >= 5 ? 'Hasta ' + desc + '% OFF' : l.length + ' productos')),
+        conFoto ? el('img', { src: conFoto.foto, alt: '', loading: 'lazy' }) : el('em', {}, estiloCat(k).ico))
+    })
+    if (cuadros.length >= 4) partes.push(seccion('🛒 Comprá por categoría', null, el('div', { clase: 'cuadros' }, cuadros)))
+    const vistos = conHay(leer(CLAVE + '.vistos', []).map((id) => porId[id]))
+    if (vistos.length >= 3) partes.push(seccion('👀 Visto recientemente', null, filaH(vistos)))
     const nv = nuevos()
     if (nv.length) partes.push(seccion('✨ Recién llegados', 'Lo nuevo que entró al local', filaH(nv.slice(0, 20)), nv.length > 4 ? () => ir({ tipo: 'lista', nuevos: true, titulo: 'Recién llegados' }) : null))
     // Una fila por cada una de las 4 categorias mas fuertes, como en las grandes tiendas.
@@ -627,8 +688,8 @@ select.chip { appearance: none; padding-right: 13px; }
 
   function ordenar (lista, orden) {
     const l = lista.slice()
-    if (orden === 'menor') return l.sort((a, b) => a.precio - b.precio)
-    if (orden === 'mayor') return l.sort((a, b) => b.precio - a.precio)
+    if (orden === 'menor') return l.sort((a, b) => precioDe(a) - precioDe(b))
+    if (orden === 'mayor') return l.sort((a, b) => precioDe(b) - precioDe(a))
     if (orden === 'nombre') return l.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
     // Relevancia: hay > mas vendido > con foto > promo > nombre.
     return l.sort((a, b) => (b.hay - a.hay) || ((rankDe[a.id] || 999) - (rankDe[b.id] || 999)) || (!!b.foto - !!a.foto) || (!!promoDe[b.id] - !!promoDe[a.id]) || a.nombre.localeCompare(b.nombre, 'es'))
@@ -754,6 +815,7 @@ select.chip { appearance: none; padding-right: 13px; }
   }
 
   function abrirFicha (p) {
+    anotar('.vistos', [p.id], 15)
     const promo = promoDe[p.id]
     const cmb = combosDe[p.id] || []
     const otros = conHay((datos.juntos && datos.juntos[p.id] || []).map((id) => porId[id]))
@@ -764,8 +826,8 @@ select.chip { appearance: none; padding-right: 13px; }
         el('h3', {}, titulo(p.nombre)),
         el('div', { clase: 'meta' }, [p.marca, titulo(p.categoria), p.subrubro && titulo(p.subrubro)].filter(Boolean).join(' · ')),
         rankDe[p.id] && rankDe[p.id] <= 10 ? el('div', { style: 'margin-top:6px' }, el('span', { clase: 'etq top' }, rankDe[p.id] === 1 ? 'N.º 1 más vendido' : 'Top ' + rankDe[p.id] + ' en ventas')) : null,
-        el('div', { clase: 'precio' }, pesos(p.precio)),
-        promo ? el('div', { clase: 'promo-caja' }, '🔥 ' + promo.etiqueta + (promo.horas ? ' · de ' + promo.horas + ' h' : '') + ' · se aplica al cobrar') : null,
+        bloquePrecio(p),
+        promo ? el('div', { clase: 'promo-caja' }, '🔥 ' + promo.etiqueta + (promo.horas ? ' · de ' + promo.horas + ' h' : '') + ' · ' + titulo(promo.nombre)) : null,
         p.poco ? el('div', { clase: 'poco', style: 'color:#b54708;font-weight:700' }, '¡Quedan pocas unidades!') : null,
         el('div', { clase: 'botones' }, control(p.id, p.hay, true), el('button', { clase: 'btn', style: 'flex:0 0 auto', onclick: () => compartir(titulo(p.nombre) + ' a ' + pesos(p.precio), '&prod=' + encodeURIComponent(p.id)) }, 'Compartir')),
         cmb.length ? seccion('Llevalo en combo', null, el('div', { clase: 'combos' }, cmb.slice(0, 3).map((c) => tarjetaCombo(c)))) : null,
@@ -843,7 +905,7 @@ select.chip { appearance: none; padding-right: 13px; }
       poner(zona, 
         ...l.map((x) => el('div', { clase: 'linea' },
           el('div', { clase: 'mini' }, x.p ? foto(x.p) : (x.combo ? fotoCombo(x.combo) : placa(x.nombre, 'combo'))),
-          el('div', { clase: 'info' }, el('div', {}, (x.combo ? '🎁 ' : '') + titulo(x.nombre)), el('div', { clase: 'sub' }, pesos(x.precio) + ' c/u' + (x.p && promoDe[x.k] ? ' · ' + promoDe[x.k].etiqueta : ''))),
+          el('div', { clase: 'info' }, el('div', {}, (x.combo ? '🎁 ' : '') + titulo(x.nombre)), el('div', { clase: 'sub' }, x.lista && x.lista > x.precio ? el('s', {}, pesos(x.lista)) : null, (x.lista > x.precio ? ' ' : '') + pesos(x.precio) + ' c/u' + (x.p && promoDe[x.k] ? ' · ' + promoDe[x.k].etiqueta : ''))),
           el('div', { clase: 'paso' },
             el('button', { 'aria-label': 'Uno menos', onclick: () => { cambiar(x.k, -1); pintarZona() } }, '−'),
             el('b', {}, x.c),
@@ -918,6 +980,7 @@ select.chip { appearance: none; padding-right: 13px; }
     const listo = () => {
       const porWhatsApp = datos.whatsapp ? textoWhatsApp(true) : ''
       guardar(CLAVE + '.ultimo', { items: Object.assign({}, carrito), en: Date.now() })
+      anotar('.comprados', Object.keys(carrito).filter((k) => porId[k]), 30)
       carrito = {}
       guardar(CLAVE + '.carrito', carrito)
       guardar(CLAVE + '.enviando', '')
