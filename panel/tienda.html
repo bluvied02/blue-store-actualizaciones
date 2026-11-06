@@ -41,6 +41,14 @@ img { display: block; }
 .franja .ancho { display: flex; gap: 14px; overflow-x: auto; white-space: nowrap; padding-top: 7px; padding-bottom: 7px; scrollbar-width: none; }
 .franja .ancho::-webkit-scrollbar { display: none; }
 .franja span { display: inline-flex; gap: 5px; align-items: center; }
+.franja .estado { font-weight: 800; padding: 1px 8px; border-radius: 99px; background: rgba(255,255,255,.16); }
+.franja .estado.abierto::before, .franja .estado.cerrado::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #40c057; }
+.franja .estado.cerrado::before { background: #ff6b6b; }
+/* Mientras carga: tarjetas grises que laten. */
+.esqueleto { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.esqueleto .banner-e { grid-column: 1 / -1; height: 160px; }
+.esqueleto div { height: 230px; border-radius: var(--radio); background: linear-gradient(90deg, #e6eaf2 25%, #f3f5fa 50%, #e6eaf2 75%); background-size: 200% 100%; animation: latido 1.2s infinite linear; }
+@keyframes latido { from { background-position: 200% 0 } to { background-position: -200% 0 } }
 @media (min-width: 760px) { .buscador { flex-basis: auto; flex: 2; order: 0; } .marca { flex: 1; } }
 
 /* Banner */
@@ -87,8 +95,13 @@ img { display: block; }
 .prod { background: var(--tarjeta); border-radius: var(--radio); box-shadow: var(--sombra); display: flex; flex-direction: column; overflow: hidden; position: relative; min-width: 0; }
 .prod .foto { aspect-ratio: 1; background: #fff; display: grid; place-items: center; border: 0; padding: 8px; width: 100%; position: relative; }
 .prod .foto img { width: 100%; height: 100%; object-fit: contain; }
-.placa { width: 100%; height: 100%; border-radius: 10px; display: grid; place-items: center; text-align: center; padding: 8px; font-weight: 800; font-size: 13px; line-height: 1.15; color: #fff; overflow: hidden; word-break: break-word; }
-.placa em { font-style: normal; font-size: 30px; display: block; margin-bottom: 4px; }
+.placa { width: 100%; height: 100%; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 10px 8px; font-weight: 700; font-size: 13px; line-height: 1.2; color: #2b3343; overflow: hidden; word-break: break-word; background: linear-gradient(160deg, var(--suave, #eef2ff), #fff 85%); border: 1px solid var(--borde-suave, #e3e8f5); }
+.placa em { font-style: normal; font-size: 40px; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(20,30,60,.08); margin-bottom: 8px; }
+.placa span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.combo .placa em, .linea .placa em, .slide .placa em { width: 40px; height: 40px; font-size: 24px; margin-bottom: 4px; }
+.linea .placa span, .combo .placa span { display: none; }
+.combo .placa { background: linear-gradient(135deg, #ffe066, #ffa94d); border: 0; }
+.fila-combos .combo .placa em, .ficha-foto .placa em { width: 64px; height: 64px; font-size: 36px; }
 .etiquetas { position: absolute; top: 6px; left: 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .etq { font-size: 10px; font-weight: 800; letter-spacing: .03em; padding: 3px 6px; border-radius: 5px; text-transform: uppercase; background: var(--azul); color: #fff; }
 .etq.top { background: #ff7a00; }
@@ -98,7 +111,8 @@ img { display: block; }
 .prod .precio { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .prod .promo-txt { font-size: 12px; font-weight: 700; color: var(--oferta); }
 .prod .nom { font-size: 13px; color: #2b3343; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.7em; }
-.prod .poco { font-size: 11px; color: #b54708; font-weight: 700; }
+.prod .poco { font-size: 11px; color: #9a5b13; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.prod .poco::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #f59f00; flex: none; }
 .prod .acciones { margin-top: auto; padding-top: 6px; }
 .prod.agotado .foto { opacity: .45; }
 .agregar { width: 100%; border: 0; border-radius: 10px; padding: 9px 8px; background: var(--azul); color: #fff; font-weight: 700; font-size: 14px; }
@@ -130,6 +144,11 @@ img { display: block; }
 .combo .precio { font-size: 21px; font-weight: 900; }
 .ahorro { display: inline-block; background: #e6f6ee; color: var(--ok); font-weight: 800; font-size: 12px; padding: 3px 7px; border-radius: 6px; }
 .combos { display: grid; gap: 10px; }
+/* En la portada los combos van en fila, como los productos. */
+.fila-combos { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.fila-combos > .combo { flex: 0 0 236px; scroll-snap-align: start; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+.fila-combos > .combo .foto { width: 100%; height: auto; aspect-ratio: 16 / 10; }
+.fila-combos > .combo .acciones { margin-top: auto; }
 @media (min-width: 760px) { .combos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* Repetir / filtros / mensajes */
@@ -221,7 +240,7 @@ select.chip { appearance: none; padding-right: 13px; }
   </div>
   <div class="franja" id="franja" hidden><div class="ancho" id="franjaTxt"></div></div>
 </header>
-<main class="ancho" id="contenido"><div class="cargando">Cargando la tienda…</div></main>
+<main class="ancho" id="contenido"><div class="esqueleto" aria-label="Cargando la tienda…"><div class="banner-e"></div><div></div><div></div><div></div><div></div></div></main>
 <div class="pie" id="pie" hidden><button id="pieBtn"></button></div>
 <div class="hoja" id="hoja"><div class="caja" id="hojaCaja"></div></div>
 <script>
@@ -355,15 +374,40 @@ select.chip { appearance: none; padding-right: 13px; }
   const t = () => datos.tienda || {}
   const nombreTienda = () => t().nombre || datos.negocio || 'Tienda'
 
+  // "Todos los dias de 8 a 24 h" -> abierto o cerrado ahora. Si el horario nombra
+  // dias sueltos ("lun a sab") no se adivina: mejor no decir nada que mentir.
+  // "SUCURSAL ALBERDI 487" -> "Alberdi 487".
+  const nombreSucursal = () => titulo(String(datos.sucursal || '').replace(/^\s*sucursal\s*/i, ''))
+
+  function abiertoAhora (h) {
+    const n = normal(h || '')
+    if (!n || /lun|mart|mar\b|mier|jue|vie|sab|dom|feriad/.test(n.replace(/todos los dias/, ''))) return null
+    const m = n.match(/(\d{1,2})(?:[:.](\d{2}))?\s*(?:h|hs)?\s*a\s*(\d{1,2})(?:[:.](\d{2}))?/)
+    if (!m) return null
+    const desde = Number(m[1]) * 60 + Number(m[2] || 0)
+    let hasta = Number(m[3]) * 60 + Number(m[4] || 0)
+    if (desde > 24 * 60 || hasta > 24 * 60) return null
+    if (desde === 0 && hasta === 24 * 60) return { abierto: true }
+    const d = new Date()
+    const ahora = d.getHours() * 60 + d.getMinutes()
+    const abierto = hasta > desde ? ahora >= desde && ahora < hasta : ahora >= desde || ahora < hasta
+    return { abierto, abre: m[1] + (m[2] && m[2] !== '00' ? ':' + m[2] : '') }
+  }
+
   function pintarCabecera () {
     const nombre = nombreTienda()
     document.title = nombre + (datos.sucursal ? ' · ' + datos.sucursal : '')
     $('titulo').textContent = nombre
     $('logo').textContent = (nombre.match(/\p{L}/u) || ['B'])[0].toUpperCase()
-    $('sucursal').textContent = [datos.sucursal, datos.direccion].filter(Boolean).join(' · ')
+    // La direccion ya suele traer el nombre de la sucursal: no repetirlo.
+    const dir = datos.direccion || ''
+    const suc = datos.sucursal && !normal(dir).includes(normal(nombreSucursal())) ? nombreSucursal() : ''
+    $('sucursal').textContent = dir ? '📍 ' + [suc, titulo(dir)].filter(Boolean).join(' · ') : titulo(datos.sucursal || '')
     $('buscador').hidden = false
     $('carritoBtn').hidden = false
     const franja = []
+    const ab = abiertoAhora(t().horario)
+    if (ab) franja.push(el('span', { clase: 'estado ' + (ab.abierto ? 'abierto' : 'cerrado') }, ab.abierto ? 'Abierto ahora' : 'Cerrado' + (ab.abre != null ? ' · abre a las ' + ab.abre : '')))
     if (t().demora) franja.push(el('span', {}, '⚡ Llega en ~' + t().demora + ' min'))
     if (t().horario) franja.push(el('span', {}, '🕒 ' + t().horario))
     if (t().envioGratis) franja.push(el('span', {}, '🚚 Envío gratis desde ' + pesos(t().envioGratis)))
@@ -450,7 +494,7 @@ select.chip { appearance: none; padding-right: 13px; }
   // ---------- Tarjetas ----------
   function placa (nombre, categoria) {
     const e = estiloCat(categoria)
-    return el('div', { clase: 'placa', style: 'background:' + e.color }, el('em', {}, e.ico), titulo(nombre).slice(0, 40))
+    return el('div', { clase: 'placa', style: '--suave:' + e.color + '1f;--borde-suave:' + e.color + '33' }, el('em', {}, e.ico), el('span', {}, titulo(nombre)))
   }
   function foto (p) {
     if (!p.foto) return placa(p.nombre, p.categoria)
@@ -561,9 +605,9 @@ select.chip { appearance: none; padding-right: 13px; }
       enPromo().length ? el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' }) }, el('div', { clase: 'ico' }, '🔥'), el('span', {}, 'Ofertas')) : null,
       cats.map((k) => el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) }, el('div', { clase: 'ico' }, estiloCat(k).ico), el('span', {}, titulo(k))))))
     const top = masVendidos()
-    if (top.length >= 4) partes.push(seccion('🔥 Lo más vendido', datos.sucursal ? 'Lo que más se lleva la gente en ' + datos.sucursal + ' esta semana' : 'Lo que más se lleva la gente esta semana', filaH(top.slice(0, 20)), () => ir({ tipo: 'lista', top: true, titulo: 'Lo más vendido' })))
+    if (top.length >= 4) partes.push(seccion('🔥 Lo más vendido', datos.sucursal ? 'Lo que más se lleva la gente en ' + nombreSucursal() + ' esta semana' : 'Lo que más se lleva la gente esta semana', filaH(top.slice(0, 20)), () => ir({ tipo: 'lista', top: true, titulo: 'Lo más vendido' })))
     if (combos.length) {
-      const s = seccion('🎁 Combos', 'Más cosas, mejor precio', el('div', { clase: 'combos' }, combos.slice(0, 6).map((c, i) => tarjetaCombo(c, i === 0))), combos.length > 6 ? () => ir({ tipo: 'lista', combos: true, titulo: 'Combos' }) : null)
+      const s = seccion('🎁 Combos', 'Más cosas, mejor precio', el('div', { clase: 'fila-combos' }, combos.slice(0, 10).map((c, i) => tarjetaCombo(c, i === 0))), combos.length > 2 ? () => ir({ tipo: 'lista', combos: true, titulo: 'Combos' }) : null)
       s.id = 'sec-combos'
       partes.push(s)
     }

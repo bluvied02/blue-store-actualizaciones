@@ -768,10 +768,57 @@ async function secGastos () {
       pendientes.length || (d.fijos || []).length ? el('div', { clase: 'tarjeta' }, el('h2', {}, 'Gastos fijos del mes'),
         d.fijos.map((f) => el('div', { clase: 'fila' }, el('div', { clase: 'izq' }, el('b', {}, f.nombre), el('div', { clase: 'sub' }, f.estado === 'pagado' ? 'Pagado · ' + plata(f.pagado) : (f.estado === 'vencido' ? 'Venció el ' : 'Vence el ') + fechaCorta(f.vence) + (f.importe ? ' · ' + plata(f.importe) : ''))),
           el('span', { clase: 'chip ' + (f.estado === 'pagado' ? 'ok' : f.estado === 'vencido' ? 'mal' : 'alerta') }, f.estado === 'pagado' ? 'Pagado' : f.estado === 'vencido' ? 'Vencido' : 'Pendiente')))) : null),
-    el('h3', {}, esteMes ? 'Los gastos del mes' : 'Los gastos de ' + nombreMes(S.gastosMes)),
-    el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((g) => el('div', { clase: 'item' + (g.anulado ? ' inactivo' : ''), onclick: () => hojaDetalleGasto(g) },
-      el('div', { clase: 'cuerpo' }, el('b', {}, g.detalle), el('div', { clase: 'sub' }, fechaCorta(g.fecha) + ' · ' + g.categoria + ' · ' + g.medio + (g.usuario ? ' · ' + g.usuario : '') + (g.anulado ? ' · borrado' : ''))),
-      el('div', { clase: 'fin' }, el('b', { clase: 'num' }, g.anulado ? el('s', {}, plata(g.importe)) : plata(g.importe)))))) : vacio('Todavía no hay gastos este mes.', 'gastos')))
+    el('div', { clase: 'fila' }, el('h3', {}, esteMes ? 'Los gastos del mes' : 'Los gastos de ' + nombreMes(S.gastosMes)),
+      d.lista.some((g) => !g.anulado && g.id) ? el('button', { clase: 'btn', onclick: () => { S.gastosElegir = !S.gastosElegir; S.gastosTildados = new Set(); refrescarSeccion() } }, S.gastosElegir ? 'Listo' : 'Elegir varios') : null),
+    S.gastosElegir ? barraGastosElegidos(d) : null,
+    el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((g) => itemGasto(g))) : vacio('Todavía no hay gastos este mes.', 'gastos')))
+}
+
+function itemGasto (g) {
+  const elegible = S.gastosElegir && !g.anulado && g.id
+  const tilde = elegible ? el('input', { type: 'checkbox', checked: S.gastosTildados.has(g.id), onclick: (ev) => ev.preventDefault() }) : null
+  const estado = g.anulado ? (g.comoRetiro ? ' · pasado a retiro' : ' · borrado') : ''
+  return el('div', {
+    clase: 'item' + (g.anulado ? ' inactivo' : ''),
+    onclick: () => {
+      if (!S.gastosElegir) return hojaDetalleGasto(g)
+      if (!elegible) return
+      if (S.gastosTildados.has(g.id)) S.gastosTildados.delete(g.id)
+      else S.gastosTildados.add(g.id)
+      refrescarSeccion()
+    }
+  },
+  tilde ? el('div', { clase: 'tilde-gasto' }, tilde) : null,
+  el('div', { clase: 'cuerpo' }, el('b', {}, g.detalle), el('div', { clase: 'sub' }, fechaCorta(g.fecha) + ' · ' + g.categoria + ' · ' + g.medio + (g.usuario ? ' · ' + g.usuario : '') + estado)),
+  el('div', { clase: 'fin' }, el('b', { clase: 'num' }, g.anulado ? el('s', {}, plata(g.importe)) : plata(g.importe))))
+}
+
+// Modo "Elegir varios": los chicos cargaron como gasto lo que era un retiro de
+// caja (pan, leña...). Se tildan y se pasan todos juntos.
+function barraGastosElegidos (d) {
+  const suc = S.sucursal
+  const elegidos = d.lista.filter((g) => S.gastosTildados.has(g.id) && !g.anulado)
+  const deCaja = elegidos.filter((g) => g.origen === 'caja')
+  const total = elegidos.reduce((s, g) => s + g.importe, 0)
+  const todosElegibles = d.lista.filter((g) => !g.anulado && g.id)
+  const terminar = () => { S.gastosElegir = false; S.gastosTildados = new Set(); refrescarSeccion() }
+  const mandar = (lista, comoRetiro) => {
+    if (!lista.length) return
+    const que = comoRetiro ? 'pasar a retiro de caja' : 'borrar'
+    const motivo = comoRetiro ? 'Era retiro de caja, no gasto' : prompt('¿Por qué se borran? (ej: se cargaron dos veces)')
+    if (!motivo || !motivo.trim()) return
+    if (comoRetiro && !confirm('¿' + que[0].toUpperCase() + que.slice(1) + ' ' + lista.length + (lista.length === 1 ? ' gasto' : ' gastos') + ' por ' + plata(lista.reduce((s, g) => s + g.importe, 0)) + '?\n\nDejan de sumar como gasto. La plata sigue contando como que salió del cajón, así la caja no da sobrante.')) return
+    mandarOrden(suc, 'gastos_anular', { ids: lista.map((g) => g.id), motivo: motivo.trim(), comoRetiro }, { texto: comoRetiro ? lista.length + ' gastos a retiro de caja' : lista.length + ' gastos borrados', alTerminar: refrescarSeccion })
+    terminar()
+  }
+  return el('div', { clase: 'tarjeta barra-gastos' },
+    el('div', { clase: 'fila' },
+      el('b', {}, elegidos.length ? elegidos.length + (elegidos.length === 1 ? ' elegido · ' : ' elegidos · ') + plata(total) : 'Tocá los gastos que querés corregir'),
+      el('button', { clase: 'btn', onclick: () => { S.gastosTildados = elegidos.length === todosElegibles.length ? new Set() : new Set(todosElegibles.map((g) => g.id)); refrescarSeccion() } }, elegidos.length === todosElegibles.length ? 'Ninguno' : 'Todos')),
+    elegidos.length && deCaja.length < elegidos.length ? el('div', { clase: 'sub' }, (elegidos.length - deCaja.length) + ' no salieron del efectivo de la caja: esos solo se pueden borrar.') : null,
+    el('div', { clase: 'acciones' },
+      el('button', { clase: 'btn primario', disabled: !deCaja.length, onclick: () => mandar(deCaja, true) }, 'Pasar a retiro de caja' + (deCaja.length ? ' (' + deCaja.length + ')' : '')),
+      el('button', { clase: 'btn peligro', disabled: !elegidos.length, onclick: () => mandar(elegidos, false) }, 'Borrar' + (elegidos.length ? ' (' + elegidos.length + ')' : ''))))
 }
 
 function hojaDetalleGasto (g) {
@@ -784,7 +831,7 @@ function hojaDetalleGasto (g) {
       el('div', { clase: 'fila' }, el('span', {}, 'Cómo se pagó'), el('b', {}, g.medio)),
       el('div', { clase: 'fila' }, el('span', {}, 'Importe'), el('b', {}, plata(g.importe))),
       g.usuario ? el('div', { clase: 'fila' }, el('span', {}, 'Lo cargó'), el('b', {}, g.usuario)) : null,
-      g.anulado ? el('p', { clase: 'sub' }, 'Borrado: ' + (g.motivoAnulacion || 'sin detalle')) : null,
+      g.anulado ? el('p', { clase: 'sub' }, (g.comoRetiro ? 'Pasado a retiro de caja: ' : 'Borrado: ') + (g.motivoAnulacion || 'sin detalle')) : null,
       !g.anulado && g.origen === 'caja' ? el('p', { clase: 'sub' }, g.cajaAbierta ? 'Salió de la caja del turno abierto: al borrarlo, esa plata vuelve a contar en el cajón.' : 'Salió de la caja de un turno ya cerrado: el arqueo de ese turno queda como estaba.') : null),
     botones: g.anulado || !g.id ? [] : [{ texto: 'Borrar gasto', peligro: true, alTocar: () => {
       const razon = prompt('¿Por qué se borra el gasto? (ej: se cargó dos veces)')

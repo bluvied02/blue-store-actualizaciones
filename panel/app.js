@@ -412,7 +412,7 @@ const NOMBRE_ORDEN = {
   ventas_dia: 'Ventas de un día',
   producto: 'Cambio de producto', stock: 'Ajuste de stock', stock_negativos_cero: 'Negativos puestos en cero', perdida_registrar: 'Pérdida registrada', perdida_anular: 'Pérdida anulada', aumento: 'Aumento de precios', producto_nuevo: 'Producto nuevo',
   promo_estado: 'Promo', promo_borrar: 'Borrar promo', promo_guardar: 'Promo nueva', anular_venta: 'Anular venta', devolver_mp: 'Devolver por Mercado Pago', anulacion_rechazar: 'No anular',
-  cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto', gasto_anular: 'Gasto borrado',
+  cliente_guardar: 'Cliente', cliente_pago: 'Pago de cliente', cliente_deuda: 'Deuda de cliente', gasto: 'Gasto', gasto_anular: 'Gasto borrado', gastos_anular: 'Gastos corregidos',
   proveedor_guardar: 'Proveedor', deuda_guardar: 'Deuda con proveedor', deuda_pagar: 'Pago a proveedor',
   transferencia_salida: 'Pasar a otra sucursal', conteo: 'Conteo de stock', recepcion: 'Mercadería recibida',
   producto_foto: 'Foto del producto', venta_celular: 'Venta', modo_emergencia: 'Modo emergencia', encargo_guardar: 'Encargo', encargo_estado: 'Encargo',
