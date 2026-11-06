@@ -808,7 +808,10 @@ function barraGastosElegidos (d) {
     const motivo = comoRetiro ? 'Era retiro de caja, no gasto' : prompt('¿Por qué se borran? (ej: se cargaron dos veces)')
     if (!motivo || !motivo.trim()) return
     if (comoRetiro && !confirm('¿' + que[0].toUpperCase() + que.slice(1) + ' ' + lista.length + (lista.length === 1 ? ' gasto' : ' gastos') + ' por ' + plata(lista.reduce((s, g) => s + g.importe, 0)) + '?\n\nDejan de sumar como gasto. La plata sigue contando como que salió del cajón, así la caja no da sobrante.')) return
-    mandarOrden(suc, 'gastos_anular', { ids: lista.map((g) => g.id), motivo: motivo.trim(), comoRetiro }, { texto: comoRetiro ? lista.length + ' gastos a retiro de caja' : lista.length + ' gastos borrados', alTerminar: refrescarSeccion })
+    // Borrar va de a uno con la orden de siempre (la entiende cualquier caja);
+    // pasar a retiro necesita la caja 0.80 o mas nueva.
+    if (!comoRetiro) lista.forEach((g, i) => mandarOrden(suc, 'gasto_anular', { id: g.id, motivo: motivo.trim() }, { texto: 'Gasto borrado: ' + g.detalle, callado: i > 0, alTerminar: i === lista.length - 1 ? refrescarSeccion : null }))
+    else mandarOrden(suc, 'gastos_anular', { ids: lista.map((g) => g.id), motivo: motivo.trim(), comoRetiro }, { texto: lista.length + ' gastos a retiro de caja', alTerminar: refrescarSeccion })
     terminar()
   }
   return el('div', { clase: 'tarjeta barra-gastos' },
