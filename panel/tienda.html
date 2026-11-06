@@ -314,6 +314,13 @@ body.en-local .cab .franja { display: none; }
 .bandeja .promo-txt { font-size: 11px; font-weight: 700; color: var(--oferta); }
 .ver-mas { align-self: flex-start; border: 0; background: none; padding: 0; color: var(--azul); font-weight: 700; font-size: 12px; }
 .bandeja-ctrl { width: 118px; flex: none; }
+.miga .chip.modo { margin-left: auto; white-space: nowrap; }
+body.en-local .miga h2 { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+.escena3d { position: relative; margin: 0 -16px; height: min(64vh, 560px); min-height: 300px; background: #2a1d14; overflow: hidden; }
+.escena3d canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+.cargando3d { position: absolute; inset: 0; display: grid; place-items: center; color: #f1e3c8; font-weight: 700; }
+.ayuda3d { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(0,0,0,.6); color: #fff; font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 99px; white-space: nowrap; pointer-events: none; transition: opacity .4s; }
+.ayuda3d.oculta { opacity: 0; }
 /* Lo mas buscado (debajo del buscador) */
 .sugeridas { background: #fff; color: var(--texto); border-bottom: 1px solid var(--borde); box-shadow: 0 8px 18px rgba(16,24,40,.12); }
 .sugeridas .ancho { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-top: 10px; padding-bottom: 10px; scrollbar-width: none; }
@@ -755,6 +762,7 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
   // ---------- Pantallas ----------
   function pintar () {
     tarjetasVivas.clear()
+    if (local3d) { local3d.cerrar(); local3d = null }
     const c = $('contenido')
     document.body.classList.toggle('en-local', vista.tipo === 'local')
     if (vista.tipo === 'buscar') return c.replaceChildren(...pantallaBuscar())
@@ -1044,11 +1052,11 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     const elegir = (p, nodo) => {
       if (elegido) elegido.classList.remove('elegido')
       elegido = nodo
-      nodo.classList.add('elegido')
+      if (nodo) nodo.classList.add('elegido')
       const ctrl = control(p.id, p.hay)
       ctrl.addEventListener('click', (ev) => {
         const b = ev.target.closest('button')
-        if (b && (b.classList.contains('agregar') || b.getAttribute('aria-label') === 'Uno más')) volar(nodo.querySelector('img, .placa em'))
+        if (b && (b.classList.contains('agregar') || b.getAttribute('aria-label') === 'Uno más')) volar((nodo || bandeja).querySelector('img, .placa em'))
       }, true)
       poner(bandeja,
         el('div', { clase: 'bandeja-foto' }, foto(p)),
@@ -1058,6 +1066,29 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
           textoPromo(p),
           el('button', { clase: 'ver-mas', onclick: () => abrirFicha(p) }, 'Ver más')),
         el('div', { clase: 'bandeja-ctrl' }, ctrl))
+    }
+    const miga = el('div', { clase: 'miga' }, el('button', { 'aria-label': 'Volver', onclick: () => ir({ tipo: 'inicio' }) }, '←'), el('h2', {}, '🚶 Recorré el local'),
+      el('button', { clase: 'chip modo', onclick: () => { vista.d2 = !vista.d2; pintar() } }, vista.d2 ? 'Ver en 3D' : 'Ver en 2D'))
+    // En 3D (como el local de verdad); si el celular no puede, las gondolas en 2D.
+    if (!vista.d2 && hay3D()) {
+      const escena3d = el('div', { clase: 'escena3d' }, el('div', { clase: 'cargando3d' }, '🏗️ Armando el local…'))
+      const chips = el('div', { clase: 'pasillos' })
+      const ayuda = el('div', { clase: 'ayuda3d' }, '👆 Arrastrá para mirar · tocá el piso para caminar')
+      const lista3d = conHay(productos).map((p) => ({ id: p.id, nombre: p.nombre, categoria: p.categoria, subrubro: p.subrubro, foto: p.foto, rank: rankDe[p.id] || 0, promo: !!promoDe[p.id] }))
+      import(new URL('local3d.js', location.href).href).then((m) => {
+        if (!escena3d.isConnected) return
+        local3d = m.montar(escena3d, {
+          productos: lista3d,
+          color: (cat) => estiloCat(cat).color,
+          nombre: nombreTienda(),
+          logo: 'icono-512.png',
+          alTocar: () => ayuda.classList.add('oculta'),
+          alElegir: (x) => porId[x.id] && elegir(porId[x.id], null)
+        })
+        escena3d.append(ayuda)
+        poner(chips, local3d.estaciones.map((e) => el('button', { clase: 'chip', onclick: () => local3d.irA(e.id) }, e.nombre)))
+      }).catch(() => { vista.d2 = true; pintar() })
+      return [miga, chips, escena3d, bandeja]
     }
     const muebles = cats.map((k) => {
       const l = conHay(productos.filter((p) => p.categoria === k))
@@ -1081,11 +1112,15 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     const riel = el('div', { clase: 'recorrido' }, el('div', { clase: 'entrada' }, el('span', {}, '🚪'), el('b', {}, 'Bienvenido'), el('small', {}, 'Deslizá para recorrer →')), muebles)
     const pasillos = el('div', { clase: 'pasillos' }, muebles.map((m) => el('button', { clase: 'chip', onclick: () => riel.scrollTo({ left: m.offsetLeft - 16, behavior: 'smooth' }) }, m.querySelector('.cartel-pasillo').textContent)))
     return [
-      el('div', { clase: 'miga' }, el('button', { 'aria-label': 'Volver', onclick: () => ir({ tipo: 'inicio' }) }, '←'), el('h2', {}, '🚶 Recorré el local')),
+      miga,
       pasillos,
       el('div', { clase: 'escena' }, el('div', { clase: 'techo' }), riel, el('div', { clase: 'piso' })),
       bandeja
     ]
+  }
+  let local3d = null
+  function hay3D () {
+    try { const c = document.createElement('canvas'); return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl'))) } catch (e) { return false }
   }
   // El producto vuela hasta el carrito.
   function volar (origen) {
