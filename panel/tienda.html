@@ -4,9 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b4fd6">
-<title>Tienda</title>
+<title>Tienda online · Tienda online</title>
 <meta name="description" content="Pedí online y te lo llevamos: golosinas, bebidas, almacén, combos y más.">
 <link rel="icon" href="icono-192.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Tienda online">
+<meta property="og:title" content="Tienda online · Pedí online y te lo llevamos">
+<meta property="og:description" content="Bebidas, golosinas, almacén, combos y promos. Armá tu pedido en un minuto.">
+<meta property="og:image" content="https://bluvied02.github.io/blue-store-actualizaciones/panel/icono-512.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:url" content="https://bluvied02.github.io/blue-store-actualizaciones/panel/tienda.html">
+<meta name="twitter:card" content="summary">
+<link rel="apple-touch-icon" href="icono-192.png">
 <style>
 :root {
   --fondo: #eef1f6; --tarjeta: #ffffff; --texto: #141a26; --tenue: #5e6878; --borde: #e2e6ee;
@@ -237,6 +247,31 @@ select.chip { appearance: none; padding-right: 13px; }
 .seg button.activo { background: var(--azul); color: #fff; border-color: var(--azul); }
 .error { color: var(--oferta); font-size: 13px; font-weight: 600; margin: 6px 0; }
 .mayor { display: flex; gap: 8px; align-items: center; font-size: 14px; background: #fff8d6; border-radius: 10px; padding: 10px; margin: 10px 0; }
+/* Empujones de venta (todos con datos reales) */
+.etq.hoy { background: #7048e8; }
+.btn.llevar { display: block; width: 100%; margin-top: 10px; background: #fff0f0; color: var(--oferta); border: 1.5px dashed var(--oferta); font-weight: 800; }
+.linea .gana { font-size: 12px; font-weight: 700; color: #00a650; }
+.empujon { margin-top: 4px; border: 0; background: #fff0f0; color: var(--oferta); font-weight: 800; font-size: 12px; border-radius: 99px; padding: 4px 10px; }
+.armar { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #fff9db, #ffec99); border: 1px solid #ffd43b; border-radius: 12px; padding: 10px 12px; margin: 4px 0 12px; }
+.armar .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.armar .btn { flex: none; padding: 10px 12px; }
+.cuentas .verde { color: #00a650; font-weight: 700; }
+.slide.verde { background: linear-gradient(120deg, #087f5b, #12b886 60%, #63e6be); }
+.slide .grande-ico { font-style: normal; font-size: 64px; flex: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,.2)); }
+.slide.marca-slide { background: radial-gradient(circle at 85% 50%, #1c7ed6 0, var(--azul) 35%, #04173f 100%); }
+.slide.marca-slide img { width: 128px; height: 128px; border-radius: 50%; padding: 0; background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
+/* Lo mas buscado (debajo del buscador) */
+.sugeridas { background: #fff; color: var(--texto); border-bottom: 1px solid var(--borde); box-shadow: 0 8px 18px rgba(16,24,40,.12); }
+.sugeridas .ancho { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-top: 10px; padding-bottom: 10px; scrollbar-width: none; }
+.sugeridas span { font-size: 12px; font-weight: 700; color: var(--tenue); white-space: nowrap; }
+.sugeridas .chip { flex: none; }
+/* WhatsApp flotante */
+.wa-flota { position: fixed; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 14; display: flex; align-items: center; gap: 6px; background: var(--whatsapp); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; border-radius: 99px; padding: 10px 14px; box-shadow: 0 6px 18px rgba(31,157,85,.4); }
+.wa-flota svg { width: 22px; height: 22px; }
+.wa-flota[hidden] { display: none; }
+body.con-pie .wa-flota { bottom: calc(84px + env(safe-area-inset-bottom)); padding: 10px; }
+body.con-pie .wa-flota span { display: none; }
+body.con-hoja .wa-flota { display: none; }
 .toast { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); background: #141a26; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 40; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
 </style>
 </head>
@@ -254,7 +289,9 @@ select.chip { appearance: none; padding-right: 13px; }
     </button>
   </div>
   <div class="franja" id="franja" hidden><div class="ancho" id="franjaTxt"></div></div>
+  <div class="sugeridas" id="sugeridas" hidden><div class="ancho" id="sugeridasTxt"></div></div>
 </header>
+<a class="wa-flota" id="waFlota" hidden target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.7 14.9L2 22l5.2-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.2.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.9 11.9 0 0 0 4.6 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3Z"/></svg><span>Consultas</span></a>
 <main class="ancho" id="contenido"><div class="esqueleto" aria-label="Cargando la tienda…"><div class="banner-e"></div><div></div><div></div><div></div><div></div></div></main>
 <div class="pie" id="pie" hidden><button id="pieBtn"></button></div>
 <div class="hoja" id="hoja"><div class="caja" id="hojaCaja"></div></div>
@@ -434,6 +471,10 @@ select.chip { appearance: none; padding-right: 13px; }
     else if (t().envioCosto) franja.push(el('span', {}, '🚚 Envío ' + pesos(t().envioCosto)))
     if (t().envioMinimo) franja.push(el('span', {}, 'Mínimo para envío ' + pesos(t().envioMinimo)))
     if (datos.puntos) franja.push(el('span', {}, '⭐ Sumás puntos con tu teléfono'))
+    if (datos.whatsapp) {
+      $('waFlota').href = 'https://wa.me/' + datos.whatsapp + '?text=' + encodeURIComponent('Hola! Tengo una consulta sobre la tienda online')
+      $('waFlota').hidden = false
+    }
     $('franja').hidden = !franja.length
     $('franjaTxt').replaceChildren(...franja)
   }
@@ -476,6 +517,22 @@ select.chip { appearance: none; padding-right: 13px; }
     return { precio: fin, antes: p.precio, off: Math.round((1 - fin / p.precio) * 100) }
   }
   const precioDe = (p) => (conPromo(p) || p).precio
+  // "6x5": llevando 6 pagas 5. Lo cobra la caja; aca se muestra cuanto sale c/u.
+  function nxmDe (p) {
+    const pr = promoDe[p.id]
+    const m = pr && !pr.horas && String(pr.etiqueta || '').match(/^(\d+)x(\d+)$/)
+    if (!m) return null
+    const lleva = Number(m[1])
+    const paga = Number(m[2])
+    if (!(lleva > paga && paga > 0 && lleva <= 24)) return null
+    return { lleva, paga, unidad: Math.round(p.precio * paga / lleva) }
+  }
+  function textoPromo (p) {
+    const pr = promoDe[p.id]
+    if (!pr || conPromo(p)) return null
+    const n = nxmDe(p)
+    return el('div', { clase: 'promo-txt' }, n ? pr.etiqueta + ' · llevando ' + n.lleva + ', ' + pesos(n.unidad) + ' c/u' : pr.etiqueta)
+  }
   function bloquePrecio (p) {
     const cp = conPromo(p)
     if (!cp) return [el('div', { clase: 'precio' }, pesos(p.precio))]
@@ -508,7 +565,12 @@ select.chip { appearance: none; padding-right: 13px; }
     const p = porId[k]
     return p ? { k, c, nombre: p.nombre, precio: precioDe(p), lista: p.precio, foto: p.foto, p } : null
   }).filter(Boolean)
-  const subtotal = () => lineas().reduce((s, x) => s + x.precio * x.c, 0)
+  // Lo que descuenta un 6x5 en esa linea (por producto: si la promo mezcla, la
+  // caja descuenta igual o mas). Va al total aproximado.
+  const ahorroLinea = (x) => { const n = x.p && nxmDe(x.p); return n ? Math.floor(x.c / n.lleva) * (n.lleva - n.paga) * x.p.precio : 0 }
+  const bruto = () => lineas().reduce((s, x) => s + x.precio * x.c, 0)
+  const ahorroPromos = () => lineas().reduce((s, x) => s + ahorroLinea(x), 0)
+  const subtotal = () => bruto() - ahorroPromos()
   const unidades = () => lineas().reduce((s, x) => s + x.c, 0)
   const costoEnvio = (sub) => t().envioGratis && sub >= t().envioGratis ? 0 : (t().envioCosto || 0)
 
@@ -517,6 +579,7 @@ select.chip { appearance: none; padding-right: 13px; }
     $('carritoCuenta').hidden = !u
     $('carritoCuenta').textContent = u
     $('pie').hidden = !u || $('hoja').classList.contains('abierta')
+    document.body.classList.toggle('con-pie', !$('pie').hidden)
     if (!u) return
     const sub = subtotal()
     const falta = t().envioGratis && sub < t().envioGratis ? t().envioGratis - sub : 0
@@ -574,12 +637,13 @@ select.chip { appearance: none; padding-right: 13px; }
     if (p.nuevo) etqs.push(el('span', { clase: 'etq nuevo' }, 'Nuevo'))
     const cp = conPromo(p)
     if (promo && !cp) etqs.push(el('span', { clase: 'etq promo' }, promo.etiqueta.length <= 14 ? promo.etiqueta : 'Promo'))
+    if (promo && promo.hasta === hoy()) etqs.push(el('span', { clase: 'etq hoy' }, 'Termina hoy'))
     const llega = p.hay && t().demora && datos.pedidos && (abiertoAhora(t().horario) || { abierto: true }).abierto
     return el('article', { clase: 'prod' + (p.hay ? '' : ' agotado') },
       el('button', { clase: 'foto', 'aria-label': 'Ver ' + p.nombre, onclick: () => abrirFicha(p) }, foto(p), etqs.length ? el('div', { clase: 'etiquetas' }, etqs) : null),
       el('div', { clase: 'info' },
         bloquePrecio(p),
-        promo && !cp ? el('div', { clase: 'promo-txt' }, promo.etiqueta) : null,
+        textoPromo(p),
         llega ? el('div', { clase: 'llega' }, 'Llega en ~' + t().demora + ' min') : null,
         el('div', { clase: 'nom', title: p.nombre }, titulo(p.nombre)),
         p.poco ? el('div', { clase: 'poco' }, '¡Últimas unidades!') : null,
@@ -640,7 +704,7 @@ select.chip { appearance: none; padding-right: 13px; }
     const c = $('contenido')
     if (vista.tipo === 'buscar') return c.replaceChildren(...pantallaBuscar())
     if (vista.tipo === 'lista') return c.replaceChildren(...pantallaLista())
-    c.replaceChildren(...pantallaInicio())
+    poner(c, pantallaInicio())
     banners()
   }
   function ir (v) { vista = v; pintar(); window.scrollTo({ top: 0 }) }
@@ -658,6 +722,7 @@ select.chip { appearance: none; padding-right: 13px; }
       enPromo().length ? el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' }) }, el('div', { clase: 'ico' }, '🔥'), el('span', {}, 'Ofertas')) : null,
       cats.map((k) => el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) }, el('div', { clase: 'ico' }, estiloCat(k).ico), el('span', {}, titulo(k))))))
     const top = masVendidos()
+    partes.push(filaMomento())
     // Lo que ya compró en este celular (como "Volvé a comprar" de las tiendas grandes).
     const comprados = conHay(leer(CLAVE + '.comprados', []).map((id) => porId[id]))
     if (comprados.length >= 2) partes.push(seccion('🔁 Volvé a comprar', 'Lo que pediste antes', filaH(comprados.slice(0, 20))))
@@ -779,9 +844,21 @@ select.chip { appearance: none; padding-right: 13px; }
         el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'N.º 1 en ventas'), el('h2', {}, titulo(top.nombre)), el('div', { clase: 'grande' }, pesos(top.precio))),
         top.foto ? el('img', { src: top.foto, alt: '' }) : null))
     }
-    if (!slides.length || slides.length < 2) {
-      slides.unshift(el('div', { clase: 'slide' }, el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'Delivery'), el('h2', {}, 'Pedí y te lo llevamos'), el('p', {}, t().demora ? 'En ~' + t().demora + ' minutos, sin moverte de tu casa.' : 'Elegí, mandá el pedido y listo.'))))
+    // Envio gratis: el segundo cartel (despues de la mejor oferta).
+    if (t().envioGratis) {
+      slides.splice(Math.min(1, slides.length), 0, el('button', { clase: 'slide verde', onclick: () => ir({ tipo: 'lista', top: true, titulo: 'Lo más vendido' }) },
+        el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'Envío'), el('h2', {}, 'Envío gratis desde ' + pesos(t().envioGratis)),
+          el('p', {}, (t().demora ? 'Te llega en ~' + t().demora + ' min. ' : '') + 'Sumá lo que te falta y no pagás el envío.')),
+        el('em', { clase: 'grande-ico' }, '🚚')))
     }
+    // La marca: el logo grande y lo que la hace distinta.
+    const logo = el('img', { src: 'icono-512.png', alt: '' })
+    const slideMarca = el('div', { clase: 'slide marca-slide' },
+      el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'Delivery'), el('h2', {}, nombreTienda()),
+        el('p', {}, [t().demora ? 'Te lo llevamos en ~' + t().demora + ' min' : 'Pedí y te lo llevamos', t().horario].filter(Boolean).join(' · '))),
+      logo)
+    logo.addEventListener('error', () => logo.remove(), { once: true })
+    slides.push(slideMarca)
     const riel = el('div', { clase: 'slides' }, slides)
     const puntos = el('div', { clase: 'puntitos' }, slides.map((_, i) => el('i', { clase: i ? '' : 'activo' })))
     poner(caja, riel, slides.length > 1 ? puntos : '')
@@ -807,11 +884,13 @@ select.chip { appearance: none; padding-right: 13px; }
     $('hoja').classList.add('abierta')
     $('hojaCaja').scrollTop = 0
     document.body.style.overflow = 'hidden'
+    document.body.classList.add('con-hoja')
     pintarPie()
   }
   function cerrarHoja () {
     $('hoja').classList.remove('abierta')
     document.body.style.overflow = ''
+    document.body.classList.remove('con-hoja')
     pintarPie()
   }
 
@@ -836,6 +915,12 @@ select.chip { appearance: none; padding-right: 13px; }
         bloquePrecio(p),
         promo ? el('div', { clase: 'promo-caja' }, '🔥 ' + promo.etiqueta + (promo.horas ? ' · de ' + promo.horas + ' h' : '') + ' · ' + titulo(promo.nombre)) : null,
         p.poco ? el('div', { clase: 'poco', style: 'color:#b54708;font-weight:700' }, '¡Quedan pocas unidades!') : null,
+        ((n) => n && p.hay ? el('button', { clase: 'btn llevar', onclick: () => {
+          const ya = cuantos(p.id)
+          const obj = Math.min(99, (Math.floor(ya / n.lleva) + 1) * n.lleva)
+          cambiar(p.id, obj - ya)
+          toast('Llevás ' + obj + ': ' + (Math.floor(obj / n.lleva) * (n.lleva - n.paga)) + ' te sale' + (Math.floor(obj / n.lleva) * (n.lleva - n.paga) > 1 ? 'n' : '') + ' gratis')
+        } }, '🔥 Llevá ' + n.lleva + ' y pagá ' + n.paga + ' · ' + pesos(n.unidad) + ' c/u') : null)(nxmDe(p)),
         el('div', { clase: 'botones' }, control(p.id, p.hay, true), el('button', { clase: 'btn', style: 'flex:0 0 auto', onclick: () => compartir(titulo(p.nombre) + ' a ' + pesos(p.precio), '&prod=' + encodeURIComponent(p.id)) }, 'Compartir')),
         cmb.length ? seccion('Llevalo en combo', null, el('div', { clase: 'combos' }, cmb.slice(0, 3).map((c) => tarjetaCombo(c)))) : null,
         otros.length ? seccion('Quienes lo compran también llevan', null, filaH(otros)) : null,
@@ -880,6 +965,85 @@ select.chip { appearance: none; padding-right: 13px; }
     abrirCarrito()
   }
 
+  // ---------- Para este momento ----------
+  // Segun la hora (y si es finde), una fila con lo que mas se vende para ese momento.
+  const MOMENTOS = {
+    desayuno: { titulo: '☀️ Para el desayuno', sub: 'Arrancá el día con todo', re: /lacte|leche|yogur|panader|\bpan\b|factura|galletit|budin|bizcoch|infusion|yerba|cafe|mate\b|cereal|jugo|tostad|mermelad|dulce de leche|manteca/ },
+    almuerzo: { titulo: '🍝 Para el almuerzo', sub: 'Lo que falta para la mesa', re: /pasta|fideo|arroz|aderez|mayones|ketchup|pure\b|salsa|tomate|aceite|\bpan\b|fiambre|queso|gaseos|agua\b|soda|vino/ },
+    merienda: { titulo: '🧉 Para la merienda', sub: 'Algo rico para acompañar', re: /galletit|alfajor|budin|bizcoch|lacte|leche|yerba|mate\b|infusion|chocolat|panader|factura|oblea/ },
+    previa: { titulo: '🍻 Armá la previa', sub: 'Bebidas, hielo y algo para picar', re: /cerveza|fernet|vino|aperitiv|vodka|whisk|\bgin\b|trago|gaseos|energiz|snack|papas|palito|chizito|mani\b|hielo/ },
+    noche: { titulo: '🌙 Antojo de noche', sub: 'Para la peli o para darte un gusto', re: /helad|golosin|chocolat|alfajor|snack|papas|gaseos|cerveza|chicle|caramel|turron|bombon/ }
+  }
+  function momentoAhora () {
+    const d = new Date()
+    const h = d.getHours()
+    if (h >= 6 && h < 11) return 'desayuno'
+    if (h >= 11 && h < 15) return 'almuerzo'
+    if (h >= 15 && h < 19) return 'merienda'
+    // Jueves a sabado a la noche (y la madrugada siguiente): previa.
+    return (h >= 19 ? [4, 5, 6] : [5, 6, 0]).includes(d.getDay()) ? 'previa' : 'noche'
+  }
+  function filaMomento () {
+    const m = MOMENTOS[momentoAhora()]
+    const l = conHay(productos.filter((p) => m.re.test(normal(p.categoria + ' ' + p.subrubro + ' ' + p.nombre))))
+      .sort((a, b) => ((rankDe[a.id] || 999) - (rankDe[b.id] || 999)) || (!!b.foto - !!a.foto) || (!!promoDe[b.id] - !!promoDe[a.id]))
+    return l.length >= 6 ? seccion(m.titulo, m.sub, filaH(l.slice(0, 20))) : null
+  }
+
+  // Lo que mas se busca: la marca (o la palabra que la nombra) de los mas vendidos.
+  const GENERICAS = /^(gaseosa|cerveza|energizante|vino|agua|jugo|alfajor|chocolate|galletitas?|galleta|pan|caramelos?|chupaleta|chicle|helado|snacks?|papas|aperitivo|leche|yogur|oblea|tableta|bebida|lata|laton|botella|caja|pack|sabor|original|de|la|el|con)$/
+  function busquedasPopulares () {
+    const out = []
+    for (const p of masVendidos()) {
+      const w = titulo(p.marca || p.nombre.split(/\s+/).find((x) => x.length > 2 && !/\d/.test(x) && !GENERICAS.test(normal(x))) || '')
+      if (w && !out.some((o) => normal(o) === normal(w))) out.push(w)
+      if (out.length >= 8) break
+    }
+    return out
+  }
+
+  // ---------- Armar combo desde el pedido ----------
+  // Si el pedido ya tiene todo un combo menos una parte, se ofrece completarlo:
+  // lo que ya eligio pasa al combo y su eleccion (el sabor) va en la nota.
+  function comboArmable () {
+    let mejor = null
+    for (const c of combos) {
+      const partes = c.partes || []
+      if (partes.length < 2 || c.horas) continue
+      const tiene = (x) => (x.ids || []).reduce((s, id) => s + (porId[id] ? cuantos(id) : 0), 0)
+      const faltan = partes.filter((x) => tiene(x) < x.n)
+      if (faltan.length !== 1) continue
+      const f = faltan[0]
+      if (tiene(f) || !(f.ids || []).some((id) => porId[id] && porId[id].hay)) continue
+      const ahorro = (c.separado || 0) - c.precio
+      if (!mejor || ahorro > mejor.ahorro) mejor = { combo: c, falta: f, ahorro }
+    }
+    return mejor
+  }
+  function armarCombo (a) {
+    const eleg = leer(CLAVE + '.elegidos', {})
+    const nombres = []
+    for (const x of a.combo.partes) {
+      if (x === a.falta) continue
+      let resta = x.n
+      for (const id of x.ids.filter((i) => cuantos(i)).sort((i, j) => cuantos(j) - cuantos(i))) {
+        if (!resta) break
+        const usa = Math.min(resta, cuantos(id))
+        if (x.ids.length > 1) nombres.push(usa + ' ' + titulo(porId[id].nombre))
+        cambiar(id, -usa)
+        resta -= usa
+      }
+    }
+    cambiar('combo:' + a.combo.id, 1)
+    if (nombres.length) { eleg[a.combo.id] = [...(eleg[a.combo.id] || []), ...nombres].slice(-6); guardar(CLAVE + '.elegidos', eleg) }
+    toast('¡Listo! Armaste el ' + titulo(a.combo.nombre))
+  }
+  // Lo que eligio para los combos armados, para la nota del pedido.
+  function notaCombos () {
+    const eleg = leer(CLAVE + '.elegidos', {})
+    return Object.entries(eleg).filter(([id]) => comboDe('combo:' + id) && cuantos('combo:' + id)).map(([id, l]) => titulo(comboDe('combo:' + id).nombre) + ' con ' + l.join(', ')).join('; ')
+  }
+
   // ---------- Pedido ----------
   function abrirCarrito () {
     if (!lineas().length) return toast('Tu pedido está vacío: tocá "+ Agregar" en lo que quieras.')
@@ -908,19 +1072,38 @@ select.chip { appearance: none; padding-right: 13px; }
       const suger = []
       for (const x of l) for (const id of (datos.juntos && datos.juntos[x.k]) || []) if (!ya.has(id) && porId[id] && porId[id].hay && !suger.includes(porId[id])) suger.push(porId[id])
       for (const p of masVendidos()) if (suger.length < 8 && !ya.has(p.id) && !suger.includes(p)) suger.push(p)
+      // Envio gratis: lo que mas se vende y alcanza para llegar (lo mas barato primero).
+      // Solo si falta poco (hasta un tercio): si falta mucho, un producto caro no es la respuesta.
+      const llegan = envio && falta && falta <= t().envioGratis / 3 ? conHay([...suger, ...masVendidos()].filter((p, i, a) => a.indexOf(p) === i && !ya.has(p.id) && precioDe(p) >= falta)).sort((a, b) => precioDe(a) - precioDe(b)).slice(0, 8) : []
+      const armable = comboArmable()
+      const filaQueSuma = (lista) => el('div', { clase: 'fila-h' }, lista.map((p) => { const n = tarjeta(p); n.addEventListener('click', (ev) => { if (ev.target.closest('.acciones')) setTimeout(pintarZona, 0) }, true); return n }))
+      const ahorro = ahorroPromos()
       tarjetasVivas.forEach((f) => { if (!f.nodo.isConnected) tarjetasVivas.delete(f) })
-      poner(zona, 
-        ...l.map((x) => el('div', { clase: 'linea' },
-          el('div', { clase: 'mini' }, x.p ? foto(x.p) : (x.combo ? fotoCombo(x.combo) : placa(x.nombre, 'combo'))),
-          el('div', { clase: 'info' }, el('div', {}, (x.combo ? '🎁 ' : '') + titulo(x.nombre)), el('div', { clase: 'sub' }, x.lista && x.lista > x.precio ? el('s', {}, pesos(x.lista)) : null, (x.lista > x.precio ? ' ' : '') + pesos(x.precio) + ' c/u' + (x.p && promoDe[x.k] ? ' · ' + promoDe[x.k].etiqueta : ''))),
-          el('div', { clase: 'paso' },
-            el('button', { 'aria-label': 'Uno menos', onclick: () => { cambiar(x.k, -1); pintarZona() } }, '−'),
-            el('b', {}, x.c),
-            el('button', { 'aria-label': 'Uno más', onclick: () => { cambiar(x.k, 1); pintarZona() } }, '+')))),
+      poner(zona,
+        ...l.map((x) => {
+          const n = x.p && nxmDe(x.p)
+          const faltan = n ? (n.lleva - x.c % n.lleva) % n.lleva : 0
+          const gratis = n ? n.lleva - n.paga : 0
+          return el('div', { clase: 'linea' },
+            el('div', { clase: 'mini' }, x.p ? foto(x.p) : (x.combo ? fotoCombo(x.combo) : placa(x.nombre, 'combo'))),
+            el('div', { clase: 'info' }, el('div', {}, (x.combo ? '🎁 ' : '') + titulo(x.nombre)), el('div', { clase: 'sub' }, x.lista && x.lista > x.precio ? el('s', {}, pesos(x.lista)) : null, (x.lista > x.precio ? ' ' : '') + pesos(x.precio) + ' c/u' + (x.p && promoDe[x.k] ? ' · ' + promoDe[x.k].etiqueta : '')),
+              ahorroLinea(x) ? el('div', { clase: 'gana' }, '✓ ' + Math.floor(x.c / n.lleva) * gratis + ' gratis por el ' + promoDe[x.k].etiqueta) : null,
+              faltan && faltan <= Math.max(2, Math.floor(n.lleva / 2)) ? el('button', { clase: 'empujon', onclick: () => { cambiar(x.k, faltan); pintarZona() } }, 'Sumá ' + faltan + ' y ' + (gratis > 1 ? gratis + ' te salen gratis' : '1 te sale gratis')) : null),
+            el('div', { clase: 'paso' },
+              el('button', { 'aria-label': 'Uno menos', onclick: () => { cambiar(x.k, -1); pintarZona() } }, '−'),
+              el('b', {}, x.c),
+              el('button', { 'aria-label': 'Uno más', onclick: () => { cambiar(x.k, 1); pintarZona() } }, '+')))
+        }),
+        armable ? el('div', { clase: 'armar' },
+          el('div', { clase: 'txt' }, el('b', {}, '🎁 Con ' + armable.falta.n + ' ' + titulo(armable.falta.nombre) + ' armás el ' + titulo(armable.combo.nombre)),
+            el('span', {}, 'Todo junto ' + pesos(armable.combo.precio) + (armable.combo.separado ? ' · ahorrás ' + pesos(armable.combo.separado - armable.combo.precio) : ''))),
+          el('button', { clase: 'btn amarillo', onclick: () => { armarCombo(armable); pintarZona() } }, 'Armar combo')) : null,
         envio && t().envioGratis ? el('div', { clase: 'barra-envio' }, falta ? '🚚 Te faltan ' + pesos(falta) + ' para el envío gratis' : '🎉 ¡Tenés envío gratis!', el('div', { clase: 'riel' }, el('i', { style: 'width:' + Math.min(100, Math.round(sub * 100 / t().envioGratis)) + '%' }))) : null,
-        suger.length ? seccion('¿Te sumamos algo?', null, el('div', { clase: 'fila-h' }, suger.slice(0, 8).map((p) => { const n = tarjeta(p); n.addEventListener('click', (ev) => { if (ev.target.closest('.acciones')) setTimeout(pintarZona, 0) }, true); return n }))) : null,
+        llegan.length ? seccion('🚚 Con esto llegás al envío gratis', null, filaQueSuma(llegan)) : null,
+        suger.length && !llegan.length ? seccion('¿Te sumamos algo?', null, filaQueSuma(suger.slice(0, 8))) : null,
         el('div', { clase: 'cuentas' },
-          el('div', {}, el('span', {}, 'Productos'), el('span', {}, pesos(sub))),
+          el('div', {}, el('span', {}, 'Productos'), el('span', {}, pesos(sub + ahorro))),
+          ahorro ? el('div', { clase: 'verde' }, el('span', {}, 'Promos'), el('span', {}, '− ' + pesos(ahorro))) : null,
           envio ? el('div', {}, el('span', {}, 'Envío'), el('span', {}, costo ? pesos(costo) : 'Gratis')) : null,
           el('div', { clase: 'tot' }, el('span', {}, 'Total aproximado'), el('span', {}, pesos(sub + costo)))),
         minimo ? el('div', { clase: 'error' }, 'Para envío a domicilio el mínimo es ' + pesos(t().envioMinimo) + ': te faltan ' + pesos(minimo) + '. También podés retirarlo.') : null,
@@ -948,6 +1131,7 @@ select.chip { appearance: none; padding-right: 13px; }
       tx.push('', 'Total aproximado: ' + pesos(sub + costo) + (costo ? ' (con envío)' : ''), 'Nombre: ' + cliente.nombre)
       tx.push(cliente.entrega === 'envio' ? 'Envío a: ' + cliente.direccion : 'Lo retiro en el local')
       tx.push('Pago: ' + ({ efectivo: 'efectivo', transferencia: 'transferencia', mp: 'Mercado Pago' }[cliente.pago] || 'efectivo') + (vuelto.value ? ' (pago con ' + pesos(Number(vuelto.value) * 100) + ')' : ''))
+      if (notaCombos()) tx.push('Combos: ' + notaCombos())
       if (nota.value.trim()) tx.push('Nota: ' + nota.value.trim())
       return 'https://wa.me/' + datos.whatsapp + '?text=' + encodeURIComponent(tx.join('\n'))
     }
@@ -970,7 +1154,7 @@ select.chip { appearance: none; padding-right: 13px; }
         direccion: envio ? cliente.direccion : '',
         pago: cliente.pago,
         vuelto: envio && cliente.pago === 'efectivo' && Number(vuelto.value) > 0 ? Math.round(Number(vuelto.value) * 100) : undefined,
-        nota: nota.value.trim(),
+        nota: [nota.value.trim(), notaCombos()].filter(Boolean).join(' · '),
         envio: envio ? costoEnvio(sub) : 0,
         total: sub + (envio ? costoEnvio(sub) : 0)
       }
@@ -991,6 +1175,7 @@ select.chip { appearance: none; padding-right: 13px; }
       carrito = {}
       guardar(CLAVE + '.carrito', carrito)
       guardar(CLAVE + '.enviando', '')
+      guardar(CLAVE + '.elegidos', {})
       pintar()
       abrirHoja('¡Pedido enviado!',
         el('div', { style: 'text-align:center;font-size:56px;margin:10px 0' }, '🎉'),
@@ -1070,6 +1255,22 @@ select.chip { appearance: none; padding-right: 13px; }
     }, 180)
   })
   $('buscar').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') $('buscar').blur() })
+  // Al tocar el buscador vacio: lo mas buscado, para elegir de un toque.
+  const mostrarSugeridas = () => {
+    const l = datos && !$('buscar').value.trim() ? busquedasPopulares() : []
+    $('sugeridas').hidden = !l.length
+    if (!l.length) return
+    $('sugeridasTxt').replaceChildren(el('span', {}, '🔥 Lo más buscado'), ...l.map((w) => el('button', { clase: 'chip', onmousedown: (ev) => ev.preventDefault(), onclick: () => {
+      $('buscar').value = w
+      $('sugeridas').hidden = true
+      vista = { tipo: 'buscar', q: w, orden: '' }
+      pintar()
+      $('buscar').blur()
+    } }, w)))
+  }
+  $('buscar').addEventListener('focus', mostrarSugeridas)
+  $('buscar').addEventListener('input', () => { if ($('buscar').value.trim()) $('sugeridas').hidden = true; else mostrarSugeridas() })
+  $('buscar').addEventListener('blur', () => setTimeout(() => { $('sugeridas').hidden = true }, 150))
   $('carritoBtn').addEventListener('click', abrirCarrito)
   $('pieBtn').addEventListener('click', abrirCarrito)
   $('hoja').addEventListener('click', (ev) => { if (ev.target === $('hoja')) cerrarHoja() })
