@@ -3,75 +3,228 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b4fd6">
 <title>Tienda</title>
-<meta name="description" content="Elegí los productos y mandá el pedido al local.">
+<meta name="description" content="Pedí online y te lo llevamos: golosinas, bebidas, almacén, combos y más.">
 <link rel="icon" href="icono-192.png">
 <style>
 :root {
-  --fondo: #f5f6f8; --tarjeta: #ffffff; --texto: #14181f; --tenue: #5d6675; --borde: #e3e6eb;
-  --acento: #1f6feb; --acento-texto: #ffffff; --ok: #1a7f37; --whatsapp: #1f9d55;
+  --fondo: #eef1f6; --tarjeta: #ffffff; --texto: #141a26; --tenue: #5e6878; --borde: #e2e6ee;
+  --azul: #0b4fd6; --azul-osc: #083a9e; --azul-claro: #e7efff; --acento: #ffd60a; --acento-texto: #141a26;
+  --oferta: #e0262f; --ok: #11845b; --whatsapp: #1f9d55; --sombra: 0 1px 2px rgba(16,24,40,.06), 0 2px 8px rgba(16,24,40,.06);
+  --radio: 14px;
 }
-@media (prefers-color-scheme: dark) {
-  :root { --fondo: #0c0f14; --tarjeta: #161b22; --texto: #e6e9ee; --tenue: #9aa4b2; --borde: #262d38; --acento: #4c8dff; --acento-texto: #0c0f14; --ok: #3fb950; --whatsapp: #2ea86a; }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding-bottom: 90px; }
-header { padding: 18px 16px 10px; max-width: 760px; margin: 0 auto; }
-h1 { font-size: 22px; margin: 0; }
-.sub { color: var(--tenue); font-size: 13px; }
-.mensaje { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: 14px; }
-.barra { position: sticky; top: 0; z-index: 5; background: var(--fondo); padding: 8px 16px; max-width: 760px; margin: 0 auto; }
-input[type=search], input[type=text], input[type=tel], textarea { width: 100%; font: inherit; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); }
-.chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0 2px; scrollbar-width: none; }
-.chip { flex: none; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
-.chip.activo { background: var(--acento); color: var(--acento-texto); border-color: var(--acento); }
-main { max-width: 760px; margin: 0 auto; padding: 0 16px; }
-.prod { display: flex; gap: 10px; align-items: center; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px; }
-.prod img, .prod .sin-foto { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex: none; background: var(--borde); }
-.prod .info { flex: 1; min-width: 0; }
-.prod .nom { font-weight: 600; font-size: 14px; overflow-wrap: anywhere; }
-.prod .precio { font-variant-numeric: tabular-nums; font-weight: 700; }
-.prod.agotado { opacity: .55; }
-.paso { display: flex; align-items: center; gap: 6px; flex: none; }
-.paso button { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); font-size: 18px; cursor: pointer; }
-.paso button.mas { background: var(--acento); color: var(--acento-texto); border-color: var(--acento); }
-.paso b { min-width: 18px; text-align: center; font-variant-numeric: tabular-nums; }
-.mas-items { display: block; margin: 10px auto 20px; }
-.btn { border: 0; border-radius: 10px; padding: 12px 16px; font: inherit; font-weight: 600; cursor: pointer; background: var(--tarjeta); color: var(--texto); border: 1px solid var(--borde); }
-.btn.principal { background: var(--acento); color: var(--acento-texto); border-color: var(--acento); }
-.btn.whatsapp { background: var(--whatsapp); color: #fff; border-color: var(--whatsapp); width: 100%; font-size: 16px; }
-.pie { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--fondo); border-top: 1px solid var(--borde); }
-.pie .btn { width: 100%; max-width: 728px; display: block; margin: 0 auto; font-size: 16px; }
-.hoja { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; z-index: 10; }
-.hoja.abierta { display: block; }
-.hoja > div { position: absolute; left: 0; right: 0; bottom: 0; max-height: 92vh; overflow: auto; background: var(--fondo); border-radius: 16px 16px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); max-width: 760px; margin: 0 auto; }
-.linea { display: flex; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--borde); }
-.linea .info { flex: 1; min-width: 0; font-size: 14px; }
-.total { display: flex; justify-content: space-between; font-size: 18px; font-weight: 700; margin: 12px 0; }
-.campo { margin: 10px 0; }
-.campo label { display: block; font-size: 13px; color: var(--tenue); margin-bottom: 4px; }
-.seg { display: flex; gap: 6px; }
-.seg button { flex: 1; }
-.seg button.activo { background: var(--acento); color: var(--acento-texto); border-color: var(--acento); }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-padding-top: 130px; }
+body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding-bottom: 96px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+img { display: block; }
+.oculto { display: none !important; }
+.ancho { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+/* Barra de arriba */
+.cab { position: sticky; top: 0; z-index: 20; background: var(--azul); color: #fff; box-shadow: 0 2px 10px rgba(11,79,214,.25); }
+.cab .ancho { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 10px; padding-bottom: 10px; }
+.marca { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.logo { width: 34px; height: 34px; border-radius: 10px; background: var(--acento); color: var(--azul-osc); display: grid; place-items: center; font-weight: 900; font-size: 17px; flex: none; }
+.marca h1 { font-size: 18px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
+.marca .suc { font-size: 12px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.carrito-btn { position: relative; border: 0; background: rgba(255,255,255,.14); border-radius: 12px; width: 44px; height: 44px; display: grid; place-items: center; color: #fff; flex: none; }
+.carrito-btn svg { width: 24px; height: 24px; }
+.carrito-btn b { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--acento); color: var(--acento-texto); font-size: 12px; display: grid; place-items: center; padding: 0 5px; }
+.buscador { flex-basis: 100%; position: relative; order: 3; }
+.buscador input { width: 100%; border: 0; border-radius: 12px; padding: 12px 14px 12px 42px; font: inherit; font-size: 16px; background: #fff; color: var(--texto); box-shadow: var(--sombra); }
+.buscador svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--tenue); }
+.franja { background: var(--azul-osc); color: #fff; font-size: 13px; }
+.carrito-btn b[hidden] { display: none; }
+.cab .franja .ancho { flex-wrap: nowrap; }
+.franja .ancho { display: flex; gap: 14px; overflow-x: auto; white-space: nowrap; padding-top: 7px; padding-bottom: 7px; scrollbar-width: none; }
+.franja .ancho::-webkit-scrollbar { display: none; }
+.franja span { display: inline-flex; gap: 5px; align-items: center; }
+@media (min-width: 760px) { .buscador { flex-basis: auto; flex: 2; order: 0; } .marca { flex: 1; } }
+
+/* Banner */
+.banner { margin-top: 14px; position: relative; }
+.slides { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; scrollbar-width: none; border-radius: var(--radio); }
+.slides::-webkit-scrollbar { display: none; }
+.slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: var(--radio); min-height: 160px; padding: 18px; display: flex; align-items: center; gap: 14px; color: #fff; border: 0; text-align: left; background: linear-gradient(120deg, var(--azul-osc), var(--azul) 60%, #3a7bff); overflow: hidden; }
+.slide.amarillo { background: linear-gradient(120deg, #ffb703, var(--acento)); color: var(--acento-texto); }
+.slide.rojo { background: linear-gradient(120deg, #b3121b, var(--oferta) 60%, #ff5a5f); }
+.slide .txt { flex: 1; min-width: 0; }
+.slide .tag { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.2); padding: 3px 8px; border-radius: 6px; }
+.slide.amarillo .tag { background: rgba(0,0,0,.08); }
+.slide h2 { margin: 6px 0 4px; font-size: 24px; line-height: 1.1; letter-spacing: -.02em; }
+.slide p { margin: 0; font-size: 14px; opacity: .92; }
+.slide .grande { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+.slide img { width: 120px; height: 120px; object-fit: contain; background: #fff; border-radius: 14px; flex: none; padding: 6px; }
+.puntitos { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+.puntitos i { width: 7px; height: 7px; border-radius: 50%; background: #c5cddc; }
+.puntitos i.activo { background: var(--azul); width: 18px; border-radius: 4px; }
+@media (min-width: 760px) { .slide { flex-basis: calc(50% - 6px); min-height: 190px; } }
+
+/* Categorias */
+.cats { display: flex; gap: 10px; overflow-x: auto; padding: 14px 0 4px; scrollbar-width: none; }
+.cats::-webkit-scrollbar { display: none; }
+.cat { flex: none; width: 76px; border: 0; background: none; padding: 0; text-align: center; font-size: 12px; font-weight: 600; color: var(--texto); }
+.cat .ico { width: 62px; height: 62px; margin: 0 auto 6px; border-radius: 50%; background: var(--tarjeta); box-shadow: var(--sombra); display: grid; place-items: center; font-size: 28px; }
+.cat.activa .ico { outline: 3px solid var(--azul); }
+.cat span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Secciones */
+.seccion { margin-top: 22px; }
+.seccion-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.seccion h2 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
+.seccion .sub { color: var(--tenue); font-size: 13px; }
+.ver-todo { border: 0; background: none; color: var(--azul); font-weight: 700; font-size: 14px; padding: 4px 0; white-space: nowrap; }
+.fila-h { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.fila-h > * { flex: 0 0 158px; scroll-snap-align: start; }
+@media (min-width: 760px) { .fila-h > * { flex-basis: 180px; } }
+.grilla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+@media (min-width: 600px) { .grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .grilla { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+
+/* Tarjeta de producto */
+.prod { background: var(--tarjeta); border-radius: var(--radio); box-shadow: var(--sombra); display: flex; flex-direction: column; overflow: hidden; position: relative; min-width: 0; }
+.prod .foto { aspect-ratio: 1; background: #fff; display: grid; place-items: center; border: 0; padding: 8px; width: 100%; position: relative; }
+.prod .foto img { width: 100%; height: 100%; object-fit: contain; }
+.placa { width: 100%; height: 100%; border-radius: 10px; display: grid; place-items: center; text-align: center; padding: 8px; font-weight: 800; font-size: 13px; line-height: 1.15; color: #fff; overflow: hidden; word-break: break-word; }
+.placa em { font-style: normal; font-size: 30px; display: block; margin-bottom: 4px; }
+.etiquetas { position: absolute; top: 6px; left: 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.etq { font-size: 10px; font-weight: 800; letter-spacing: .03em; padding: 3px 6px; border-radius: 5px; text-transform: uppercase; background: var(--azul); color: #fff; }
+.etq.top { background: #ff7a00; }
+.etq.nuevo { background: var(--ok); }
+.etq.promo { background: var(--oferta); }
+.prod .info { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.prod .precio { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.prod .promo-txt { font-size: 12px; font-weight: 700; color: var(--oferta); }
+.prod .nom { font-size: 13px; color: #2b3343; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.7em; }
+.prod .poco { font-size: 11px; color: #b54708; font-weight: 700; }
+.prod .acciones { margin-top: auto; padding-top: 6px; }
+.prod.agotado .foto { opacity: .45; }
+.agregar { width: 100%; border: 0; border-radius: 10px; padding: 9px 8px; background: var(--azul); color: #fff; font-weight: 700; font-size: 14px; }
+.agregar:active { transform: scale(.98); }
+.paso { display: flex; align-items: center; justify-content: space-between; background: var(--azul-claro); border-radius: 10px; padding: 3px; }
+.paso button { width: 34px; height: 34px; border: 0; border-radius: 8px; background: #fff; color: var(--azul); font-size: 20px; font-weight: 700; line-height: 1; }
+.paso b { font-variant-numeric: tabular-nums; color: var(--azul-osc); }
+.sin-stock { text-align: center; font-size: 13px; color: var(--tenue); padding: 9px 0; }
+
+/* Combos */
+.combo { background: var(--tarjeta); border-radius: var(--radio); box-shadow: var(--sombra); display: flex; gap: 12px; padding: 12px; align-items: center; border: 2px solid transparent; position: relative; }
+.combo.destacado { border-color: var(--acento); }
+.combo .foto { width: 96px; height: 96px; flex: none; border-radius: 12px; background: #fff; display: grid; place-items: center; overflow: hidden; border: 0; padding: 0; }
+.combo .foto img { width: 100%; height: 100%; object-fit: contain; }
+.combo .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.combo h3 { margin: 0; font-size: 16px; }
+.combo .lleva { font-size: 12px; color: var(--tenue); }
+.combo .tachado { color: var(--tenue); text-decoration: line-through; font-size: 13px; }
+.combo .precio { font-size: 21px; font-weight: 900; }
+.ahorro { display: inline-block; background: #e6f6ee; color: var(--ok); font-weight: 800; font-size: 12px; padding: 3px 7px; border-radius: 6px; }
+.combos { display: grid; gap: 10px; }
+@media (min-width: 760px) { .combos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Repetir / filtros / mensajes */
+.repetir { margin-top: 14px; background: var(--tarjeta); border-radius: var(--radio); box-shadow: var(--sombra); padding: 12px 14px; display: flex; gap: 12px; align-items: center; }
+.repetir .txt { flex: 1; min-width: 0; font-size: 14px; }
+.repetir .txt b { display: block; }
+.repetir .txt span { color: var(--tenue); font-size: 13px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn { border: 1px solid var(--borde); border-radius: 12px; padding: 11px 16px; background: var(--tarjeta); font-weight: 700; }
+.btn.azul { background: var(--azul); color: #fff; border-color: var(--azul); }
+.btn.amarillo { background: var(--acento); color: var(--acento-texto); border-color: var(--acento); }
+.btn.whatsapp { background: var(--whatsapp); color: #fff; border-color: var(--whatsapp); }
+.btn.ancho-total { width: 100%; font-size: 16px; padding: 14px; }
+.filtros { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 10px; scrollbar-width: none; align-items: center; }
+.filtros::-webkit-scrollbar { display: none; }
+.chip { flex: none; border: 1px solid var(--borde); background: var(--tarjeta); border-radius: 999px; padding: 7px 13px; font-size: 13px; font-weight: 600; }
+.chip.activo { background: var(--azul); color: #fff; border-color: var(--azul); }
+select.chip { appearance: none; padding-right: 13px; }
+.mensaje { margin-top: 14px; background: #fff8d6; border: 1px solid #f5e08a; border-radius: 12px; padding: 10px 14px; font-size: 14px; }
 .vacio { text-align: center; color: var(--tenue); padding: 40px 10px; }
-.aviso { color: var(--tenue); font-size: 12px; text-align: center; margin: 8px 0 0; }
+.aviso { color: var(--tenue); font-size: 12px; text-align: center; margin: 18px 0 0; }
+.cargando { text-align: center; padding: 80px 20px; color: var(--tenue); }
+.mas-abajo { height: 1px; }
+.miga { display: flex; align-items: center; gap: 8px; margin: 16px 0 10px; }
+.miga button { border: 0; background: var(--tarjeta); border-radius: 50%; width: 36px; height: 36px; box-shadow: var(--sombra); font-size: 18px; }
+.miga h2 { margin: 0; font-size: 20px; }
+
+/* Barra del carrito abajo */
+.pie { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--fondo) 70%, transparent); pointer-events: none; }
+.pie button { pointer-events: auto; width: 100%; max-width: 640px; margin: 0 auto; display: flex; align-items: center; gap: 10px; border: 0; border-radius: 14px; padding: 13px 16px; background: var(--azul); color: #fff; font-size: 16px; font-weight: 700; box-shadow: 0 8px 24px rgba(11,79,214,.35); }
+.pie .cuenta { background: rgba(255,255,255,.2); border-radius: 8px; padding: 2px 9px; font-size: 14px; }
+.pie .total { margin-left: auto; font-variant-numeric: tabular-nums; }
+.pie .falta { display: block; font-size: 12px; font-weight: 600; opacity: .9; text-align: left; }
+
+/* Hojas (ficha, carrito) */
+.hoja { position: fixed; inset: 0; background: rgba(10,16,30,.5); z-index: 30; display: none; }
+.hoja.abierta { display: block; }
+.hoja > .caja { position: absolute; left: 0; right: 0; bottom: 0; max-height: 94vh; overflow: auto; background: var(--fondo); border-radius: 20px 20px 0 0; padding: 0 0 calc(18px + env(safe-area-inset-bottom)); max-width: 680px; margin: 0 auto; animation: subir .2s ease-out; }
+@keyframes subir { from { transform: translateY(30px); opacity: .5; } to { transform: none; opacity: 1; } }
+@media (min-width: 760px) { .hoja > .caja { top: 50%; bottom: auto; transform: translateY(-50%); border-radius: 20px; max-height: 90vh; animation: none; } }
+.hoja-cab { position: sticky; top: 0; z-index: 2; background: var(--fondo); display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; }
+.hoja-cab h2 { margin: 0; font-size: 19px; }
+.cerrar { border: 0; background: var(--tarjeta); width: 38px; height: 38px; border-radius: 50%; font-size: 20px; box-shadow: var(--sombra); }
+.hoja-cuerpo { padding: 0 16px; }
+.ficha-foto { background: #fff; border-radius: var(--radio); aspect-ratio: 1; max-height: 360px; width: 100%; display: grid; place-items: center; padding: 16px; }
+.ficha-foto img { width: 100%; height: 100%; object-fit: contain; }
+.ficha h3 { font-size: 20px; margin: 12px 0 2px; }
+.ficha .meta { color: var(--tenue); font-size: 13px; }
+.ficha .precio { font-size: 30px; font-weight: 900; margin: 6px 0; letter-spacing: -.02em; }
+.ficha .promo-caja { background: #fdecec; color: var(--oferta); border-radius: 10px; padding: 8px 12px; font-weight: 700; font-size: 14px; margin: 6px 0; }
+.ficha .botones { display: flex; gap: 8px; margin: 12px 0; }
+.ficha .botones > * { flex: 1; }
+.ficha .paso button { width: 44px; height: 44px; }
+.linea { display: flex; gap: 10px; align-items: center; background: var(--tarjeta); border-radius: 12px; padding: 8px; margin-bottom: 8px; }
+.linea .mini { width: 52px; height: 52px; flex: none; background: #fff; border-radius: 8px; display: grid; place-items: center; overflow: hidden; }
+.linea .mini img { width: 100%; height: 100%; object-fit: contain; }
+.linea .info { flex: 1; min-width: 0; font-size: 14px; }
+.linea .info div:first-child { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.linea .sub { color: var(--tenue); font-size: 12px; }
+.linea .paso { flex: none; gap: 4px; }
+.barra-envio { background: var(--tarjeta); border-radius: 12px; padding: 10px 12px; margin: 4px 0 12px; font-size: 13px; }
+.barra-envio .riel { height: 7px; background: var(--azul-claro); border-radius: 4px; margin-top: 7px; overflow: hidden; }
+.barra-envio .riel i { display: block; height: 100%; background: var(--ok); border-radius: 4px; transition: width .3s; }
+.cuentas { background: var(--tarjeta); border-radius: 12px; padding: 10px 12px; margin: 12px 0; }
+.cuentas div { display: flex; justify-content: space-between; padding: 3px 0; font-size: 14px; }
+.cuentas .tot { font-size: 18px; font-weight: 800; border-top: 1px solid var(--borde); margin-top: 5px; padding-top: 8px; }
+.campo { margin: 10px 0; }
+.campo label { display: block; font-size: 13px; color: var(--tenue); margin-bottom: 4px; font-weight: 600; }
+.campo input, .campo textarea { width: 100%; font: inherit; font-size: 16px; padding: 12px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); }
+.seg { display: flex; gap: 6px; }
+.seg button { flex: 1; border: 1px solid var(--borde); background: var(--tarjeta); border-radius: 12px; padding: 10px 6px; font-weight: 600; font-size: 14px; }
+.seg button.activo { background: var(--azul); color: #fff; border-color: var(--azul); }
+.error { color: var(--oferta); font-size: 13px; font-weight: 600; margin: 6px 0; }
+.mayor { display: flex; gap: 8px; align-items: center; font-size: 14px; background: #fff8d6; border-radius: 10px; padding: 10px; margin: 10px 0; }
+.toast { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); background: #141a26; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 40; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
 </style>
 </head>
 <body>
-<header id="cab"><h1>Cargando…</h1></header>
-<div class="barra" id="barra" hidden>
-  <input type="search" id="buscar" placeholder="Buscar un producto…" autocomplete="off">
-  <div class="chips" id="chips"></div>
-</div>
-<main id="lista"></main>
-<div class="pie" id="pie" hidden><button class="btn principal" id="verPedido"></button></div>
-<div class="hoja" id="hoja"><div id="hojaCuerpo"></div></div>
+<header class="cab">
+  <div class="ancho">
+    <div class="marca"><div class="logo" id="logo">B</div><div style="min-width:0"><h1 id="titulo">Cargando…</h1><div class="suc" id="sucursal"></div></div></div>
+    <label class="buscador" id="buscador" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="buscar" placeholder="Buscar golosinas, bebidas, marcas…" autocomplete="off" enterkeyhint="search" aria-label="Buscar productos">
+    </label>
+    <button class="carrito-btn" id="carritoBtn" aria-label="Ver mi pedido" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6"/><circle cx="10" cy="20.5" r="1.3"/><circle cx="17" cy="20.5" r="1.3"/></svg>
+      <b id="carritoCuenta" hidden>0</b>
+    </button>
+  </div>
+  <div class="franja" id="franja" hidden><div class="ancho" id="franjaTxt"></div></div>
+</header>
+<main class="ancho" id="contenido"><div class="cargando">Cargando la tienda…</div></main>
+<div class="pie" id="pie" hidden><button id="pieBtn"></button></div>
+<div class="hoja" id="hoja"><div class="caja" id="hojaCaja"></div></div>
 <script>
 'use strict'
-// La tienda online: lee el archivo publico que deja la caja de la sucursal y
-// arma el pedido. Si la caja recibe pedidos (datos.pedidos), lo deja en la nube
-// con la clave publica (pos_tienda_pedido: solo puede dejar pedidos, con tope)
-// y entra solo a Encargos; si eso falla, o si no los recibe, va por WhatsApp.
+// La tienda online (Blue Store YA, 05-11-2026): lee el archivo publico que deja
+// la caja de la sucursal (servicios/tienda.js) y arma una tienda de delivery:
+// mas vendidos, combos, promos, nuevos y todo el catalogo. El pedido entra
+// directo a Encargos (pos_tienda_pedido con la clave publica) o, si no se
+// puede, sale por WhatsApp. Lee tambien el archivo viejo (v 1).
+//
+// Marketing honesto: "mas vendido", "ultimas unidades" y "nuevo" salen de los
+// datos reales de la caja; el precio tachado de un combo es la suma real de los
+// productos sueltos; el envio se ve desde el carrito.
 ;(function () {
   const params = new URLSearchParams((location.hash || '').slice(1) || location.search.slice(1))
   const proyecto = String(params.get('p') || '').replace(/[^a-z0-9-]/gi, '')
@@ -87,23 +240,70 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; }
     for (const h of hijos.flat()) if (h != null && h !== false) n.append(h.nodeType ? h : String(h))
     return n
   }
+  // replaceChildren escribe "null" si le llega un null: este los saca.
+  const poner = (n, ...h) => n.replaceChildren(...h.flat().filter((x) => x != null && x !== false && x !== ''))
   const pesos = (c) => '$ ' + (Math.round(c) / 100).toLocaleString('es-AR', { minimumFractionDigits: c % 100 ? 2 : 0, maximumFractionDigits: 2 })
   const normal = (t) => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  const titulo = (t) => String(t || '').toLowerCase().replace(/(^|[\s(/-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase())
   const CLAVE = 'tienda.' + proyecto + '.' + sucursal
   const leer = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d } catch (e) { return d } }
   const guardar = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)) } catch (e) { /* sin almacenamiento */ } }
+  const hoy = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
 
   let datos = null
   let productos = []
-  let pedido = leer(CLAVE + '.pedido', {})
-  let categoria = ''
-  let mostrar = 80
-  const cliente = leer(CLAVE + '.cliente', { nombre: '', telefono: '', entrega: 'retiro', direccion: '' })
-  // El pedido que se esta mandando: si se corta y se toca de nuevo, va con el
-  // mismo numero y la caja no lo carga dos veces.
+  const porId = {}
+  let combos = []
+  let promos = []
+  const promoDe = {} // producto -> promo
+  const combosDe = {} // producto -> combos donde entra
+  let rankDe = {} // producto -> puesto en mas vendidos
+  let carrito = leer(CLAVE + '.carrito', null) || {}
+  const cliente = leer(CLAVE + '.cliente', { nombre: '', telefono: '', entrega: 'retiro', direccion: '', pago: 'efectivo' })
+  let vista = { tipo: 'inicio' }
   let enviando = false
+  const tarjetasVivas = new Set() // para repintar el +/- de todas las tarjetas a la vez
 
-  const fallar = (texto) => { $('cab').replaceChildren(el('h1', {}, 'Tienda'), el('p', { clase: 'sub' }, texto)) }
+  // ---------- Categorias: icono y color ----------
+  const ICONOS = [
+    [/combo/, '🎁', '#f59f00'],
+    [/golosin|caramel|chicle|chocolat|alfajor|bombon/, '🍬', '#d6336c'],
+    [/galletit|galleta|bizcoch|budin/, '🍪', '#b7791f'],
+    [/snack|papas|palito|chizito|mani/, '🍟', '#e8590c'],
+    [/cerveza|vino|fernet|aperitiv|whisk|vodka|licor|alcoh|espumant|gin\b/, '🍺', '#a85d00'],
+    [/gaseos|bebida|agua|jugo|soda|energiz|isoton/, '🥤', '#1c7ed6'],
+    [/lacte|leche|yogur|queso|manteca|crema/, '🥛', '#4c6ef5'],
+    [/fiambre|embutid/, '🥓', '#c2255c'],
+    [/helad/, '🍦', '#f783ac'],
+    [/congelad/, '🧊', '#15aabf'],
+    [/panader|pan\b|factura/, '🥐', '#d9480f'],
+    [/limpieza|lavand|deterg|lavavaj/, '🧽', '#0ca678'],
+    [/perfum|higiene|cosmet|shampoo|jabon|desodor|panal|pañal/, '🧴', '#ae3ec9'],
+    [/farmac|botiquin|preservat|analges/, '💊', '#e03131'],
+    [/mascota|perro|gato/, '🐾', '#795548'],
+    [/libreri|papeler|escolar/, '✏️', '#f08c00'],
+    [/bazar|descartab|cocina/, '🍽️', '#495057'],
+    [/infusion|yerba|cafe|te\b|mate/, '🧉', '#2b8a3e'],
+    [/almacen|fideo|arroz|aceite|harina|conserva|enlatad|azucar|condiment|aderez/, '🥫', '#e67700'],
+    [/verdu|fruta/, '🍎', '#2f9e44'],
+    [/carne|pollo|carnic/, '🥩', '#c92a2a'],
+    [/pila|electr|cargador|regalo|juguet/, '🔋', '#5f3dc4'],
+    [/recarga|carga virtual|sube/, '📱', '#1971c2']
+  ]
+  const estilos = {}
+  const estiloCat = (c) => {
+    if (estilos[c]) return estilos[c]
+    const n = normal(c)
+    const f = ICONOS.find(([re]) => re.test(n))
+    return (estilos[c] = f ? { ico: f[1], color: f[2] } : { ico: '🛒', color: '#3b5bdb' })
+  }
+  const esAlcohol = (p) => /cerveza|vino|fernet|aperitiv|whisk|vodka|licor|alcoh|espumant|\bgin\b|ron\b|champa/.test(normal(p.categoria + ' ' + p.subrubro + ' ' + p.nombre))
+
+  // ---------- Carga ----------
+  const fallar = (texto) => {
+    $('titulo').textContent = 'Tienda'
+    $('contenido').replaceChildren(el('div', { clase: 'vacio' }, texto))
+  }
 
   async function cargar () {
     if (!proyecto || !sucursal) return fallar('El link está incompleto. Pedile al local que te lo mande de nuevo.')
@@ -115,125 +315,525 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; }
       datos = await r.json()
     } catch (e) { return fallar('No se pudo abrir la tienda. Revisá la conexión y probá de nuevo.') }
     if (!datos || datos.apagada || !Array.isArray(datos.productos)) return fallar('Esta tienda no está disponible por ahora.')
-    productos = datos.productos.map((p, i) => ({ i, nombre: p[0], precio: p[1], categoria: p[2] || 'Otros', foto: p[3], hay: !!p[4], id: p[5] || null, busca: normal(p[0] + ' ' + p[2]) }))
-    // Lo guardado de otra visita: solo lo que sigue estando, al precio de hoy.
-    const porNombre = {}
-    for (const p of productos) porNombre[p.nombre] = p
-    const limpio = {}
-    for (const [n, c] of Object.entries(pedido)) if (porNombre[n] && porNombre[n].hay && c > 0) limpio[n] = Math.min(99, c)
-    pedido = limpio
-    document.title = (datos.negocio || 'Tienda') + (datos.sucursal ? ' · ' + datos.sucursal : '')
-    $('cab').replaceChildren(...[
-      el('h1', {}, datos.negocio || 'Tienda'),
-      el('div', { clase: 'sub' }, [datos.sucursal, datos.direccion].filter(Boolean).join(' · ')),
-      datos.mensaje ? el('div', { clase: 'mensaje' }, datos.mensaje) : null,
-      !datos.whatsapp && !datos.pedidos ? el('div', { clase: 'mensaje' }, 'Esta tienda todavía no tiene WhatsApp para recibir pedidos.') : null].filter(Boolean))
-    $('barra').hidden = false
-    pintarChips()
-    pintarLista()
+    preparar()
+    pintarCabecera()
+    limpiarCarrito()
+    abrirDelLink()
+    pintar()
     pintarPie()
   }
 
-  function pintarChips () {
-    const cats = [...new Set(productos.map((p) => p.categoria))]
-    $('chips').replaceChildren(...[''].concat(cats).map((c) => el('button', { clase: 'chip' + (c === categoria ? ' activo' : ''), onclick: () => { categoria = c; mostrar = 80; pintarChips(); pintarLista() } }, c || 'Todo')))
-  }
-
-  function paso (p, alCambiar) {
-    const cant = pedido[p.nombre] || 0
-    if (!p.hay) return el('span', { clase: 'sub' }, 'sin stock')
-    const cambiar = (d) => {
-      const n = Math.max(0, Math.min(99, (pedido[p.nombre] || 0) + d))
-      if (n) pedido[p.nombre] = n
-      else delete pedido[p.nombre]
-      guardar(CLAVE + '.pedido', pedido)
-      alCambiar()
-      pintarPie()
+  function preparar () {
+    productos = datos.productos.map((p, i) => ({
+      i, nombre: p[0], precio: p[1], categoria: p[2] || 'Otros', foto: p[3] || '', hay: !!p[4], id: String(p[5] || 'n:' + p[0]),
+      marca: p[6] || '', nuevo: !!p[7], poco: !!p[8], subrubro: p[9] || ''
+    }))
+    for (const p of productos) {
+      porId[p.id] = p
+      p.busca = normal([p.nombre, p.marca, p.categoria, p.subrubro].join(' '))
     }
-    return el('div', { clase: 'paso' },
-      cant ? el('button', { 'aria-label': 'Uno menos', onclick: () => cambiar(-1) }, '−') : null,
-      cant ? el('b', {}, cant) : null,
-      el('button', { clase: 'mas', 'aria-label': 'Agregar ' + p.nombre, onclick: () => cambiar(1) }, '+'))
+    combos = (datos.combos || []).filter((c) => c && c.precio > 0)
+    promos = datos.promos || []
+    for (const pr of promos) for (const id of pr.ids || []) if (!promoDe[id]) promoDe[id] = pr
+    for (const c of combos) for (const parte of c.partes || []) for (const id of parte.ids || []) (combosDe[id] = combosDe[id] || []).includes(c) || combosDe[id].push(c)
+    rankDe = {}
+    ;(datos.masVendidos || []).forEach((id, i) => { if (porId[id]) rankDe[id] = i + 1 })
   }
 
-  function fila (p) {
-    const n = el('div', { clase: 'prod' + (p.hay ? '' : ' agotado') })
-    const pintar = () => n.replaceChildren(
-      p.foto ? el('img', { src: p.foto, alt: '', loading: 'lazy' }) : el('div', { clase: 'sin-foto' }),
-      el('div', { clase: 'info' }, el('div', { clase: 'nom' }, p.nombre), el('div', { clase: 'precio' }, pesos(p.precio))),
-      paso(p, pintar))
-    pintar()
-    return n
+  const t = () => datos.tienda || {}
+  const nombreTienda = () => t().nombre || datos.negocio || 'Tienda'
+
+  function pintarCabecera () {
+    const nombre = nombreTienda()
+    document.title = nombre + (datos.sucursal ? ' · ' + datos.sucursal : '')
+    $('titulo').textContent = nombre
+    $('logo').textContent = (nombre.match(/\p{L}/u) || ['B'])[0].toUpperCase()
+    $('sucursal').textContent = [datos.sucursal, datos.direccion].filter(Boolean).join(' · ')
+    $('buscador').hidden = false
+    $('carritoBtn').hidden = false
+    const franja = []
+    if (t().demora) franja.push(el('span', {}, '⚡ Llega en ~' + t().demora + ' min'))
+    if (t().horario) franja.push(el('span', {}, '🕒 ' + t().horario))
+    if (t().envioGratis) franja.push(el('span', {}, '🚚 Envío gratis desde ' + pesos(t().envioGratis)))
+    else if (t().envioCosto) franja.push(el('span', {}, '🚚 Envío ' + pesos(t().envioCosto)))
+    if (t().envioMinimo) franja.push(el('span', {}, 'Mínimo para envío ' + pesos(t().envioMinimo)))
+    if (datos.puntos) franja.push(el('span', {}, '⭐ Sumás puntos con tu teléfono'))
+    $('franja').hidden = !franja.length
+    $('franjaTxt').replaceChildren(...franja)
   }
 
-  function pintarLista () {
-    const q = normal($('buscar').value).split(/\s+/).filter(Boolean)
-    const vis = productos.filter((p) => (!categoria || p.categoria === categoria) && q.every((w) => p.busca.includes(w)))
-    const lista = $('lista')
-    if (!vis.length) return lista.replaceChildren(el('div', { clase: 'vacio' }, productos.length ? 'No encontramos ese producto.' : 'Todavía no hay productos.'))
-    lista.replaceChildren(...vis.slice(0, mostrar).map(fila),
-      vis.length > mostrar ? el('button', { clase: 'btn mas-items', onclick: () => { mostrar += 120; pintarLista() } }, 'Ver más (' + (vis.length - mostrar) + ')') : '',
-      el('p', { clase: 'aviso' }, 'Precios de lista: pueden cambiar. Las promociones se aplican en el local.'))
+  // Lo guardado de otra visita: solo lo que sigue estando. El carrito viejo
+  // (antes del 05-11) estaba por nombre: se pasa al id.
+  function limpiarCarrito () {
+    const viejo = leer(CLAVE + '.pedido', null)
+    if (viejo && !Object.keys(carrito).length) for (const [n, c] of Object.entries(viejo)) { const p = productos.find((x) => x.nombre === n); if (p) carrito[p.id] = c }
+    const limpio = {}
+    for (const [k, c] of Object.entries(carrito)) if (c > 0 && disponible(k)) limpio[k] = Math.min(99, c)
+    carrito = limpio
+    guardar(CLAVE + '.carrito', carrito)
+  }
+  const comboDe = (k) => k.startsWith('combo:') ? combos.find((c) => c.id === k.slice(6)) : null
+  const disponible = (k) => k.startsWith('combo:') ? !!comboDe(k) : !!(porId[k] && porId[k].hay)
+
+  // Link compartido de un producto o un combo: lo abre directo.
+  function abrirDelLink () {
+    const prod = params.get('prod')
+    const combo = params.get('combo')
+    if (prod && porId[prod]) setTimeout(() => abrirFicha(porId[prod]), 50)
+    else if (combo) { const c = combos.find((x) => x.id === combo); if (c) setTimeout(() => abrirCombo(c), 50) }
   }
 
-  const lineas = () => Object.entries(pedido).map(([n, c]) => ({ p: productos.find((x) => x.nombre === n), c })).filter((x) => x.p)
-  const totalPedido = () => lineas().reduce((s, x) => s + x.p.precio * x.c, 0)
+  // ---------- Carrito ----------
+  const cuantos = (k) => carrito[k] || 0
+  function cambiar (k, d) {
+    const antes = cuantos(k)
+    if (d > 0 && !antes && Object.keys(carrito).length >= 40) return toast('Llegaste al máximo de 40 productos distintos por pedido.')
+    const n = Math.max(0, Math.min(99, antes + d))
+    if (n) carrito[k] = n
+    else delete carrito[k]
+    guardar(CLAVE + '.carrito', carrito)
+    for (const f of [...tarjetasVivas]) { if (!f.nodo.isConnected) tarjetasVivas.delete(f); else if (f.k === k) f.pintar() }
+    pintarPie()
+    if (!antes && n) toast('Agregado a tu pedido')
+  }
+  const lineas = () => Object.entries(carrito).map(([k, c]) => {
+    const combo = comboDe(k)
+    if (combo) return { k, c, nombre: combo.nombre, precio: combo.precio, foto: combo.foto, combo }
+    const p = porId[k]
+    return p ? { k, c, nombre: p.nombre, precio: p.precio, foto: p.foto, p } : null
+  }).filter(Boolean)
+  const subtotal = () => lineas().reduce((s, x) => s + x.precio * x.c, 0)
+  const unidades = () => lineas().reduce((s, x) => s + x.c, 0)
+  const costoEnvio = (sub) => t().envioGratis && sub >= t().envioGratis ? 0 : (t().envioCosto || 0)
 
   function pintarPie () {
-    const l = lineas()
-    $('pie').hidden = !l.length
-    if (l.length) $('verPedido').textContent = 'Ver pedido · ' + l.reduce((s, x) => s + x.c, 0) + ' u. · ' + pesos(totalPedido())
+    const u = unidades()
+    $('carritoCuenta').hidden = !u
+    $('carritoCuenta').textContent = u
+    $('pie').hidden = !u || $('hoja').classList.contains('abierta')
+    if (!u) return
+    const sub = subtotal()
+    const falta = t().envioGratis && sub < t().envioGratis ? t().envioGratis - sub : 0
+    $('pieBtn').replaceChildren(
+      el('span', { clase: 'cuenta' }, u),
+      el('span', {}, 'Ver mi pedido', falta ? el('span', { clase: 'falta' }, 'Te faltan ' + pesos(falta) + ' para envío gratis') : null),
+      el('span', { clase: 'total' }, pesos(sub)))
   }
 
-  function abrirPedido () {
-    const cuerpo = $('hojaCuerpo')
-    const nombre = el('input', { type: 'text', maxlength: '60', placeholder: 'Tu nombre', value: cliente.nombre })
+  function paso (k, grande) {
+    return el('div', { clase: 'paso' },
+      el('button', { 'aria-label': 'Uno menos', onclick: (ev) => { ev.stopPropagation(); cambiar(k, -1) } }, '−'),
+      el('b', {}, cuantos(k) + (grande ? ' en tu pedido' : '')),
+      el('button', { 'aria-label': 'Uno más', onclick: (ev) => { ev.stopPropagation(); cambiar(k, 1) } }, '+'))
+  }
+  // El boton Agregar / − n + que se repinta solo cuando cambia ese producto.
+  function control (k, hay, grande) {
+    const nodo = el('div', { clase: 'acciones' })
+    const f = { k, nodo, pintar: () => nodo.replaceChildren(!hay ? el('div', { clase: 'sin-stock' }, 'Sin stock') : cuantos(k) ? paso(k, grande) : el('button', { clase: 'agregar', onclick: (ev) => { ev.stopPropagation(); cambiar(k, 1) } }, '+ Agregar')) }
+    f.pintar()
+    tarjetasVivas.add(f)
+    return nodo
+  }
+
+  // ---------- Tarjetas ----------
+  function placa (nombre, categoria) {
+    const e = estiloCat(categoria)
+    return el('div', { clase: 'placa', style: 'background:' + e.color }, el('em', {}, e.ico), titulo(nombre).slice(0, 40))
+  }
+  function foto (p) {
+    if (!p.foto) return placa(p.nombre, p.categoria)
+    const img = el('img', { src: p.foto, alt: '', loading: 'lazy', decoding: 'async' })
+    img.addEventListener('error', () => img.replaceWith(placa(p.nombre, p.categoria)), { once: true })
+    return img
+  }
+  function tarjeta (p) {
+    const promo = promoDe[p.id]
+    const rank = rankDe[p.id]
+    const etqs = []
+    if (rank && rank <= 10) etqs.push(el('span', { clase: 'etq top' }, rank === 1 ? 'N.º 1 más vendido' : 'Más vendido'))
+    if (p.nuevo) etqs.push(el('span', { clase: 'etq nuevo' }, 'Nuevo'))
+    if (promo) etqs.push(el('span', { clase: 'etq promo' }, promo.etiqueta.length <= 14 ? promo.etiqueta : 'Promo'))
+    return el('article', { clase: 'prod' + (p.hay ? '' : ' agotado') },
+      el('button', { clase: 'foto', 'aria-label': 'Ver ' + p.nombre, onclick: () => abrirFicha(p) }, foto(p), etqs.length ? el('div', { clase: 'etiquetas' }, etqs) : null),
+      el('div', { clase: 'info' },
+        el('div', { clase: 'precio' }, pesos(p.precio)),
+        promo ? el('div', { clase: 'promo-txt' }, promo.etiqueta) : null,
+        el('div', { clase: 'nom', title: p.nombre }, titulo(p.nombre)),
+        p.poco ? el('div', { clase: 'poco' }, '¡Últimas unidades!') : null,
+        control(p.id, p.hay)))
+  }
+  function tarjetaCombo (c, destacado) {
+    const lleva = (c.partes || []).map((x) => x.n + ' ' + titulo(x.nombre)).join(' + ')
+    const ahorro = c.separado ? c.separado - c.precio : 0
+    return el('article', { clase: 'combo' + (destacado ? ' destacado' : '') },
+      el('button', { clase: 'foto', 'aria-label': 'Ver ' + c.nombre, onclick: () => abrirCombo(c) }, c.foto ? el('img', { src: c.foto, alt: '', loading: 'lazy' }) : placa(c.nombre, 'combo')),
+      el('div', { clase: 'info' },
+        el('h3', {}, titulo(c.nombre)),
+        el('div', { clase: 'lleva' }, lleva),
+        c.separado ? el('div', { clase: 'tachado' }, 'Por separado ' + pesos(c.separado)) : null,
+        el('div', { clase: 'precio' }, pesos(c.precio)),
+        ahorro > 0 ? el('div', {}, el('span', { clase: 'ahorro' }, 'Ahorrás ' + pesos(ahorro))) : null,
+        c.horas ? el('div', { clase: 'lleva' }, 'De ' + c.horas + ' h') : null,
+        control('combo:' + c.id, true)))
+  }
+
+  // ---------- Listas ----------
+  const conHay = (l) => l.filter((p) => p && p.hay)
+  // Solo lo que de verdad se vende (nunca relleno: seria mentirle al cliente).
+  const masVendidos = () => conHay((datos.masVendidos || []).map((id) => porId[id]))
+  const nuevos = () => conHay(productos.filter((p) => p.nuevo)).sort((a, b) => !!b.foto - !!a.foto)
+  const enPromo = () => conHay(productos.filter((p) => promoDe[p.id])).sort((a, b) => (rankDe[a.id] || 999) - (rankDe[b.id] || 999))
+  const categorias = () => {
+    const cuenta = {}
+    for (const p of productos) if (p.hay) cuenta[p.categoria] = (cuenta[p.categoria] || 0) + 1
+    // Primero las que mas venden.
+    const peso = {}
+    for (const id of datos.masVendidos || []) if (porId[id]) peso[porId[id].categoria] = (peso[porId[id].categoria] || 0) + 1
+    return Object.keys(cuenta).sort((a, b) => (peso[b] || 0) - (peso[a] || 0) || cuenta[b] - cuenta[a])
+  }
+
+  function filaH (lista) { return el('div', { clase: 'fila-h' }, lista.map(tarjeta)) }
+  function seccion (titulo1, sub, cuerpo, verTodo) {
+    return el('section', { clase: 'seccion' },
+      el('div', { clase: 'seccion-cab' }, el('div', {}, el('h2', {}, titulo1), sub ? el('div', { clase: 'sub' }, sub) : null), verTodo ? el('button', { clase: 'ver-todo', onclick: verTodo }, 'Ver todo ›') : null),
+      cuerpo)
+  }
+
+  // Grilla que se va cargando sola al bajar.
+  function grilla (lista) {
+    const g = el('div', { clase: 'grilla' })
+    const fin = el('div', { clase: 'mas-abajo' })
+    let hasta = 0
+    const mas = () => { const tramo = lista.slice(hasta, hasta + 40); hasta += tramo.length; g.append(...tramo.map(tarjeta)); if (hasta >= lista.length) obs.disconnect() }
+    const obs = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) mas() }, { rootMargin: '800px' })
+    mas()
+    setTimeout(() => { if (hasta < lista.length) obs.observe(fin) }, 0)
+    return el('div', {}, g, fin)
+  }
+
+  // ---------- Pantallas ----------
+  function pintar () {
+    tarjetasVivas.clear()
+    const c = $('contenido')
+    if (vista.tipo === 'buscar') return c.replaceChildren(...pantallaBuscar())
+    if (vista.tipo === 'lista') return c.replaceChildren(...pantallaLista())
+    c.replaceChildren(...pantallaInicio())
+    banners()
+  }
+  function ir (v) { vista = v; pintar(); window.scrollTo({ top: 0 }) }
+
+  function pantallaInicio () {
+    const partes = []
+    if (datos.mensaje) partes.push(el('div', { clase: 'mensaje' }, datos.mensaje))
+    if (!datos.whatsapp && !datos.pedidos) partes.push(el('div', { clase: 'mensaje' }, 'Esta tienda todavía no recibe pedidos online. Podés mirar los precios.'))
+    partes.push(el('div', { clase: 'banner', id: 'banner' }))
+    const ult = ultimoPedido()
+    if (ult) partes.push(el('div', { clase: 'repetir' }, el('div', { clase: 'txt' }, el('b', {}, '¿Lo de siempre?'), el('span', {}, ult.texto)), el('button', { clase: 'btn amarillo', onclick: repetir }, 'Repetir')))
+    const cats = categorias()
+    partes.push(el('nav', { clase: 'cats', 'aria-label': 'Categorías' },
+      combos.length ? el('button', { clase: 'cat', onclick: () => document.getElementById('sec-combos').scrollIntoView({ behavior: 'smooth' }) }, el('div', { clase: 'ico' }, '🎁'), el('span', {}, 'Combos')) : null,
+      enPromo().length ? el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' }) }, el('div', { clase: 'ico' }, '🔥'), el('span', {}, 'Ofertas')) : null,
+      cats.map((k) => el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) }, el('div', { clase: 'ico' }, estiloCat(k).ico), el('span', {}, titulo(k))))))
+    const top = masVendidos()
+    if (top.length >= 4) partes.push(seccion('🔥 Lo más vendido', datos.sucursal ? 'Lo que más se lleva la gente en ' + datos.sucursal + ' esta semana' : 'Lo que más se lleva la gente esta semana', filaH(top.slice(0, 20)), () => ir({ tipo: 'lista', top: true, titulo: 'Lo más vendido' })))
+    if (combos.length) {
+      const s = seccion('🎁 Combos', 'Más cosas, mejor precio', el('div', { clase: 'combos' }, combos.slice(0, 6).map((c, i) => tarjetaCombo(c, i === 0))), combos.length > 6 ? () => ir({ tipo: 'lista', combos: true, titulo: 'Combos' }) : null)
+      s.id = 'sec-combos'
+      partes.push(s)
+    }
+    const ofertas = enPromo()
+    if (ofertas.length) partes.push(seccion('💥 Ofertas', 'Promos vigentes · se aplican al cobrar', filaH(ofertas.slice(0, 20)), () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' })))
+    const nv = nuevos()
+    if (nv.length) partes.push(seccion('✨ Recién llegados', 'Lo nuevo que entró al local', filaH(nv.slice(0, 20)), nv.length > 4 ? () => ir({ tipo: 'lista', nuevos: true, titulo: 'Recién llegados' }) : null))
+    // Una fila por cada una de las 4 categorias mas fuertes, como en las grandes tiendas.
+    for (const k of cats.slice(0, 4)) {
+      const l = conHay(productos.filter((p) => p.categoria === k)).sort((a, b) => (rankDe[a.id] || 999) - (rankDe[b.id] || 999) || !!b.foto - !!a.foto).slice(0, 14)
+      if (l.length >= 3) partes.push(seccion(estiloCat(k).ico + ' ' + titulo(k), null, filaH(l), () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) })))
+    }
+    partes.push(seccion('Todos los productos', productos.length + ' productos', grilla(ordenar(productos, 'relevancia'))))
+    partes.push(el('p', { clase: 'aviso' }, 'Precios de lista: pueden cambiar. Las promos se aplican al cobrar. Fotos ilustrativas.'))
+    return partes
+  }
+
+  function ordenar (lista, orden) {
+    const l = lista.slice()
+    if (orden === 'menor') return l.sort((a, b) => a.precio - b.precio)
+    if (orden === 'mayor') return l.sort((a, b) => b.precio - a.precio)
+    if (orden === 'nombre') return l.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    // Relevancia: hay > mas vendido > con foto > promo > nombre.
+    return l.sort((a, b) => (b.hay - a.hay) || ((rankDe[a.id] || 999) - (rankDe[b.id] || 999)) || (!!b.foto - !!a.foto) || (!!promoDe[b.id] - !!promoDe[a.id]) || a.nombre.localeCompare(b.nombre, 'es'))
+  }
+
+  function filtros (alCambiar) {
+    const sel = el('select', { clase: 'chip', 'aria-label': 'Ordenar' }, [['relevancia', 'Más relevantes'], ['menor', 'Menor precio'], ['mayor', 'Mayor precio'], ['nombre', 'A-Z']].map(([v, tx]) => el('option', { value: v, selected: vista.orden === v }, tx)))
+    sel.addEventListener('change', () => { vista.orden = sel.value; alCambiar() })
+    const chip = (k, tx) => el('button', { clase: 'chip' + (vista[k] ? ' activo' : ''), onclick: () => { vista[k] = !vista[k]; alCambiar() } }, tx)
+    return el('div', { clase: 'filtros' }, sel, chip('fPromo', '🔥 En promo'), chip('fFoto', '📷 Con foto'))
+  }
+  const aplicarFiltros = (l) => l.filter((p) => (!vista.fPromo || promoDe[p.id]) && (!vista.fFoto || p.foto))
+
+  function pantallaLista () {
+    const volver = el('div', { clase: 'miga' }, el('button', { 'aria-label': 'Volver', onclick: () => ir({ tipo: 'inicio' }) }, '←'), el('h2', {}, vista.titulo || 'Productos'))
+    if (vista.combos) return [volver, el('div', { clase: 'combos' }, combos.map((c) => tarjetaCombo(c)))]
+    let base
+    if (vista.top) base = masVendidos()
+    else if (vista.nuevos) base = nuevos()
+    else if (vista.promo) base = enPromo()
+    else base = productos.filter((p) => p.categoria === vista.categoria)
+    // Subcategorias como chips (si las hay).
+    let subs = []
+    if (vista.categoria) subs = [...new Set(base.map((p) => p.subrubro).filter(Boolean))].sort()
+    const caja = el('div', {})
+    const repintar = () => {
+      tarjetasVivas.clear()
+      let l = aplicarFiltros(base.filter((p) => !vista.sub || p.subrubro === vista.sub))
+      if (!vista.top || vista.orden) l = ordenar(l, vista.orden || 'relevancia')
+      poner(caja, 
+        subs.length > 1 ? el('div', { clase: 'filtros' }, ['', ...subs].map((s) => el('button', { clase: 'chip' + ((vista.sub || '') === s ? ' activo' : ''), onclick: () => { vista.sub = s; repintar() } }, s ? titulo(s) : 'Todo'))) : null,
+        filtros(repintar),
+        l.length ? grilla(l) : el('div', { clase: 'vacio' }, 'No hay productos con esos filtros.'))
+    }
+    repintar()
+    return [volver, caja]
+  }
+
+  function pantallaBuscar () {
+    const q = normal(vista.q).split(/\s+/).filter(Boolean)
+    // Tolerante: si una palabra no aparece, prueba sin la ultima letra (plurales, tipeo).
+    const coincide = (p, w) => p.busca.includes(w) || (w.length > 4 && p.busca.includes(w.slice(0, -1)))
+    let l = productos.filter((p) => q.every((w) => coincide(p, w)))
+    const combosQ = combos.filter((c) => q.every((w) => normal(c.nombre + ' ' + (c.partes || []).map((x) => x.nombre).join(' ')).includes(w)))
+    const caja = el('div', {})
+    const repintar = () => {
+      tarjetasVivas.clear()
+      const fl = ordenar(aplicarFiltros(l), vista.orden || 'relevancia')
+      poner(caja, 
+        filtros(repintar),
+        combosQ.length ? el('div', { clase: 'combos', style: 'margin-bottom:12px' }, combosQ.slice(0, 4).map((c) => tarjetaCombo(c))) : null,
+        fl.length ? grilla(fl) : el('div', { clase: 'vacio' }, combosQ.length ? '' : 'No encontramos "' + vista.q + '". Probá con otra palabra o mirá las categorías.'))
+    }
+    repintar()
+    return [el('div', { clase: 'miga' }, el('button', { 'aria-label': 'Volver', onclick: () => { $('buscar').value = ''; ir({ tipo: 'inicio' }) } }, '←'), el('h2', {}, l.length + combosQ.length + ' resultados')), caja]
+  }
+
+  // ---------- Banner ----------
+  let rotar = null
+  function banners () {
+    const caja = $('banner')
+    if (!caja) return
+    const slides = []
+    const top = masVendidos()[0]
+    for (const c of combos.slice(0, 3)) {
+      slides.push(el('button', { clase: 'slide amarillo', onclick: () => abrirCombo(c) },
+        el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'Combo'), el('h2', {}, titulo(c.nombre)),
+          el('div', { clase: 'grande' }, pesos(c.precio)),
+          el('p', {}, c.separado ? 'Ahorrás ' + pesos(c.separado - c.precio) : (c.partes || []).map((x) => x.n + ' ' + titulo(x.nombre)).join(' + '))),
+        c.foto ? el('img', { src: c.foto, alt: '' }) : null))
+    }
+    for (const pr of promos.slice(0, 3)) {
+      const conFoto = (pr.ids || []).map((id) => porId[id]).find((p) => p && p.foto && p.hay)
+      slides.push(el('button', { clase: 'slide rojo', onclick: () => pr.todo ? null : ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' }) },
+        el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, pr.hasta === hoy() ? 'Solo por hoy' : 'Promo'), el('h2', {}, pr.etiqueta), el('p', {}, titulo(pr.nombre) + (pr.horas ? ' · de ' + pr.horas + ' h' : '') + (pr.hasta && pr.hasta !== hoy() ? ' · hasta el ' + pr.hasta.split('-').reverse().slice(0, 2).join('/') : ''))),
+        pr.foto || conFoto ? el('img', { src: pr.foto || conFoto.foto, alt: '' }) : null))
+    }
+    if (top) {
+      slides.push(el('button', { clase: 'slide', onclick: () => abrirFicha(top) },
+        el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'N.º 1 en ventas'), el('h2', {}, titulo(top.nombre)), el('div', { clase: 'grande' }, pesos(top.precio))),
+        top.foto ? el('img', { src: top.foto, alt: '' }) : null))
+    }
+    if (!slides.length || slides.length < 2) {
+      slides.unshift(el('div', { clase: 'slide' }, el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'Delivery'), el('h2', {}, 'Pedí y te lo llevamos'), el('p', {}, t().demora ? 'En ~' + t().demora + ' minutos, sin moverte de tu casa.' : 'Elegí, mandá el pedido y listo.'))))
+    }
+    const riel = el('div', { clase: 'slides' }, slides)
+    const puntos = el('div', { clase: 'puntitos' }, slides.map((_, i) => el('i', { clase: i ? '' : 'activo' })))
+    poner(caja, riel, slides.length > 1 ? puntos : '')
+    const actual = () => Math.round(riel.scrollLeft / (slides[0].offsetWidth + 12))
+    riel.addEventListener('scroll', () => { const i = actual(); [...puntos.children].forEach((p, j) => p.classList.toggle('activo', i === j)) }, { passive: true })
+    clearInterval(rotar)
+    if (slides.length > 1) {
+      rotar = setInterval(() => {
+        if (!riel.isConnected) return clearInterval(rotar)
+        if (document.hidden || $('hoja').classList.contains('abierta')) return
+        const sig = (actual() + 1) % slides.length
+        riel.scrollTo({ left: sig ? slides[sig].offsetLeft - riel.offsetLeft : 0, behavior: 'smooth' })
+      }, 5000)
+    }
+  }
+
+  // ---------- Hojas ----------
+  function abrirHoja (tituloHoja, ...cuerpo) {
+    tarjetasVivas.forEach((f) => { if (!f.nodo.isConnected) tarjetasVivas.delete(f) })
+    $('hojaCaja').replaceChildren(
+      el('div', { clase: 'hoja-cab' }, el('h2', {}, tituloHoja), el('button', { clase: 'cerrar', 'aria-label': 'Cerrar', onclick: cerrarHoja }, '✕')),
+      el('div', { clase: 'hoja-cuerpo' }, ...cuerpo))
+    $('hoja').classList.add('abierta')
+    $('hojaCaja').scrollTop = 0
+    document.body.style.overflow = 'hidden'
+    pintarPie()
+  }
+  function cerrarHoja () {
+    $('hoja').classList.remove('abierta')
+    document.body.style.overflow = ''
+    pintarPie()
+  }
+
+  function compartir (texto, extra) {
+    const url = location.origin + location.pathname + '#p=' + proyecto + '&s=' + sucursal + extra
+    if (navigator.share) navigator.share({ title: nombreTienda(), text: texto, url }).catch(() => {})
+    else window.open('https://wa.me/?text=' + encodeURIComponent(texto + ' ' + url))
+  }
+
+  function abrirFicha (p) {
+    const promo = promoDe[p.id]
+    const cmb = combosDe[p.id] || []
+    const otros = conHay((datos.juntos && datos.juntos[p.id] || []).map((id) => porId[id]))
+    const parecidos = otros.length >= 3 ? [] : conHay(productos.filter((x) => x !== p && x.categoria === p.categoria && (!p.subrubro || x.subrubro === p.subrubro))).sort((a, b) => (rankDe[a.id] || 999) - (rankDe[b.id] || 999)).slice(0, 10)
+    abrirHoja('Producto',
+      el('div', { clase: 'ficha' },
+        el('div', { clase: 'ficha-foto' }, foto(p)),
+        el('h3', {}, titulo(p.nombre)),
+        el('div', { clase: 'meta' }, [p.marca, titulo(p.categoria), p.subrubro && titulo(p.subrubro)].filter(Boolean).join(' · ')),
+        rankDe[p.id] && rankDe[p.id] <= 10 ? el('div', { style: 'margin-top:6px' }, el('span', { clase: 'etq top' }, rankDe[p.id] === 1 ? 'N.º 1 más vendido' : 'Top ' + rankDe[p.id] + ' en ventas')) : null,
+        el('div', { clase: 'precio' }, pesos(p.precio)),
+        promo ? el('div', { clase: 'promo-caja' }, '🔥 ' + promo.etiqueta + (promo.horas ? ' · de ' + promo.horas + ' h' : '') + ' · se aplica al cobrar') : null,
+        p.poco ? el('div', { clase: 'poco', style: 'color:#b54708;font-weight:700' }, '¡Quedan pocas unidades!') : null,
+        el('div', { clase: 'botones' }, control(p.id, p.hay, true), el('button', { clase: 'btn', style: 'flex:0 0 auto', onclick: () => compartir(titulo(p.nombre) + ' a ' + pesos(p.precio), '&prod=' + encodeURIComponent(p.id)) }, 'Compartir')),
+        cmb.length ? seccion('Llevalo en combo', null, el('div', { clase: 'combos' }, cmb.slice(0, 3).map((c) => tarjetaCombo(c)))) : null,
+        otros.length ? seccion('Quienes lo compran también llevan', null, filaH(otros)) : null,
+        parecidos.length ? seccion('También te puede gustar', null, filaH(parecidos)) : null))
+  }
+
+  function abrirCombo (c) {
+    abrirHoja('Combo',
+      el('div', { clase: 'ficha' },
+        el('div', { clase: 'ficha-foto' }, c.foto ? el('img', { src: c.foto, alt: '' }) : placa(c.nombre, 'combo')),
+        el('h3', {}, titulo(c.nombre)),
+        c.separado ? el('div', { clase: 'tachado', style: 'text-decoration:line-through;color:var(--tenue);margin-top:6px' }, 'Por separado ' + pesos(c.separado)) : null,
+        el('div', { clase: 'precio' }, pesos(c.precio)),
+        c.separado ? el('span', { clase: 'ahorro' }, 'Ahorrás ' + pesos(c.separado - c.precio)) : null,
+        c.horas ? el('div', { clase: 'meta', style: 'margin-top:6px' }, 'Vale de ' + c.horas + ' h') : null,
+        el('div', { clase: 'botones' }, control('combo:' + c.id, true, true), el('button', { clase: 'btn', style: 'flex:0 0 auto', onclick: () => compartir('Combo ' + titulo(c.nombre) + ' a ' + pesos(c.precio), '&combo=' + encodeURIComponent(c.id)) }, 'Compartir')),
+        el('p', { clase: 'meta' }, 'Lleva:'),
+        (c.partes || []).map((x) => {
+          const fijos = x.ids.map((id) => porId[id]).filter(Boolean)
+          return el('div', { clase: 'linea' },
+            el('div', { clase: 'mini' }, fijos[0] ? foto(fijos[0]) : placa(x.nombre, x.nombre)),
+            el('div', { clase: 'info' }, el('div', {}, x.n + ' × ' + titulo(x.nombre)), fijos.length > 1 ? el('div', { clase: 'sub' }, 'Elegís en el local entre ' + fijos.length + ' opciones') : null))
+        })))
+  }
+
+  // ---------- Ultimo pedido ----------
+  function ultimoPedido () {
+    const u = leer(CLAVE + '.ultimo', null)
+    if (!u || !u.items) return null
+    const vivos = Object.keys(u.items).filter(disponible)
+    if (!vivos.length) return null
+    const nombres = vivos.map((k) => { const c = comboDe(k); return titulo(c ? c.nombre : porId[k].nombre) })
+    return { vivos, items: u.items, texto: nombres.slice(0, 3).join(', ') + (nombres.length > 3 ? ' y ' + (nombres.length - 3) + ' más' : '') }
+  }
+  function repetir () {
+    const u = ultimoPedido()
+    if (!u) return
+    for (const k of u.vivos) carrito[k] = Math.max(cuantos(k), u.items[k])
+    guardar(CLAVE + '.carrito', carrito)
+    pintar()
+    pintarPie()
+    abrirCarrito()
+  }
+
+  // ---------- Pedido ----------
+  function abrirCarrito () {
+    if (!lineas().length) return toast('Tu pedido está vacío: tocá "+ Agregar" en lo que quieras.')
+    const cuerpo = el('div', {})
+    const nombre = el('input', { type: 'text', maxlength: '60', placeholder: 'Tu nombre', autocomplete: 'name', value: cliente.nombre })
     const telefono = el('input', { type: 'tel', maxlength: '20', placeholder: 'Ej: 351 555-1234', autocomplete: 'tel', value: cliente.telefono || '' })
-    const campoTel = el('div', { clase: 'campo' }, el('label', {}, 'Tu WhatsApp (para confirmarte el pedido)'), telefono)
-    campoTel.hidden = !datos.pedidos
-    const direccion = el('input', { type: 'text', maxlength: '120', placeholder: 'Calle, número, piso', value: cliente.direccion })
-    const nota = el('textarea', { rows: '2', maxlength: '300', placeholder: 'Algo más (opcional)' })
-    const campoDir = el('div', { clase: 'campo' }, el('label', {}, 'Dirección de envío'), direccion)
-    const seg = el('div', { clase: 'seg' })
-    const pintarSeg = () => {
-      seg.replaceChildren(...[['retiro', 'Retiro en el local'], ['envio', 'Envío a domicilio']].map(([k, t]) => el('button', { clase: 'btn' + (cliente.entrega === k ? ' activo' : ''), onclick: () => { cliente.entrega = k; pintarSeg() } }, t)))
-      campoDir.hidden = cliente.entrega !== 'envio'
-    }
-    const listaL = el('div', {})
-    const tot = el('div', { clase: 'total' })
-    const pintarL = () => {
+    const direccion = el('input', { type: 'text', maxlength: '120', placeholder: 'Calle, número, piso, entre calles', autocomplete: 'street-address', value: cliente.direccion })
+    const vuelto = el('input', { type: 'number', min: '0', step: '100', inputmode: 'numeric', placeholder: 'Ej: 20000' })
+    const nota = el('textarea', { rows: '2', maxlength: '150', placeholder: 'Algo más: timbre, marca que preferís, etc. (opcional)' })
+    const mayor = el('input', { type: 'checkbox' })
+    const error = el('div', { clase: 'error' })
+    const zona = el('div', {})
+    const boton = el('button', { clase: 'btn whatsapp ancho-total' })
+
+    const pintarZona = () => {
       const l = lineas()
-      if (!l.length) { cerrarHoja(); return }
-      listaL.replaceChildren(...l.map((x) => el('div', { clase: 'linea' },
-        el('div', { clase: 'info' }, el('div', {}, x.p.nombre), el('div', { clase: 'sub' }, pesos(x.p.precio) + ' c/u')),
-        paso(x.p, pintarL))))
-      tot.replaceChildren(el('span', {}, 'Total aproximado'), el('span', {}, pesos(totalPedido())))
+      if (!l.length) { cerrarHoja(); pintar(); return }
+      const sub = subtotal()
+      const envio = cliente.entrega === 'envio'
+      const costo = envio ? costoEnvio(sub) : 0
+      const falta = t().envioGratis && sub < t().envioGratis ? t().envioGratis - sub : 0
+      const minimo = envio && t().envioMinimo && sub < t().envioMinimo ? t().envioMinimo - sub : 0
+      const hayAlcohol = l.some((x) => x.p && esAlcohol(x.p))
+      // Sugerencias: lo que se compra junto con lo que ya lleva; si no, los mas vendidos.
+      const ya = new Set(l.map((x) => x.k))
+      const suger = []
+      for (const x of l) for (const id of (datos.juntos && datos.juntos[x.k]) || []) if (!ya.has(id) && porId[id] && porId[id].hay && !suger.includes(porId[id])) suger.push(porId[id])
+      for (const p of masVendidos()) if (suger.length < 8 && !ya.has(p.id) && !suger.includes(p)) suger.push(p)
+      tarjetasVivas.forEach((f) => { if (!f.nodo.isConnected) tarjetasVivas.delete(f) })
+      poner(zona, 
+        ...l.map((x) => el('div', { clase: 'linea' },
+          el('div', { clase: 'mini' }, x.p ? foto(x.p) : (x.foto ? el('img', { src: x.foto, alt: '' }) : placa(x.nombre, 'combo'))),
+          el('div', { clase: 'info' }, el('div', {}, (x.combo ? '🎁 ' : '') + titulo(x.nombre)), el('div', { clase: 'sub' }, pesos(x.precio) + ' c/u' + (x.p && promoDe[x.k] ? ' · ' + promoDe[x.k].etiqueta : ''))),
+          el('div', { clase: 'paso' },
+            el('button', { 'aria-label': 'Uno menos', onclick: () => { cambiar(x.k, -1); pintarZona() } }, '−'),
+            el('b', {}, x.c),
+            el('button', { 'aria-label': 'Uno más', onclick: () => { cambiar(x.k, 1); pintarZona() } }, '+')))),
+        envio && t().envioGratis ? el('div', { clase: 'barra-envio' }, falta ? '🚚 Te faltan ' + pesos(falta) + ' para el envío gratis' : '🎉 ¡Tenés envío gratis!', el('div', { clase: 'riel' }, el('i', { style: 'width:' + Math.min(100, Math.round(sub * 100 / t().envioGratis)) + '%' }))) : null,
+        suger.length ? seccion('¿Te sumamos algo?', null, el('div', { clase: 'fila-h' }, suger.slice(0, 8).map((p) => { const n = tarjeta(p); n.addEventListener('click', (ev) => { if (ev.target.closest('.acciones')) setTimeout(pintarZona, 0) }, true); return n }))) : null,
+        el('div', { clase: 'cuentas' },
+          el('div', {}, el('span', {}, 'Productos'), el('span', {}, pesos(sub))),
+          envio ? el('div', {}, el('span', {}, 'Envío'), el('span', {}, costo ? pesos(costo) : 'Gratis')) : null,
+          el('div', { clase: 'tot' }, el('span', {}, 'Total aproximado'), el('span', {}, pesos(sub + costo)))),
+        minimo ? el('div', { clase: 'error' }, 'Para envío a domicilio el mínimo es ' + pesos(t().envioMinimo) + ': te faltan ' + pesos(minimo) + '. También podés retirarlo.') : null,
+        hayAlcohol ? el('label', { clase: 'mayor' }, mayor, 'Soy mayor de 18 años (tu pedido tiene bebidas con alcohol)') : null)
+      boton.disabled = !!minimo
+      boton.style.opacity = minimo ? '.5' : ''
     }
-    const textoWhatsApp = (numero) => {
-      const t = ['Hola! Quiero hacer este pedido' + (datos.sucursal ? ' (' + datos.sucursal + ')' : '') + (numero ? ' (ya lo mandé por la tienda)' : '') + ':', '']
-      for (const x of lineas()) t.push(x.c + ' x ' + x.p.nombre + ' — ' + pesos(x.p.precio * x.c))
-      t.push('', 'Total aproximado: ' + pesos(totalPedido()), 'Nombre: ' + cliente.nombre)
-      t.push(cliente.entrega === 'envio' ? 'Envío a: ' + cliente.direccion : 'Lo retiro en el local')
-      if (nota.value.trim()) t.push('Nota: ' + nota.value.trim())
-      return 'https://wa.me/' + datos.whatsapp + '?text=' + encodeURIComponent(t.join('\n'))
+
+    const seg = (opciones, clave, alCambiar) => {
+      const n = el('div', { clase: 'seg' })
+      const p = () => n.replaceChildren(...opciones.map(([k, tx]) => el('button', { clase: cliente[clave] === k ? 'activo' : '', onclick: () => { cliente[clave] = k; guardar(CLAVE + '.cliente', cliente); p(); alCambiar && alCambiar() } }, tx)))
+      p()
+      return n
+    }
+    const campoDir = el('div', { clase: 'campo' }, el('label', {}, 'Dirección de envío'), direccion)
+    const campoVuelto = el('div', { clase: 'campo' }, el('label', {}, '¿Con cuánto pagás? (para llevarte el vuelto)'), vuelto)
+    const alEntrega = () => { campoDir.hidden = cliente.entrega !== 'envio'; pintarZona() }
+    const alPago = () => { campoVuelto.hidden = cliente.pago !== 'efectivo' || cliente.entrega !== 'envio' }
+
+    const textoWhatsApp = (yaMandado) => {
+      const tx = ['Hola! Quiero hacer este pedido' + (datos.sucursal ? ' (' + datos.sucursal + ')' : '') + (yaMandado ? ' (ya lo mandé por la tienda)' : '') + ':', '']
+      for (const x of lineas()) tx.push(x.c + ' x ' + (x.combo ? 'COMBO ' : '') + x.nombre + ' — ' + pesos(x.precio * x.c))
+      const sub = subtotal()
+      const costo = cliente.entrega === 'envio' ? costoEnvio(sub) : 0
+      tx.push('', 'Total aproximado: ' + pesos(sub + costo) + (costo ? ' (con envío)' : ''), 'Nombre: ' + cliente.nombre)
+      tx.push(cliente.entrega === 'envio' ? 'Envío a: ' + cliente.direccion : 'Lo retiro en el local')
+      tx.push('Pago: ' + ({ efectivo: 'efectivo', transferencia: 'transferencia', mp: 'Mercado Pago' }[cliente.pago] || 'efectivo') + (vuelto.value ? ' (pago con ' + pesos(Number(vuelto.value) * 100) + ')' : ''))
+      if (nota.value.trim()) tx.push('Nota: ' + nota.value.trim())
+      return 'https://wa.me/' + datos.whatsapp + '?text=' + encodeURIComponent(tx.join('\n'))
     }
     // Directo a la caja. Devuelve 'ok' o por que no entro.
     const mandarDirecto = async () => {
       let pid = leer(CLAVE + '.enviando', '')
-      const huella = JSON.stringify([lineas().map((x) => [x.p.nombre, x.c]), cliente, nota.value.trim()])
+      const huella = JSON.stringify([lineas().map((x) => [x.k, x.c]), cliente, nota.value.trim(), vuelto.value])
       if (!pid || leer(CLAVE + '.huella', '') !== huella) {
         pid = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16))
         guardar(CLAVE + '.enviando', pid)
         guardar(CLAVE + '.huella', huella)
       }
+      const sub = subtotal()
+      const envio = cliente.entrega === 'envio'
       const pedidoNube = {
-        items: lineas().map((x) => ({ id: x.p.id, n: x.p.nombre, c: x.c })),
+        items: lineas().map((x) => ({ id: x.combo ? 'combo:' + x.combo.id : (x.k.startsWith('n:') ? null : x.k), n: x.nombre, c: x.c })),
         nombre: cliente.nombre,
         telefono: cliente.telefono,
-        entrega: cliente.entrega === 'envio' ? 'envio' : 'retira',
-        direccion: cliente.entrega === 'envio' ? cliente.direccion : '',
+        entrega: envio ? 'envio' : 'retira',
+        direccion: envio ? cliente.direccion : '',
+        pago: cliente.pago,
+        vuelto: envio && cliente.pago === 'efectivo' && Number(vuelto.value) > 0 ? Math.round(Number(vuelto.value) * 100) : undefined,
         nota: nota.value.trim(),
-        total: totalPedido()
+        envio: envio ? costoEnvio(sub) : 0,
+        total: sub + (envio ? costoEnvio(sub) : 0)
       }
       try {
         const r = await fetch('https://' + proyecto + '.supabase.co/rest/v1/rpc/pos_tienda_pedido', {
@@ -245,29 +845,33 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; }
         return String(await r.json())
       } catch (e) { return 'sin-internet' }
     }
-    const listo = (tel) => {
+    const listo = () => {
       const porWhatsApp = datos.whatsapp ? textoWhatsApp(true) : ''
-      pedido = {}
-      guardar(CLAVE + '.pedido', pedido)
+      guardar(CLAVE + '.ultimo', { items: Object.assign({}, carrito), en: Date.now() })
+      carrito = {}
+      guardar(CLAVE + '.carrito', carrito)
       guardar(CLAVE + '.enviando', '')
-      pintarPie()
-      pintarLista()
-      cuerpo.replaceChildren(
-        el('h2', { style: 'margin:0 0 8px;font-size:21px' }, '¡Listo! Tu pedido llegó al local'),
-        el('p', {}, 'Te vamos a escribir al ' + tel + ' para confirmarte el total' + (cliente.entrega === 'envio' ? ' y el envío.' : ' y cuándo pasar a buscarlo.')),
-        datos.puntos ? el('p', { clase: 'aviso' }, 'Con tu teléfono sumás puntos cuando lo pagás.') : null,
-        porWhatsApp ? el('a', { clase: 'btn whatsapp', href: porWhatsApp, style: 'display:block;text-align:center;text-decoration:none;margin-top:10px' }, 'Avisar también por WhatsApp') : null,
-        el('button', { clase: 'btn', style: 'width:100%;margin-top:10px', onclick: cerrarHoja }, 'Volver a la tienda'))
+      pintar()
+      abrirHoja('¡Pedido enviado!',
+        el('div', { style: 'text-align:center;font-size:56px;margin:10px 0' }, '🎉'),
+        el('h3', { style: 'text-align:center;margin:0 0 8px' }, '¡Listo, ' + cliente.nombre.split(' ')[0] + '! Tu pedido llegó al local'),
+        el('p', { style: 'text-align:center' }, 'Te escribimos al ' + cliente.telefono + ' para confirmarte el total' + (cliente.entrega === 'envio' ? ' y el envío' + (t().demora ? ' (llega en ~' + t().demora + ' min)' : '') + '.' : ' y cuándo pasar a buscarlo.')),
+        datos.puntos ? el('p', { clase: 'aviso' }, '⭐ Con tu teléfono sumás puntos cuando lo pagás.') : null,
+        porWhatsApp ? el('a', { clase: 'btn whatsapp ancho-total', href: porWhatsApp, style: 'display:block;text-align:center;text-decoration:none;margin-top:12px' }, 'Avisar también por WhatsApp') : null,
+        el('button', { clase: 'btn ancho-total', style: 'margin-top:10px', onclick: cerrarHoja }, 'Volver a la tienda'))
     }
     const enviar = async () => {
       if (enviando) return
+      error.textContent = ''
       cliente.nombre = nombre.value.trim()
       cliente.telefono = telefono.value.trim()
       cliente.direccion = direccion.value.trim()
       guardar(CLAVE + '.cliente', cliente)
-      if (!cliente.nombre) { nombre.focus(); nombre.placeholder = 'Poné tu nombre'; return }
-      if (datos.pedidos && cliente.telefono.replace(/\D/g, '').length < 8) { telefono.focus(); telefono.placeholder = 'Poné tu teléfono con la característica'; return }
-      if (cliente.entrega === 'envio' && !cliente.direccion) { direccion.focus(); return }
+      const pedir = (campo, txt) => { error.textContent = txt; campo.focus(); campo.scrollIntoView({ block: 'center', behavior: 'smooth' }) }
+      if (!cliente.nombre) return pedir(nombre, 'Poné tu nombre.')
+      if (datos.pedidos && cliente.telefono.replace(/\D/g, '').length < 8) return pedir(telefono, 'Poné tu teléfono con la característica, así te confirmamos.')
+      if (cliente.entrega === 'envio' && !cliente.direccion) return pedir(direccion, 'Poné la dirección de envío.')
+      if (lineas().some((x) => x.p && esAlcohol(x.p)) && !mayor.checked) return pedir(mayor, 'Las bebidas con alcohol son solo para mayores de 18.')
       if (datos.pedidos && datos.clave) {
         enviando = true
         boton.disabled = true
@@ -276,35 +880,60 @@ main { max-width: 760px; margin: 0 auto; padding: 0 16px; }
         enviando = false
         boton.disabled = false
         boton.textContent = textoBoton
-        if (r === 'ok') return listo(cliente.telefono)
-        if (!datos.whatsapp) return alert(r === 'muchos' ? 'Hay muchos pedidos en este momento: probá de nuevo en unos minutos.' : 'No se pudo mandar el pedido. Revisá la conexión y probá de nuevo.')
+        if (r === 'ok') return listo()
+        if (!datos.whatsapp) { error.textContent = r === 'muchos' ? 'Hay muchos pedidos en este momento: probá de nuevo en unos minutos.' : r === 'cerrada' ? 'La tienda no está tomando pedidos ahora.' : 'No se pudo mandar el pedido. Revisá la conexión y probá de nuevo.'; return }
       }
-      if (!datos.whatsapp) return alert('Esta tienda todavía no tiene WhatsApp para recibir pedidos.')
+      if (!datos.whatsapp) { error.textContent = 'Esta tienda todavía no tiene WhatsApp para recibir pedidos.'; return }
       location.href = textoWhatsApp(false)
     }
     const textoBoton = datos.pedidos ? 'Enviar pedido' : 'Enviar pedido por WhatsApp'
-    const boton = el('button', { clase: 'btn whatsapp', onclick: enviar }, textoBoton)
-    cuerpo.replaceChildren(
-      el('div', { style: 'display:flex;justify-content:space-between;align-items:center' }, el('h2', { style: 'margin:0;font-size:19px' }, 'Tu pedido'), el('button', { clase: 'btn', onclick: cerrarHoja }, 'Seguir eligiendo')),
-      listaL, tot,
-      el('div', { clase: 'campo' }, el('label', {}, 'Nombre'), nombre),
-      campoTel,
-      el('div', { clase: 'campo' }, seg),
+    boton.textContent = textoBoton
+    boton.addEventListener('click', enviar)
+
+    cuerpo.append(
+      zona,
+      el('div', { clase: 'campo' }, el('label', {}, '¿Cómo lo recibís?'), seg([['envio', '🚚 Envío'], ['retiro', '🏪 Retiro en el local']], 'entrega', () => { alEntrega(); alPago() })),
       campoDir,
+      el('div', { clase: 'campo' }, el('label', {}, 'Nombre'), nombre),
+      datos.pedidos ? el('div', { clase: 'campo' }, el('label', {}, 'Tu WhatsApp (para confirmarte el pedido)'), telefono) : null,
+      el('div', { clase: 'campo' }, el('label', {}, '¿Cómo pagás?'), seg([['efectivo', '💵 Efectivo'], ['transferencia', '🏦 Transferencia'], ['mp', '📱 Mercado Pago']], 'pago', alPago)),
+      campoVuelto,
       el('div', { clase: 'campo' }, nota),
+      error,
       boton,
       el('p', { clase: 'aviso' }, datos.pedidos
-        ? 'El pedido llega directo al local y te escriben para confirmarte el total.' + (datos.puntos ? ' Con tu teléfono sumás puntos.' : '')
-        : 'Se abre WhatsApp con el pedido escrito: solo tenés que apretar enviar. El local te confirma el total.'))
-    pintarSeg()
-    pintarL()
-    $('hoja').classList.add('abierta')
+        ? 'El pedido llega directo al local y te escriben para confirmarte el total. Pagás al recibirlo.'
+        : 'Se abre WhatsApp con el pedido escrito: solo tenés que apretar enviar.'))
+    if (!cliente.pago) cliente.pago = 'efectivo'
+    abrirHoja('Tu pedido', cuerpo)
+    alEntrega()
+    alPago()
   }
-  function cerrarHoja () { $('hoja').classList.remove('abierta'); pintarLista() }
 
-  $('buscar').addEventListener('input', () => { mostrar = 80; pintarLista() })
-  $('verPedido').addEventListener('click', abrirPedido)
+  // ---------- Avisos ----------
+  let toastT = null
+  function toast (txt) {
+    let n = document.querySelector('.toast')
+    if (!n) { n = el('div', { clase: 'toast', role: 'status' }); document.body.append(n) }
+    n.textContent = txt
+    clearTimeout(toastT)
+    toastT = setTimeout(() => n.remove(), 1800)
+  }
+
+  // ---------- Eventos ----------
+  let buscarT = null
+  $('buscar').addEventListener('input', () => {
+    clearTimeout(buscarT)
+    buscarT = setTimeout(() => {
+      const q = $('buscar').value.trim()
+      if (q) { vista = { tipo: 'buscar', q, orden: vista.tipo === 'buscar' ? vista.orden : '' }; pintar() } else if (vista.tipo === 'buscar') ir({ tipo: 'inicio' })
+    }, 180)
+  })
+  $('buscar').addEventListener('keydown', (ev) => { if (ev.key === 'Enter') $('buscar').blur() })
+  $('carritoBtn').addEventListener('click', abrirCarrito)
+  $('pieBtn').addEventListener('click', abrirCarrito)
   $('hoja').addEventListener('click', (ev) => { if (ev.target === $('hoja')) cerrarHoja() })
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && $('hoja').classList.contains('abierta')) cerrarHoja() })
   cargar()
 })()
 </script>
