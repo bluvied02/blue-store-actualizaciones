@@ -311,6 +311,8 @@ select.chip { appearance: none; padding-right: 13px; }
       // En la compu de prueba (localhost) se puede leer un archivo de ejemplo.
       const ejemplo = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && params.get('datos')
       const r = ejemplo ? await fetch(ejemplo) : await fetch('https://' + proyecto + '.supabase.co/storage/v1/object/public/panel/tienda/' + sucursal + '.json?t=' + Math.floor(Date.now() / 120000), { cache: 'no-store' })
+      // 400/404 = la caja todavía no publicó la tienda (o la apagó): no es la conexión del cliente.
+      if (r.status === 400 || r.status === 404) return fallar('Esta tienda todavía no está abierta. Probá más tarde.')
       if (!r.ok) throw new Error('no hay')
       datos = await r.json()
     } catch (e) { return fallar('No se pudo abrir la tienda. Revisá la conexión y probá de nuevo.') }
