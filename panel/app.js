@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.32'
+const VERSION_APP = '13.33'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -418,7 +418,7 @@ const NOMBRE_ORDEN = {
   producto_foto: 'Foto del producto', venta_celular: 'Venta', modo_emergencia: 'Modo emergencia', encargo_guardar: 'Encargo', encargo_estado: 'Encargo',
   mayorista_guardar: 'Presupuesto mayorista', mayorista_estado: 'Presupuesto mayorista', mayorista_venta: 'Venta mayorista',
   pedido_guardar: 'Pedido a proveedor', pedido_estado: 'Pedido a proveedor', pedido_recalcular: 'Recalcular pedido', pedido_ajustar: 'Ajustar pedido mandado',
-  horario_guardar: 'Horario', valor_hora: 'Valor hora', fichaje_corregir: 'Turno corregido', fichaje_manual: 'Día a mano', fichaje_config: 'Fichaje',
+  horario_guardar: 'Horario', valor_hora: 'Valor hora', fichaje_corregir: 'Turno corregido', fichaje_manual: 'Día a mano', fichaje_anular: 'Turno borrado', dia_marcar: 'Día marcado', fichaje_config: 'Fichaje',
   sueldo_registrar: 'Sueldo', sueldo_anular: 'Anular movimiento', sueldo_perdonar: 'Faltante',
   vencimiento_guardar: 'Vencimiento', vencimiento_resolver: 'Vencimiento', vencimiento_borrar: 'Vencimiento',
   envases_config: 'Envases', medios_config: 'Medios de pago', rubros_margen: 'Ganancia por rubro'
@@ -856,7 +856,7 @@ function seccion (id, def) { SECCIONES[id] = def }
 // Dueño o encargado. El encargado ve lo del local; la plata, los costos y los
 // precios son del dueño. (La caja revisa lo mismo antes de aplicar cada orden.)
 // (Vencimientos y Pérdidas los ve tambien el encargado, sin lo que cuesta.)
-const SOLO_DUENIO = ['cierresemana', 'cierremes', 'envases', 'medios', 'rubrosganancia', 'personal', 'reportes', 'caja', 'gastos', 'apagar', 'proveedores', 'promos', 'cierres', 'historial', 'ventas', 'mayorista', 'metricas']
+const SOLO_DUENIO = ['empleado', 'cierresemana', 'cierremes', 'envases', 'medios', 'rubrosganancia', 'personal', 'reportes', 'caja', 'gastos', 'apagar', 'proveedores', 'promos', 'cierres', 'historial', 'ventas', 'mayorista', 'metricas']
 const PERMISOS_ENCARGADO = ['verStock', 'ajustarStock', 'contar', 'recibir', 'pasar', 'clientes', 'productoNuevo', 'fotos', 'pedidosClientes', 'vender']
 // El empleado: vender y contar stock, nada mas (y solo con el turno abierto).
 const PERMISOS_EMPLEADO = ['contar', 'vender']

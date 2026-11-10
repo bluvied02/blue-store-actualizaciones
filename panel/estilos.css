@@ -507,3 +507,19 @@ input[type=number], input[type=date], input[type=tel], select, textarea {
 .tilde-gasto input { width: 22px; height: 22px; pointer-events: none; }
 .barra-gastos { position: sticky; top: 8px; z-index: 5; }
 .barra-gastos .acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+/* Personal: la ficha de un empleado, dia por dia. */
+.dia-emp { align-items: flex-start; }
+.dia-emp.vacio { min-height: 0; padding-top: 7px; padding-bottom: 7px; opacity: .6; }
+.dia-emp.falta .dia-fecha { background: var(--rojo-suave); color: var(--rojo); }
+.dia-fecha { flex: none; width: 46px; border-radius: 11px; background: var(--sup2); text-align: center; padding: 5px 0; line-height: 1.1; }
+.dia-fecha span { display: block; font-size: 11px; font-weight: 650; color: var(--texto3); text-transform: uppercase; }
+.dia-fecha b { font-size: 19px; font-family: var(--mono); }
+.dia-fecha.hoy { background: var(--acento); color: var(--acento-texto); }
+.dia-fecha.hoy span { color: inherit; opacity: .8; }
+.dia-emp.falta .dia-fecha span { color: inherit; }
+.dia-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 2px 0; white-space: normal; }
+.dia-linea .ico, .dia-linea svg { width: 15px; height: 15px; }
+.dia-acciones { display: inline-flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+.dia-acciones .btn.chico { min-height: 30px; padding: 3px 9px; font-size: 12.5px; }
+.dia-emp .cuerpo .sub { white-space: normal; overflow: visible; }
