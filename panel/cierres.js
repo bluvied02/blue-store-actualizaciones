@@ -184,7 +184,21 @@ function tarjetaCierreSemana (p) {
 
 // --- CERRAR MES ---------------------------------------------------------------------------
 
-const ESTADO_MES = { sucursal: null, mes: null, previo: null, pedido: false, revision: 0 }
+const ESTADO_MES = { sucursal: null, mes: null, desde: '', hasta: '', previo: null, pedido: false, editado: false, revision: 0 }
+
+// Al elegir un mes: el rango que propone la caja (desde donde terminó el
+// cierre anterior hasta el día 1 del mes siguiente), o vacío si no lo subió.
+function elegirMesCierre (d, mes) {
+  const e = ESTADO_MES
+  const sug = d.meses[mes]
+  e.mes = mes
+  e.desde = sug && sug.desde ? localCierre(sug.desde) : ''
+  e.hasta = sug && sug.hasta ? localCierre(sug.hasta) : ''
+  e.previo = null
+  e.pedido = false
+  e.editado = false
+  e.revision++
+}
 
 async function secCierreMes () {
   if (!S.sucursal) return pintarSeccion('cierremes', cabecera('Cerrar mes'), el('div', { clase: 'tarjeta' }, vacio('Todavía no hay sucursales conectadas.', 'caja')))
@@ -194,24 +208,44 @@ async function secCierreMes () {
   const e = ESTADO_MES
   if (e.sucursal !== S.sucursal) {
     e.sucursal = S.sucursal
-    e.mes = claves[0] || null
-    e.previo = null
-    e.pedido = false
-    e.revision++
+    elegirMesCierre(d, claves[0] || null)
   }
-  const p = e.pedido ? null : e.previo && e.previo.mes === e.mes ? e.previo : d.meses[e.mes]
+  const sug = d.meses[e.mes]
+  // Una caja vieja no entiende la hora: cierra el mes entero. Ahí no se ofrece el rango.
+  const conHora = Object.values(d.meses).some((m) => 'rangoSugerido' in m)
+  if (!conHora) { e.desde = ''; e.hasta = '' }
+  // Lo que se muestra: lo último que calculó la caja, o lo que subió sola si
+  // el rango es justo el que propuso. Si se tocaron las fechas, hay que calcular.
+  const p = e.pedido ? null : e.previo && e.previo.mes === e.mes ? e.previo
+    : (!e.editado && sug && e.desde === localCierre(sug.desde) && e.hasta === localCierre(sug.hasta) ? sug : null)
   const cuerpo = []
+  const vista = el('div', {})
+  const boton = el('button', { clase: 'btn primario ancho', disabled: e.pedido, onclick: () => pedirCierreMes() }, e.pedido ? 'Calculando en la caja…' : 'Calcular este rango')
+  const mensaje = () => el('div', { clase: 'tarjeta' }, el('p', { clase: 'sub' }, e.pedido ? 'Esperando el cálculo de la caja…' : 'Elegí desde y hasta cuándo va este cierre y tocá «Calcular este rango» para ver las cuentas antes de cerrar.'))
+  const cambiar = () => {
+    e.previo = null; e.pedido = false; e.editado = true; e.revision++
+    boton.disabled = false
+    boton.textContent = 'Calcular este rango'
+    poner(vista, mensaje())
+  }
   const mes = el('input', { type: 'month', valor: e.mes || '' })
-  mes.addEventListener('change', () => { e.mes = mes.value; e.previo = null; e.pedido = false; e.revision++; refrescarSeccion() })
-  cuerpo.push(el('div', { clase: 'tarjeta' }, el('label', { clase: 'campo' }, 'Mes que querés cerrar', mes),
-    el('button', { clase: 'btn primario ancho', disabled: e.pedido, onclick: () => pedirCierreMes() }, e.pedido ? 'Calculando en la caja…' : 'Calcular este mes'),
-    el('p', { clase: 'sub' }, 'El mes va del día 1 al último día calendario. La caja debe estar encendida y conectada.')))
-  cuerpo.push(el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, claves.map((m) => el('button', { clase: m === e.mes ? 'activo' : '', onclick: () => { e.mes = m; e.previo = null; e.pedido = false; e.revision++; refrescarSeccion() } }, nombreMesCierre(m)))))
-  if (p) cuerpo.push(...tarjetasMes(p, d))
-  else cuerpo.push(el('div', { clase: 'tarjeta' }, el('p', { clase: 'sub' }, e.pedido ? 'Esperando el cálculo de la caja…' : 'Tocá «Calcular este mes» para ver las cuentas antes de cerrar.')))
+  mes.addEventListener('change', () => { elegirMesCierre(d, mes.value); refrescarSeccion() })
+  const desde = campoFechaHora(e.desde, (v) => { e.desde = v; cambiar() })
+  const hasta = campoFechaHora(e.hasta, (v) => { e.hasta = v; cambiar() })
+  cuerpo.push(el('div', { clase: 'seg ancho', estilo: { marginBottom: '10px' } }, claves.map((m) => el('button', { clase: m === e.mes ? 'activo' : '', onclick: () => { elegirMesCierre(d, m); refrescarSeccion() } }, nombreMesCierre(m)))))
+  cuerpo.push(el('div', { clase: 'tarjeta' }, el('label', { clase: 'campo' }, 'Mes del cierre (el nombre que va a tener)', mes),
+    conHora ? el('div', { clase: 'dos cierre-fechas' }, el('label', { clase: 'campo' }, 'Desde (fecha y hora)', desde), el('label', { clase: 'campo' }, 'Hasta (fecha y hora)', hasta)) : null,
+    boton,
+    el('p', { clase: 'sub' }, conHora
+      ? 'Cuenta desde la hora de inicio hasta justo antes de la hora de fin. Viene propuesto desde donde terminó el cierre anterior; cambialo si este mes cortaron en otro momento. La caja debe estar encendida y conectada.'
+      : 'Esta caja todavía cierra el mes entero (del día 1 al último). Para elegir fecha y hora, la caja tiene que actualizarse a la versión nueva (se instala sola al cerrar el programa).')))
+  poner(vista, p ? el('div', {}, ...tarjetasMes(p, d)) : mensaje())
+  cuerpo.push(vista)
   cuerpo.push(el('h3', {}, 'Meses cerrados'))
   cuerpo.push(el('div', { clase: 'tarjeta sin-relleno' }, d.lista.length ? el('div', { clase: 'lista' }, d.lista.map((c) => el('div', { clase: 'item' },
-    el('div', { clase: 'cuerpo' }, el('b', {}, nombreMesCierre(c.mes)), el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, c.reparto.map((x) => x.nombre + ' ' + plata(x.importe)).join(' · '))),
+    el('div', { clase: 'cuerpo' }, el('b', {}, nombreMesCierre(c.mes)),
+      c.desde ? el('div', { clase: 'sub' }, cuandoCierre(c.desde) + ' → ' + cuandoCierre(c.hasta)) : null,
+      el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, c.reparto.map((x) => x.nombre + ' ' + plata(x.importe)).join(' · '))),
     el('div', { clase: 'fin' }, el('b', { clase: 'num' }, plata(c.cuentas.gananciaNeta)), el('div', {}, el('button', { clase: 'btn chico', onclick: () => copiarResumenMes(c, nombreSucursal(S.sucursal)) }, 'Copiar'))))))
     : vacio('Todavía no hay meses cerrados.', 'cierres')))
   pintarSeccion('cierremes', cabecera('Cerrar mes', nombreSucursal(S.sucursal), el('button', { clase: 'btn primario', onclick: () => hojaSocios(d.socios) }, icono('editar'), 'Socios')), ...cuerpo)
@@ -220,19 +254,25 @@ async function secCierreMes () {
 async function pedirCierreMes () {
   const e = ESTADO_MES
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(e.mes || '')) return toast('Elegí el mes', 'mal')
+  if (!!e.desde !== !!e.hasta) return toast('Completá el desde y el hasta (o dejá los dos vacíos)', 'mal')
+  if (e.desde && e.hasta <= e.desde) return toast('El hasta tiene que ser después del desde', 'mal')
   const sucursal = S.sucursal
   const revision = ++e.revision
   e.pedido = true
   e.previo = null
   refrescarSeccion()
-  await mandarOrden(sucursal, 'cierre_mes_previsualizar', { mes: e.mes }, {
+  const rango = e.desde ? { desde: new Date(e.desde).toISOString(), hasta: new Date(e.hasta).toISOString() } : {}
+  await mandarOrden(sucursal, 'cierre_mes_previsualizar', Object.assign({ mes: e.mes }, rango), {
     texto: 'Calcular cierre mensual', callado: true, silencioso: true,
     alTerminar: (r) => {
       if (e.revision !== revision || e.sucursal !== sucursal) return
       e.pedido = false
       const res = r.resultado || {}
-      if (r.estado === 'aplicada' && res.datos) e.previo = res.datos
-      else toast('No se pudo calcular: ' + (res.error || 'error de la caja'), 'mal', 7)
+      if (r.estado === 'aplicada' && res.datos) {
+        e.previo = res.datos
+        e.editado = false
+        if (res.datos.desde) { e.desde = localCierre(res.datos.desde); e.hasta = localCierre(res.datos.hasta) }
+      } else toast('No se pudo calcular: ' + (res.error || 'error de la caja'), 'mal', 7)
       if (S.seccion === 'cierremes') refrescarSeccion()
     }
   })
@@ -245,9 +285,12 @@ function tarjetasMes (p, d) {
   const nota = el('textarea', { rows: '2', placeholder: 'Nota del cierre (opcional)' })
   const out = []
   if (p.yaCerrado) out.push(el('div', { clase: 'tarjeta' }, el('b', { clase: 'mal' }, 'Este mes ya está cerrado'), el('div', { clase: 'sub' }, 'Se cerró el ' + cuandoCierre(p.yaCerrado.cerradoEn))))
-  if (!c.cantidadVentas) out.push(el('div', { clase: 'tarjeta' }, el('b', {}, 'No hay ventas de ' + nombreSucursal(S.sucursal) + ' en este mes'), el('div', { clase: 'sub' }, 'Si es la sucursal de otra caja, el cierre se ve desde esa sucursal.')))
+  if (p.pisaCon) out.push(el('div', { clase: 'tarjeta' }, el('b', { clase: 'mal' }, 'Este rango se pisa con el cierre de ' + nombreMesCierre(p.pisaCon.mes)), el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, 'Ese cierre va de ' + cuandoCierre(p.pisaCon.desde) + ' a ' + cuandoCierre(p.pisaCon.hasta) + '. Poné el desde a partir de donde terminó.')))
+  if (!p.terminado && !p.yaCerrado) out.push(el('div', { clase: 'tarjeta' }, el('b', {}, 'Este rango todavía no terminó'), el('div', { clase: 'sub' }, 'Podés ver las cuentas, pero se cierra cuando pase la fecha y hora de fin.')))
+  if (!c.cantidadVentas) out.push(el('div', { clase: 'tarjeta' }, el('b', {}, 'No hay ventas de ' + nombreSucursal(S.sucursal) + ' en este rango'), el('div', { clase: 'sub' }, 'Si es la sucursal de otra caja, el cierre se ve desde esa sucursal.')))
   if (c.lineasSinCosto) out.push(el('div', { clase: 'tarjeta' }, el('b', {}, c.lineasSinCosto + ' productos vendidos sin costo cargado'), el('div', { clase: 'sub' }, 'Su costo cuenta como cero: la ganancia queda más alta de lo real.')))
   out.push(el('div', { clase: 'tarjeta' }, el('h2', {}, nombreSucursal(S.sucursal) + ' · ' + nombreMesCierre(p.mes)),
+    p.desde && 'rangoSugerido' in p ? el('p', { clase: 'sub' }, cuandoCierre(p.desde) + ' → ' + cuandoCierre(p.hasta)) : null,
     fila('Ventas (' + c.cantidadVentas + ')', plata(c.ventas)),
     fila('Costo de lo vendido', '−' + plata(c.costoVendido).replace('−', '')),
     fila('Ganancia bruta', plata(c.gananciaBruta)),
@@ -255,7 +298,7 @@ function tarjetasMes (p, d) {
     fila('Gastos', '−' + plata(c.gastos).replace('−', '')),
     fila('Ganancia neta a repartir', plata(c.gananciaNeta), c.gananciaNeta > 0 ? 'ok' : 'mal'),
     c.pagosMercaderia ? el('p', { clase: 'sub' }, 'Los ' + plata(c.pagosMercaderia) + ' pagados a proveedores no se restan: ya están en el costo.') : null))
-  out.push(el('div', { clase: 'tarjeta' }, el('b', {}, 'Cierres de semana: ' + s.cierres + ' · cubren el ' + s.cobertura + '% del mes'),
+  out.push(el('div', { clase: 'tarjeta' }, el('b', {}, 'Cierres de semana: ' + s.cierres + ' · cubren el ' + s.cobertura + '% del rango'),
     el('div', { clase: 'sub', estilo: { whiteSpace: 'normal' } }, s.conDiferencia
       ? s.conDiferencia + ' cerraron con diferencia (' + signoPlata(s.diferenciaTotal) + ' en total). Revisalas antes de repartir.'
       : s.cobertura >= 100 ? 'Todas las semanas del mes están cerradas y coinciden.' : 'Hay partes del mes sin cerrar: conviene cerrarlas antes de repartir.')))
@@ -267,17 +310,20 @@ function tarjetasMes (p, d) {
     p.reparto.map((x) => el('div', { clase: 'fila' }, el('div', { clase: 'izq' }, el('b', {}, x.nombre), el('div', { clase: 'sub' }, (x.pct / 100) + '%')), el('b', { clase: 'num' }, plata(x.importe)))),
     c.gananciaNeta <= 0 ? el('p', { clase: 'sub mal' }, 'No hubo ganancia este mes: no hay nada para repartir.') : null))
   out.push(el('div', { clase: 'tarjeta' }, el('label', { clase: 'campo' }, 'Nota', nota),
-    el('button', { clase: 'btn primario ancho grande', disabled: !!p.yaCerrado || !p.terminado, onclick: async () => {
-      await mandarOrden(S.sucursal, 'cierre_mes_cerrar', { mes: p.mes, nota: nota.value.trim() }, { texto: 'Cerrar mes', alTerminar: () => { ESTADO_MES.previo = null; refrescarSeccion() } })
+    el('button', { clase: 'btn primario ancho grande', disabled: !!p.yaCerrado || !!p.pisaCon || !p.terminado, onclick: async () => {
+      const rango = 'rangoSugerido' in p ? { desde: p.desde, hasta: p.hasta } : {}
+      await mandarOrden(S.sucursal, 'cierre_mes_cerrar', Object.assign({ mes: p.mes, nota: nota.value.trim() }, rango), { texto: 'Cerrar mes', alTerminar: () => { ESTADO_MES.previo = null; ESTADO_MES.sucursal = null; refrescarSeccion() } })
     } }, 'Confirmar cierre del mes'),
-    el('button', { clase: 'btn ancho', estilo: { marginTop: '8px' }, onclick: () => copiarResumenMes({ mes: p.mes, cuentas: c, reparto: p.reparto }, nombreSucursal(S.sucursal)) }, 'Copiar resumen para los socios')))
+    el('button', { clase: 'btn ancho', estilo: { marginTop: '8px' }, onclick: () => copiarResumenMes({ mes: p.mes, desde: 'rangoSugerido' in p ? p.desde : null, hasta: p.hasta, cuentas: c, reparto: p.reparto }, nombreSucursal(S.sucursal)) }, 'Copiar resumen para los socios')))
   return out
 }
 
 async function copiarResumenMes (c, sucursal) {
-  const lineas = ['Cierre de ' + nombreMesCierre(c.mes) + ' · ' + sucursal,
+  const lineas = ['Cierre de ' + nombreMesCierre(c.mes) + ' · ' + sucursal]
+    .concat(c.desde ? ['Del ' + cuandoCierre(c.desde) + ' al ' + cuandoCierre(c.hasta)] : [])
+    .concat([
     'Ventas: ' + plata(c.cuentas.ventas), 'Costo de lo vendido: ' + plata(c.cuentas.costoVendido), 'Comisiones: ' + plata(c.cuentas.comisiones),
-    'Gastos: ' + plata(c.cuentas.gastos), 'Ganancia neta: ' + plata(c.cuentas.gananciaNeta), '', 'Reparto:']
+    'Gastos: ' + plata(c.cuentas.gastos), 'Ganancia neta: ' + plata(c.cuentas.gananciaNeta), '', 'Reparto:'])
     .concat(c.reparto.map((x) => '- ' + x.nombre + ' (' + (x.pct / 100) + '%): ' + plata(x.importe)))
   try { await navigator.clipboard.writeText(lineas.join('\n')); toast('Copiado: pegalo en el grupo de los socios') } catch (e) { toast('No se pudo copiar', 'mal') }
 }
