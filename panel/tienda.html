@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b4fd6">
+<meta name="theme-color" content="#0b4fd6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0a2f85" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Blue Store · Tienda online</title>
 <meta name="description" content="Pedí online y te lo llevamos: golosinas, bebidas, almacén, combos y más.">
 <link rel="icon" href="icono-192.png">
@@ -19,13 +22,30 @@
 <link rel="apple-touch-icon" href="icono-192.png">
 <style>
 :root {
+  color-scheme: light dark;
   --fondo: #eef1f6; --tarjeta: #ffffff; --texto: #141a26; --tenue: #5e6878; --borde: #e2e6ee;
-  --azul: #0b4fd6; --azul-osc: #083a9e; --azul-claro: #e7efff; --acento: #ffd60a; --acento-texto: #141a26;
-  --oferta: #e0262f; --ok: #11845b; --whatsapp: #1f9d55; --sombra: 0 1px 2px rgba(16,24,40,.06), 0 2px 8px rgba(16,24,40,.06);
+  --azul: #0b4fd6; --azul-osc: #083a9e; --azul-claro: #e7efff; --link: #0b4fd6; --acento: #ffd60a; --acento-texto: #141a26;
+  --cab: #0b4fd6; --cab-osc: #083a9e;
+  --oferta: #e0262f; --ok: #11845b; --verde: var(--verde); --whatsapp: #1f9d55; --sombra: 0 1px 2px rgba(16,24,40,.06), 0 2px 8px rgba(16,24,40,.06);
+  --nom: #2b3343; --poco: #9a5b13; --aviso-bg: #fff8d6; --aviso-borde: #f5e08a; --aviso-texto: #141a26;
+  --gris1: var(--gris1); --gris2: var(--gris2); --punto: #c5cddc; --toast: #141a26;
   --radio: 14px;
 }
+/* Modo noche: sigue al celular del cliente. Las fotos quedan sobre blanco. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fondo: #0d1220; --tarjeta: #19202f; --texto: #edf0f6; --tenue: #9ba6b9; --borde: #2a3348;
+    --azul: #2f6df0; --azul-osc: #a9c2ff; --azul-claro: #1c2a4a; --link: #8fb1ff;
+    --cab: #0a2f85; --cab-osc: #071f5c;
+    --oferta: #ff5c64; --ok: #3ecf8e; --verde: #3ecf8e; --sombra: 0 1px 2px rgba(0,0,0,.5), 0 2px 8px rgba(0,0,0,.3);
+    --nom: #d3d9e5; --poco: #f0a94a; --aviso-bg: #3a3210; --aviso-borde: #5c5018; --aviso-texto: #ffe9a3;
+    --gris1: #1a2130; --gris2: #232c40; --punto: #3a4560; --toast: #2c3852;
+  }
+}
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; scroll-behavior: auto !important; } }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html { scroll-padding-top: 130px; }
+html { scroll-padding-top: 72px; }
 body { margin: 0; background: var(--fondo); color: var(--texto); font: 15px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding-bottom: 96px; }
 button { font: inherit; color: inherit; cursor: pointer; }
 img { display: block; }
@@ -33,10 +53,14 @@ img { display: block; }
 .ancho { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
 
 /* Barra de arriba */
-.cab { position: sticky; top: 0; z-index: 20; background: var(--azul); color: #fff; box-shadow: 0 2px 10px rgba(11,79,214,.25); }
-.cab .ancho { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-top: 10px; padding-bottom: 10px; }
+.marca-fila { background: var(--cab); color: #fff; }
+.marca-fila .ancho { display: flex; align-items: center; gap: 10px; padding-top: 10px; padding-bottom: 2px; }
+.wa-btn { flex: none; width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.14); color: #fff; display: grid; place-items: center; }
+.wa-btn svg { width: 22px; height: 22px; }
+.cab { position: sticky; top: 0; z-index: 20; background: var(--cab); color: #fff; box-shadow: 0 2px 10px rgba(8,30,90,.25); }
+.cab .ancho { display: flex; align-items: center; gap: 8px; padding-top: 8px; padding-bottom: 8px; }
 .marca { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.logo { width: 34px; height: 34px; border-radius: 10px; background: var(--acento); color: var(--azul-osc); display: grid; place-items: center; font-weight: 900; font-size: 17px; flex: none; }
+.logo { width: 34px; height: 34px; border-radius: 10px; background: var(--acento); color: #083a9e; display: grid; place-items: center; font-weight: 900; font-size: 17px; flex: none; }
 .logo.con-img { width: 46px; height: 46px; border-radius: 50%; background: #fff; padding: 1px; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
 .logo.con-img img { width: 100%; height: 100%; border-radius: 50%; object-fit: contain; }
 .marca h1 { font-size: 18px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
@@ -44,12 +68,11 @@ img { display: block; }
 .carrito-btn { position: relative; border: 0; background: rgba(255,255,255,.14); border-radius: 12px; width: 44px; height: 44px; display: grid; place-items: center; color: #fff; flex: none; }
 .carrito-btn svg { width: 24px; height: 24px; }
 .carrito-btn b { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; border-radius: 10px; background: var(--acento); color: var(--acento-texto); font-size: 12px; display: grid; place-items: center; padding: 0 5px; }
-.buscador { flex-basis: 100%; position: relative; order: 3; }
-.buscador input { width: 100%; border: 0; border-radius: 12px; padding: 12px 14px 12px 42px; font: inherit; font-size: 16px; background: #fff; color: var(--texto); box-shadow: var(--sombra); }
+.buscador { flex: 1; min-width: 0; position: relative; }
+.buscador input { width: 100%; border: 0; border-radius: 12px; padding: 11px 14px 11px 42px; font: inherit; font-size: 16px; background: var(--tarjeta); color: var(--texto); box-shadow: var(--sombra); }
 .buscador svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; color: var(--tenue); }
-.franja { background: var(--azul-osc); color: #fff; font-size: 13px; }
+.franja { background: var(--cab-osc); color: #fff; font-size: 13px; }
 .carrito-btn b[hidden] { display: none; }
-.cab .franja .ancho { flex-wrap: nowrap; }
 .franja .ancho { display: flex; gap: 14px; overflow-x: auto; white-space: nowrap; padding-top: 7px; padding-bottom: 7px; scrollbar-width: none; }
 .franja .ancho::-webkit-scrollbar { display: none; }
 .franja span { display: inline-flex; gap: 5px; align-items: center; }
@@ -58,27 +81,26 @@ img { display: block; }
 .franja .estado.cerrado::before { background: #ff6b6b; }
 /* Mientras carga: tarjetas grises que laten. */
 .esqueleto { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-.esqueleto .banner-e { grid-column: 1 / -1; height: 160px; }
-.esqueleto div { height: 230px; border-radius: var(--radio); background: linear-gradient(90deg, #e6eaf2 25%, #f3f5fa 50%, #e6eaf2 75%); background-size: 200% 100%; animation: latido 1.2s infinite linear; }
+.esqueleto .banner-e { grid-column: 1 / -1; height: 132px; }
+.esqueleto div { height: 200px; border-radius: var(--radio); background: linear-gradient(90deg, var(--gris1) 25%, var(--gris2) 50%, var(--gris1) 75%); background-size: 200% 100%; animation: latido 1.2s infinite linear; }
 @keyframes latido { from { background-position: 200% 0 } to { background-position: -200% 0 } }
-@media (min-width: 760px) { .buscador { flex-basis: auto; flex: 2; order: 0; } .marca { flex: 1; } }
 
 /* Banner */
 .banner { margin-top: 14px; position: relative; }
 .slides { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; scrollbar-width: none; border-radius: var(--radio); }
 .slides::-webkit-scrollbar { display: none; }
-.slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: var(--radio); min-height: 160px; padding: 18px; display: flex; align-items: center; gap: 14px; color: #fff; border: 0; text-align: left; background: linear-gradient(120deg, var(--azul-osc), var(--azul) 60%, #3a7bff); overflow: hidden; }
+.slide { flex: 0 0 100%; scroll-snap-align: start; border-radius: var(--radio); min-height: 132px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; color: #fff; border: 0; text-align: left; background: linear-gradient(120deg, #083a9e, #0b4fd6 60%, #3a7bff); overflow: hidden; }
 .slide.amarillo { background: linear-gradient(120deg, #ffb703, var(--acento)); color: var(--acento-texto); }
-.slide.rojo { background: linear-gradient(120deg, #b3121b, var(--oferta) 60%, #ff5a5f); }
+.slide.rojo { background: linear-gradient(120deg, #b3121b, #e0262f 60%, #ff5a5f); }
 .slide .txt { flex: 1; min-width: 0; }
 .slide .tag { display: inline-block; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; background: rgba(255,255,255,.2); padding: 3px 8px; border-radius: 6px; }
 .slide.amarillo .tag { background: rgba(0,0,0,.08); }
-.slide h2 { margin: 6px 0 4px; font-size: 24px; line-height: 1.1; letter-spacing: -.02em; }
+.slide h2 { margin: 6px 0 4px; font-size: 21px; line-height: 1.1; letter-spacing: -.02em; }
 .slide p { margin: 0; font-size: 14px; opacity: .92; }
-.slide .grande { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
-.slide img { width: 120px; height: 120px; object-fit: contain; background: #fff; border-radius: 14px; flex: none; padding: 6px; }
+.slide .grande { font-size: 26px; font-weight: 900; letter-spacing: -.02em; }
+.slide img { width: 104px; height: 104px; object-fit: contain; background: #fff; border-radius: 14px; flex: none; padding: 6px; }
 .puntitos { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
-.puntitos i { width: 7px; height: 7px; border-radius: 50%; background: #c5cddc; }
+.puntitos i { width: 7px; height: 7px; border-radius: 50%; background: var(--punto); }
 .puntitos i.activo { background: var(--azul); width: 18px; border-radius: 4px; }
 @media (min-width: 760px) { .slide { flex-basis: calc(50% - 6px); min-height: 190px; } }
 
@@ -95,9 +117,9 @@ img { display: block; }
 .seccion-cab { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .seccion h2 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
 .seccion .sub { color: var(--tenue); font-size: 13px; }
-.ver-todo { border: 0; background: none; color: var(--azul); font-weight: 700; font-size: 14px; padding: 4px 0; white-space: nowrap; }
+.ver-todo { border: 0; background: none; color: var(--link); font-weight: 700; font-size: 14px; padding: 4px 0; white-space: nowrap; }
 .fila-h { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
-.fila-h > * { flex: 0 0 158px; scroll-snap-align: start; }
+.fila-h > * { flex: 0 0 150px; scroll-snap-align: start; }
 @media (min-width: 760px) { .fila-h > * { flex-basis: 180px; } }
 .grilla { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 @media (min-width: 600px) { .grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
@@ -105,11 +127,27 @@ img { display: block; }
 
 /* Tarjeta de producto */
 .prod { background: var(--tarjeta); border-radius: var(--radio); box-shadow: var(--sombra); display: flex; flex-direction: column; overflow: hidden; position: relative; min-width: 0; }
-.prod .foto { aspect-ratio: 1; background: #fff; display: grid; place-items: center; border: 0; padding: 8px; width: 100%; position: relative; }
-.prod .foto img { width: 100%; height: 100%; object-fit: contain; }
+.marco { position: relative; }
+.prod .foto { aspect-ratio: 4 / 3; background: #fff; display: grid; place-items: center; border: 0; padding: 6px; width: 100%; position: relative; }
+.prod .marco .acciones { position: absolute; right: 6px; bottom: 6px; margin: 0; padding: 0; }
+.marco .agregar { width: 38px; height: 38px; border-radius: 50%; padding: 0; font-size: 24px; font-weight: 500; line-height: 1; box-shadow: 0 2px 8px rgba(11,79,214,.4); }
+.marco .paso { background: var(--azul); border-radius: 99px; padding: 3px; gap: 2px; box-shadow: 0 2px 8px rgba(11,79,214,.4); }
+.marco .paso button { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,.2); color: #fff; }
+.marco .paso b { color: #fff; min-width: 24px; text-align: center; }
+.marco .sin-stock { background: rgba(20,26,38,.78); color: #fff; border-radius: 99px; padding: 4px 10px; font-size: 12px; font-weight: 700; }
+.fav { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border: 0; border-radius: 50%; background: rgba(255,255,255,.94); display: grid; place-items: center; padding: 0; box-shadow: 0 1px 4px rgba(16,24,40,.2); }
+.fav svg { width: 18px; height: 18px; fill: none; stroke: #8a94a6; stroke-width: 2; }
+.fav.activo svg { fill: #e0262f; stroke: #e0262f; }
+.fav.activo { animation: latir .3s; }
+@keyframes latir { 50% { transform: scale(1.25); } }
+/* La foto no estira la tarjeta: va encajada en el marco, sea alta o ancha. */
+.prod .foto { overflow: hidden; }
+.prod .foto > img, .prod .foto > .placa { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); object-fit: contain; }
+.prod .foto > .placa span { display: none; }
+.prod .foto > .placa em { margin: 0; width: 56px; height: 56px; font-size: 34px; }
 .placa { width: 100%; height: 100%; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 10px 8px; font-weight: 700; font-size: 13px; line-height: 1.2; color: #2b3343; overflow: hidden; word-break: break-word; background: linear-gradient(160deg, var(--suave, #eef2ff), #fff 85%); border: 1px solid var(--borde-suave, #e3e8f5); }
-.placa em { font-style: normal; font-size: 40px; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(20,30,60,.08); margin-bottom: 8px; }
-.placa span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.placa em { font-style: normal; font-size: 30px; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(20,30,60,.08); margin-bottom: 8px; }
+.placa span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .combo .placa em, .linea .placa em, .slide .placa em { width: 40px; height: 40px; font-size: 24px; margin-bottom: 4px; }
 .linea .placa span, .combo .placa span { display: none; }
 .combo .placa { background: linear-gradient(135deg, #ffe066, #ffa94d); border: 0; }
@@ -117,13 +155,13 @@ img { display: block; }
 .etiquetas { position: absolute; top: 6px; left: 6px; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
 .etq { font-size: 10px; font-weight: 800; letter-spacing: .03em; padding: 3px 6px; border-radius: 5px; text-transform: uppercase; background: var(--azul); color: #fff; }
 .etq.top { background: #ff7a00; }
-.etq.nuevo { background: var(--ok); }
-.etq.promo { background: var(--oferta); }
-.prod .info { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
-.prod .precio { font-size: 19px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.etq.nuevo { background: #11845b; }
+.etq.promo { background: #e0262f; }
+.prod .info { padding: 7px 9px 9px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.prod .precio { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .prod .antes, .ficha .antes { font-size: 12px; color: var(--tenue); text-decoration: line-through; line-height: 1; margin-bottom: -2px; }
-.precio .off { font-size: 13px; font-weight: 700; color: #00a650; margin-left: 6px; letter-spacing: 0; vertical-align: 3px; }
-.prod .llega { font-size: 12px; font-weight: 600; color: #00a650; }
+.precio .off { font-size: 13px; font-weight: 700; color: var(--verde); margin-left: 6px; letter-spacing: 0; vertical-align: 3px; }
+.llega { font-size: 13px; font-weight: 700; color: var(--verde); }
 .linea .sub s { color: var(--tenue); }
 /* Cuadros por categoria */
 .cuadros { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -135,15 +173,15 @@ img { display: block; }
 .cuadro img { width: 64px; height: 64px; object-fit: contain; background: #fff; border-radius: 12px; padding: 4px; flex: none; }
 .cuadro em { font-style: normal; font-size: 34px; flex: none; }
 .prod .promo-txt { font-size: 12px; font-weight: 700; color: var(--oferta); }
-.prod .nom { font-size: 13px; color: #2b3343; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.7em; }
-.prod .poco { font-size: 11px; color: #9a5b13; font-weight: 600; display: flex; align-items: center; gap: 4px; }
-.prod .poco::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #f59f00; flex: none; }
+.prod .nom { font-size: 13px; color: var(--nom); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em; }
+.prod .poco, .ficha .poco { font-size: 11px; color: var(--poco); font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.poco::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #f59f00; flex: none; }
 .prod .acciones { margin-top: auto; padding-top: 6px; }
 .prod.agotado .foto { opacity: .45; }
 .agregar { width: 100%; border: 0; border-radius: 10px; padding: 9px 8px; background: var(--azul); color: #fff; font-weight: 700; font-size: 14px; }
 .agregar:active { transform: scale(.98); }
 .paso { display: flex; align-items: center; justify-content: space-between; background: var(--azul-claro); border-radius: 10px; padding: 3px; }
-.paso button { width: 34px; height: 34px; border: 0; border-radius: 8px; background: #fff; color: var(--azul); font-size: 20px; font-weight: 700; line-height: 1; }
+.paso button { width: 34px; height: 34px; border: 0; border-radius: 8px; background: var(--tarjeta); color: var(--link); font-size: 20px; font-weight: 700; line-height: 1; }
 .paso b { font-variant-numeric: tabular-nums; color: var(--azul-osc); }
 .sin-stock { text-align: center; font-size: 13px; color: var(--tenue); padding: 9px 0; }
 
@@ -161,13 +199,13 @@ img { display: block; }
 .collage.n3 img:nth-child(2) { right: 2%; top: 2%; bottom: auto; }
 .collage.n3 img:nth-child(3) { left: 23%; bottom: 2%; }
 .collage .mas { position: absolute; right: 4px; bottom: 4px; background: var(--azul); color: #fff; font-weight: 800; font-size: 11px; border-radius: 99px; padding: 2px 7px; }
-.slide .collage { width: 120px; height: 120px; flex: none; border-radius: 14px; }
+.slide .collage { width: 104px; height: 104px; flex: none; border-radius: 14px; }
 .combo .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .combo h3 { margin: 0; font-size: 16px; }
 .combo .lleva { font-size: 12px; color: var(--tenue); }
 .combo .tachado { color: var(--tenue); text-decoration: line-through; font-size: 13px; }
 .combo .precio { font-size: 21px; font-weight: 900; }
-.ahorro { display: inline-block; background: #e6f6ee; color: var(--ok); font-weight: 800; font-size: 12px; padding: 3px 7px; border-radius: 6px; }
+.ahorro { display: inline-block; background: color-mix(in srgb, var(--ok) 15%, var(--tarjeta)); color: var(--ok); font-weight: 800; font-size: 12px; padding: 3px 7px; border-radius: 6px; }
 .combos { display: grid; gap: 10px; }
 /* En la portada los combos van en fila, como los productos. */
 .fila-combos { display: flex; gap: 10px; overflow-x: auto; padding: 2px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
@@ -191,7 +229,7 @@ img { display: block; }
 .chip { flex: none; border: 1px solid var(--borde); background: var(--tarjeta); border-radius: 999px; padding: 7px 13px; font-size: 13px; font-weight: 600; }
 .chip.activo { background: var(--azul); color: #fff; border-color: var(--azul); }
 select.chip { appearance: none; padding-right: 13px; }
-.mensaje { margin-top: 14px; background: #fff8d6; border: 1px solid #f5e08a; border-radius: 12px; padding: 10px 14px; font-size: 14px; }
+.mensaje { margin-top: 14px; background: var(--aviso-bg); color: var(--aviso-texto); border: 1px solid var(--aviso-borde); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
 .vacio { text-align: center; color: var(--tenue); padding: 40px 10px; }
 .aviso { color: var(--tenue); font-size: 12px; text-align: center; margin: 18px 0 0; }
 .cargando { text-align: center; padding: 80px 20px; color: var(--tenue); }
@@ -218,12 +256,12 @@ body.en-local .miga { margin: 10px 0 8px; }
 .hoja-cab h2 { margin: 0; font-size: 19px; }
 .cerrar { border: 0; background: var(--tarjeta); width: 38px; height: 38px; border-radius: 50%; font-size: 20px; box-shadow: var(--sombra); }
 .hoja-cuerpo { padding: 0 16px; }
-.ficha-foto { background: #fff; border-radius: var(--radio); aspect-ratio: 1; max-height: 360px; width: 100%; display: grid; place-items: center; padding: 16px; }
+.ficha-foto { position: relative; background: #fff; border-radius: var(--radio); aspect-ratio: 1; max-height: 360px; width: 100%; display: grid; place-items: center; padding: 16px; }
 .ficha-foto img { width: 100%; height: 100%; object-fit: contain; }
 .ficha h3 { font-size: 20px; margin: 12px 0 2px; }
 .ficha .meta { color: var(--tenue); font-size: 13px; }
 .ficha .precio { font-size: 30px; font-weight: 900; margin: 6px 0; letter-spacing: -.02em; }
-.ficha .promo-caja { background: #fdecec; color: var(--oferta); border-radius: 10px; padding: 8px 12px; font-weight: 700; font-size: 14px; margin: 6px 0; }
+.ficha .promo-caja { background: color-mix(in srgb, var(--oferta) 14%, var(--tarjeta)); color: var(--oferta); border-radius: 10px; padding: 8px 12px; font-weight: 700; font-size: 14px; margin: 6px 0; }
 .ficha .botones { display: flex; gap: 8px; margin: 12px 0; }
 .ficha .botones > * { flex: 1; }
 .ficha .paso button { width: 44px; height: 44px; }
@@ -242,23 +280,23 @@ body.en-local .miga { margin: 10px 0 8px; }
 .cuentas .tot { font-size: 18px; font-weight: 800; border-top: 1px solid var(--borde); margin-top: 5px; padding-top: 8px; }
 .campo { margin: 10px 0; }
 .campo label { display: block; font-size: 13px; color: var(--tenue); margin-bottom: 4px; font-weight: 600; }
-.campo input, .campo textarea { width: 100%; font: inherit; font-size: 16px; padding: 12px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); }
+.campo input, .campo textarea, .campo select { width: 100%; font: inherit; font-size: 16px; padding: 12px; border-radius: 12px; border: 1px solid var(--borde); background: var(--tarjeta); color: var(--texto); }
 .seg { display: flex; gap: 6px; }
 .seg button { flex: 1; border: 1px solid var(--borde); background: var(--tarjeta); border-radius: 12px; padding: 10px 6px; font-weight: 600; font-size: 14px; }
 .seg button.activo { background: var(--azul); color: #fff; border-color: var(--azul); }
 .error { color: var(--oferta); font-size: 13px; font-weight: 600; margin: 6px 0; }
-.mayor { display: flex; gap: 8px; align-items: center; font-size: 14px; background: #fff8d6; border-radius: 10px; padding: 10px; margin: 10px 0; }
+.mayor { display: flex; gap: 8px; align-items: center; font-size: 14px; background: var(--aviso-bg); color: var(--aviso-texto); border-radius: 10px; padding: 10px; margin: 10px 0; }
 /* Empujones de venta (todos con datos reales) */
 .etq.hoy { background: #7048e8; }
-.btn.llevar { display: block; width: 100%; margin-top: 10px; background: #fff0f0; color: var(--oferta); border: 1.5px dashed var(--oferta); font-weight: 800; }
-.linea .gana { font-size: 12px; font-weight: 700; color: #00a650; }
-.empujon { margin-top: 4px; border: 0; background: #fff0f0; color: var(--oferta); font-weight: 800; font-size: 12px; border-radius: 99px; padding: 4px 10px; }
-.armar { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #fff9db, #ffec99); border: 1px solid #ffd43b; border-radius: 12px; padding: 10px 12px; margin: 4px 0 12px; }
+.btn.llevar { display: block; width: 100%; margin-top: 10px; background: color-mix(in srgb, var(--oferta) 12%, var(--tarjeta)); color: var(--oferta); border: 1.5px dashed var(--oferta); font-weight: 800; }
+.linea .gana { font-size: 12px; font-weight: 700; color: var(--verde); }
+.empujon { margin-top: 4px; border: 0; background: color-mix(in srgb, var(--oferta) 12%, var(--tarjeta)); color: var(--oferta); font-weight: 800; font-size: 12px; border-radius: 99px; padding: 4px 10px; }
+.armar { color: #141a26; display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #fff9db, #ffec99); border: 1px solid #ffd43b; border-radius: 12px; padding: 10px 12px; margin: 4px 0 12px; }
 .armar .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .armar .btn { flex: none; padding: 10px 12px; }
-.cuentas .verde { color: #00a650; font-weight: 700; }
+.cuentas .verde { color: var(--verde); font-weight: 700; }
 .slide.verde { background: linear-gradient(120deg, #087f5b, #12b886 60%, #63e6be); }
-.slide .grande-ico { font-style: normal; font-size: 64px; flex: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,.2)); }
+.slide .grande-ico { font-style: normal; font-size: 56px; flex: none; filter: drop-shadow(0 4px 10px rgba(0,0,0,.2)); }
 .slide.marca-slide { background: radial-gradient(circle at 85% 50%, #1c7ed6 0, var(--azul) 35%, #04173f 100%); }
 .slide.marca-slide img { width: 128px; height: 128px; border-radius: 50%; padding: 0; background: #fff; box-shadow: 0 6px 24px rgba(0,0,0,.35); }
 /* Recorre el local (prueba) */
@@ -297,7 +335,7 @@ body.en-local .miga { margin: 10px 0 8px; }
 .precio-gondola.rojo { background: var(--oferta); color: #fff; }
 .item.elegido { transform: translateY(-8px) scale(1.12); z-index: 2; }
 .item.elegido .item-foto { filter: drop-shadow(0 0 6px var(--azul)); }
-.ver-todos { margin-top: 8px; align-self: flex-end; border: 0; background: none; color: var(--azul); font-weight: 700; }
+.ver-todos { margin-top: 8px; align-self: flex-end; border: 0; background: none; color: var(--link); font-weight: 700; }
 .bandeja { position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); z-index: 12; margin-top: 10px; background: var(--tarjeta); border-radius: 16px; box-shadow: 0 -4px 24px rgba(16,24,40,.18); padding: 8px 10px; display: flex; gap: 10px; align-items: center; min-height: 80px; }
 body.con-pie .bandeja { bottom: calc(80px + env(safe-area-inset-bottom)); }
 .bandeja-vacia { flex: 1; text-align: center; color: var(--tenue); font-weight: 600; }
@@ -306,13 +344,13 @@ body.con-pie .bandeja { bottom: calc(80px + env(safe-area-inset-bottom)); }
 .bandeja-foto .placa em { width: 40px; height: 40px; font-size: 22px; margin: 0; }
 .bandeja-foto .placa span { display: none; }
 /* En el local: sin la franja de arriba, para que entren las gondolas enteras. */
-body.en-local .cab .franja { display: none; }
+body.en-local .franja, body.en-local .marca-fila { display: none; }
 .bandeja-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .bandeja-info b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .bandeja-precio .precio { font-size: 18px; font-weight: 800; }
 .bandeja-precio .antes { font-size: 11px; color: var(--tenue); text-decoration: line-through; }
 .bandeja .promo-txt { font-size: 11px; font-weight: 700; color: var(--oferta); }
-.ver-mas { align-self: flex-start; border: 0; background: none; padding: 0; color: var(--azul); font-weight: 700; font-size: 12px; }
+.ver-mas { align-self: flex-start; border: 0; background: none; padding: 0; color: var(--link); font-weight: 700; font-size: 12px; }
 .bandeja-ctrl { width: 118px; flex: none; }
 .miga .chip.modo { margin-left: auto; white-space: nowrap; }
 body.en-local .miga h2 { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
@@ -322,24 +360,51 @@ body.en-local .miga h2 { font-size: 17px; white-space: nowrap; overflow: hidden;
 .ayuda3d { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); background: rgba(0,0,0,.6); color: #fff; font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 99px; white-space: nowrap; pointer-events: none; transition: opacity .4s; }
 .ayuda3d.oculta { opacity: 0; }
 /* Lo mas buscado (debajo del buscador) */
-.sugeridas { background: #fff; color: var(--texto); border-bottom: 1px solid var(--borde); box-shadow: 0 8px 18px rgba(16,24,40,.12); }
+.sugeridas { position: absolute; left: 0; right: 0; top: 100%; background: var(--tarjeta); color: var(--texto); border-bottom: 1px solid var(--borde); box-shadow: 0 8px 18px rgba(16,24,40,.12); }
 .sugeridas .ancho { display: flex; gap: 8px; align-items: center; overflow-x: auto; padding-top: 10px; padding-bottom: 10px; scrollbar-width: none; }
 .sugeridas span { font-size: 12px; font-weight: 700; color: var(--tenue); white-space: nowrap; }
 .sugeridas .chip { flex: none; }
-/* WhatsApp flotante */
-.wa-flota { position: fixed; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 14; display: flex; align-items: center; gap: 6px; background: var(--whatsapp); color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; border-radius: 99px; padding: 10px 14px; box-shadow: 0 6px 18px rgba(31,157,85,.4); }
-.wa-flota svg { width: 22px; height: 22px; }
-.wa-flota[hidden] { display: none; }
-body.con-pie .wa-flota { bottom: calc(84px + env(safe-area-inset-bottom)); padding: 10px; }
-body.con-pie .wa-flota span { display: none; }
-body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
-.toast { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); background: #141a26; color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 40; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
+/* Seguimiento del pedido */
+.sigue { margin-top: 14px; background: var(--tarjeta); border-radius: var(--radio); box-shadow: var(--sombra); padding: 12px 14px; border-left: 4px solid var(--ok); }
+.sigue.mal { border-left-color: var(--oferta); }
+.sigue-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sigue .sub { color: var(--tenue); font-size: 12px; }
+.sigue p { margin: 8px 0 0; font-size: 14px; }
+.sigue .btn { display: inline-block; margin-top: 10px; text-decoration: none; }
+.pasos { list-style: none; display: flex; margin: 12px 0 0; padding: 0; }
+.pasos li { flex: 1; position: relative; text-align: center; font-size: 11px; font-weight: 600; color: var(--tenue); }
+.pasos li i { display: block; width: 14px; height: 14px; border-radius: 50%; background: var(--punto); margin: 0 auto 5px; position: relative; z-index: 1; }
+.pasos li::before { content: ''; position: absolute; top: 6px; right: 50%; width: 100%; height: 3px; background: var(--punto); }
+.pasos li:first-child::before { display: none; }
+.pasos li.hecho i, .pasos li.ahora i, .pasos li.hecho::before, .pasos li.ahora::before { background: var(--ok); }
+.pasos li.hecho, .pasos li.ahora { color: var(--texto); }
+.pasos li.ahora { font-weight: 800; }
+.pasos li.ahora i { box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 28%, transparent); animation: pulso 1.6s infinite; }
+.pasos li.espera i { animation: pulso 1.6s infinite; }
+@keyframes pulso { 50% { transform: scale(1.3); } }
+.cerrar.chico { width: 30px; height: 30px; font-size: 14px; flex: none; }
+/* Alias para transferir */
+.alias { display: flex; align-items: center; gap: 10px; background: var(--tarjeta); border: 1px dashed var(--link); border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+.alias .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--tenue); }
+.alias b { font-size: 17px; color: var(--texto); word-break: break-all; }
+.alias .btn { flex: none; }
+/* Instalar la tienda en el celular */
+.instalar { margin-top: 22px; display: flex; align-items: center; gap: 10px; background: var(--tarjeta); border-radius: var(--radio); box-shadow: var(--sombra); padding: 12px 14px; }
+.instalar .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--tenue); }
+.instalar b { font-size: 15px; color: var(--texto); }
+.aviso a { color: var(--link); font-weight: 700; text-decoration: none; }
+.toast { position: fixed; left: 50%; bottom: 92px; transform: translateX(-50%); background: var(--toast); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; z-index: 60; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: calc(100% - 32px); }
 </style>
 </head>
 <body>
-<header class="cab">
+<header class="marca-fila">
   <div class="ancho">
     <div class="marca"><div class="logo" id="logo">B</div><div style="min-width:0"><h1 id="titulo">Cargando…</h1><div class="suc" id="sucursal"></div></div></div>
+    <a class="wa-btn" id="waFlota" hidden target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.7 14.9L2 22l5.2-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.2.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.9 11.9 0 0 0 4.6 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3Z"/></svg></a>
+  </div>
+</header>
+<div class="cab">
+  <div class="ancho">
     <label class="buscador" id="buscador" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
       <input type="search" id="buscar" placeholder="Buscar golosinas, bebidas, marcas…" autocomplete="off" enterkeyhint="search" aria-label="Buscar productos">
@@ -349,10 +414,9 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
       <b id="carritoCuenta" hidden>0</b>
     </button>
   </div>
-  <div class="franja" id="franja" hidden><div class="ancho" id="franjaTxt"></div></div>
   <div class="sugeridas" id="sugeridas" hidden><div class="ancho" id="sugeridasTxt"></div></div>
-</header>
-<a class="wa-flota" id="waFlota" hidden target="_blank" rel="noopener" aria-label="Escribinos por WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.7 14.9L2 22l5.2-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.2.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.9 11.9 0 0 0 4.6 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3Z"/></svg><span>Consultas</span></a>
+</div>
+<div class="franja" id="franja" hidden><div class="ancho" id="franjaTxt"></div></div>
 <main class="ancho" id="contenido"><div class="esqueleto" aria-label="Cargando la tienda…"><div class="banner-e"></div><div></div><div></div><div></div><div></div></div></main>
 <div class="pie" id="pie" hidden><button id="pieBtn"></button></div>
 <div class="hoja" id="hoja"><div class="caja" id="hojaCaja"></div></div>
@@ -369,8 +433,21 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
 // productos sueltos; el envio se ve desde el carrito.
 ;(function () {
   const params = new URLSearchParams((location.hash || '').slice(1) || location.search.slice(1))
-  const proyecto = String(params.get('p') || '').replace(/[^a-z0-9-]/gi, '')
-  const sucursal = String(params.get('s') || '').replace(/[^\w-]/g, '')
+  let proyecto = String(params.get('p') || '').replace(/[^a-z0-9-]/gi, '')
+  let sucursal = String(params.get('s') || '').replace(/[^\w-]/g, '')
+  // La tienda instalada (el icono en la pantalla de inicio) abre sin el link:
+  // se acuerda de la ultima sucursal que se vio en este celular.
+  try {
+    const ULTIMA = 'tienda.ultima|' + location.pathname
+    if (proyecto && sucursal) localStorage.setItem(ULTIMA, JSON.stringify([proyecto, sucursal]))
+    else {
+      const u = JSON.parse(localStorage.getItem(ULTIMA)) || []
+      proyecto = String(u[0] || '').replace(/[^a-z0-9-]/gi, '')
+      sucursal = String(u[1] || '').replace(/[^\w-]/g, '')
+      if (proyecto && sucursal) history.replaceState(null, '', location.pathname + '?p=' + proyecto + '&s=' + sucursal)
+    }
+  } catch (e) { /* sin almacenamiento */ }
+  const EN_PRUEBA = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
   const $ = (id) => document.getElementById(id)
   const el = (tag, props, ...hijos) => {
     const n = document.createElement(tag)
@@ -445,29 +522,66 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
   const fallar = (texto) => {
     $('titulo').textContent = 'Tienda'
     $('contenido').replaceChildren(el('div', { clase: 'vacio' }, texto))
+    $('pie').hidden = true
+    $('buscador').hidden = true
+    $('carritoBtn').hidden = true
+    datos = null
+  }
+
+  const urlTienda = () => 'https://' + proyecto + '.supabase.co/storage/v1/object/public/panel/tienda/' + sucursal
+  const sirve = (d) => !!d && !d.apagada && Array.isArray(d.productos)
+  let arrancado = false
+  function arrancar () {
+    preparar()
+    pintarCabecera()
+    limpiarCarrito()
+    // Si ya esta mirando algo (una ficha, una lista, bajo en la pagina) no se
+    // le mueve la pantalla: los precios nuevos igual quedan cargados.
+    const quieto = arrancado && (vista.tipo !== 'inicio' || $('hoja').classList.contains('abierta') || window.scrollY > 300)
+    if (!arrancado) abrirDelLink()
+    arrancado = true
+    if (!quieto) pintar()
+    pintarPie()
   }
 
   async function cargar () {
     if (!proyecto || !sucursal) return fallar('El link está incompleto. Pedile al local que te lo mande de nuevo.')
+    // En la compu de prueba (localhost) se puede leer un archivo de ejemplo.
+    const ejemplo = EN_PRUEBA && params.get('datos')
+    const url = urlTienda() + '.json'
+    // 1. Lo guardado de la ultima visita: la tienda abre al instante.
+    let cache = null
+    let guardado = ''
     try {
-      // En la compu de prueba (localhost) se puede leer un archivo de ejemplo.
-      const ejemplo = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) && params.get('datos')
-      const r = ejemplo ? await fetch(ejemplo) : await fetch('https://' + proyecto + '.supabase.co/storage/v1/object/public/panel/tienda/' + sucursal + '.json?t=' + Math.floor(Date.now() / 120000), { cache: 'no-store' })
+      cache = await caches.open('tienda-datos')
+      const r = ejemplo ? null : await cache.match(url)
+      if (r) {
+        guardado = await r.text()
+        const d = JSON.parse(guardado)
+        if (sirve(d)) { datos = d; arrancar() }
+      }
+    } catch (e) { guardado = '' }
+    const olvidar = () => { if (cache) cache.delete(url).catch(() => {}) }
+    // 2. Lo de ahora: si cambio algo, se actualiza.
+    try {
+      const r = ejemplo ? await fetch(ejemplo) : await fetch(url + '?t=' + Math.floor(Date.now() / 120000), { cache: 'no-store' })
       // 400/404 = la caja todavía no publicó la tienda (o la apagó): no es la conexión del cliente.
-      if (r.status === 400 || r.status === 404) return fallar('Esta tienda todavía no está abierta. Probá más tarde.')
+      if (r.status === 400 || r.status === 404) { olvidar(); return fallar('Esta tienda todavía no está abierta. Probá más tarde.') }
       if (!r.ok) throw new Error('no hay')
-      datos = await r.json()
-    } catch (e) { return fallar('No se pudo abrir la tienda. Revisá la conexión y probá de nuevo.') }
-    if (!datos || datos.apagada || !Array.isArray(datos.productos)) return fallar('Esta tienda no está disponible por ahora.')
-    preparar()
-    pintarCabecera()
-    limpiarCarrito()
-    abrirDelLink()
-    pintar()
-    pintarPie()
+      const texto = await r.text()
+      const d = JSON.parse(texto)
+      if (!sirve(d)) { olvidar(); return fallar('Esta tienda no está disponible por ahora.') }
+      if (!arrancado || texto !== guardado) { datos = d; arrancar() }
+      if (cache && !ejemplo) cache.put(url, new Response(texto, { headers: { 'Content-Type': 'application/json' } })).catch(() => {})
+    } catch (e) {
+      if (!arrancado) return fallar('No se pudo abrir la tienda. Revisá la conexión y probá de nuevo.')
+      toast('Sin conexión: estás viendo los precios de tu última visita.')
+    }
+    seguir()
   }
 
   function preparar () {
+    for (const o of [porId, promoDe, combosDe]) for (const k of Object.keys(o)) delete o[k]
     productos = datos.productos.map((p, i) => ({
       i, nombre: p[0], precio: p[1], categoria: p[2] || 'Otros', foto: p[3] || '', hay: !!p[4], id: String(p[5] || 'n:' + p[0]),
       marca: p[6] || '', nuevo: !!p[7], poco: !!p[8], subrubro: p[9] || ''
@@ -492,19 +606,38 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
   // "SUCURSAL ALBERDI 487" -> "Alberdi 487".
   const nombreSucursal = () => titulo(String(datos.sucursal || '').replace(/^\s*sucursal\s*/i, ''))
 
-  function abiertoAhora (h) {
+  function horarioDe (h) {
     const n = normal(h || '')
     if (!n || /lun|mart|mar\b|mier|jue|vie|sab|dom|feriad/.test(n.replace(/todos los dias/, ''))) return null
     const m = n.match(/(\d{1,2})(?:[:.](\d{2}))?\s*(?:h|hs)?\s*a\s*(\d{1,2})(?:[:.](\d{2}))?/)
     if (!m) return null
     const desde = Number(m[1]) * 60 + Number(m[2] || 0)
-    let hasta = Number(m[3]) * 60 + Number(m[4] || 0)
+    const hasta = Number(m[3]) * 60 + Number(m[4] || 0)
     if (desde > 24 * 60 || hasta > 24 * 60) return null
-    if (desde === 0 && hasta === 24 * 60) return { abierto: true }
+    return { desde, hasta, siempre: desde === 0 && hasta === 24 * 60, abre: m[1] + (m[2] && m[2] !== '00' ? ':' + m[2] : '') }
+  }
+  function abiertoAhora (h) {
+    const x = horarioDe(h)
+    if (!x) return null
+    if (x.siempre) return { abierto: true }
     const d = new Date()
     const ahora = d.getHours() * 60 + d.getMinutes()
-    const abierto = hasta > desde ? ahora >= desde && ahora < hasta : ahora >= desde || ahora < hasta
-    return { abierto, abre: m[1] + (m[2] && m[2] !== '00' ? ':' + m[2] : '') }
+    const abierto = x.hasta > x.desde ? ahora >= x.desde && ahora < x.hasta : ahora >= x.desde || ahora < x.hasta
+    return { abierto, abre: x.abre }
+  }
+  // "Para mas tarde": cada media hora, desde que da el tiempo hasta el cierre de hoy.
+  function horariosTarde () {
+    const d = new Date()
+    const ahora = d.getHours() * 60 + d.getMinutes()
+    const h = horarioDe(t().horario)
+    let desde = ahora + Math.max(30, t().demora || 0) + 15
+    let hasta = 23 * 60 + 30
+    if (h && !h.siempre) {
+      if (h.hasta > h.desde) { desde = Math.max(desde, h.desde + 30); hasta = Math.min(hasta, h.hasta - 15) } else if (ahora >= h.hasta && ahora < h.desde) desde = Math.max(desde, h.desde + 30)
+    }
+    const l = []
+    for (let m = Math.ceil(desde / 30) * 30; m <= hasta; m += 30) l.push(String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'))
+    return l
   }
 
   function pintarCabecera () {
@@ -657,9 +790,9 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
       el('button', { 'aria-label': 'Uno más', onclick: (ev) => { ev.stopPropagation(); cambiar(k, 1) } }, '+'))
   }
   // El boton Agregar / − n + que se repinta solo cuando cambia ese producto.
-  function control (k, hay, grande) {
+  function control (k, hay, grande, chico) {
     const nodo = el('div', { clase: 'acciones' })
-    const f = { k, nodo, pintar: () => nodo.replaceChildren(!hay ? el('div', { clase: 'sin-stock' }, 'Sin stock') : cuantos(k) ? paso(k, grande) : el('button', { clase: 'agregar', onclick: (ev) => { ev.stopPropagation(); cambiar(k, 1) } }, '+ Agregar')) }
+    const f = { k, nodo, pintar: () => nodo.replaceChildren(!hay ? el('div', { clase: 'sin-stock' }, 'Sin stock') : cuantos(k) ? paso(k, grande) : el('button', { clase: 'agregar', 'aria-label': chico ? 'Agregar' : null, onclick: (ev) => { ev.stopPropagation(); cambiar(k, 1) } }, chico ? '+' : '+ Agregar')) }
     f.pintar()
     tarjetasVivas.add(f)
     return nodo
@@ -690,6 +823,26 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
       fotos.slice(0, 3).map((u) => el('img', { src: u, alt: '', loading: 'lazy', decoding: 'async' })),
       extra > 0 ? el('span', { clase: 'mas' }, '+' + extra) : null)
   }
+  // ---------- Favoritos (quedan en este celular) ----------
+  let favoritos = leer(CLAVE + '.favoritos', [])
+  const CORAZON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>'
+  function botonFav (p) {
+    const esta = favoritos.includes(p.id)
+    const b = el('button', { clase: 'fav' + (esta ? ' activo' : ''), 'aria-label': 'Guardar en favoritos', 'aria-pressed': String(esta) })
+    b.innerHTML = CORAZON
+    b.dataset.id = p.id
+    b.addEventListener('click', (ev) => {
+      ev.stopPropagation()
+      const estaba = favoritos.includes(p.id)
+      favoritos = estaba ? favoritos.filter((x) => x !== p.id) : [p.id, ...favoritos].slice(0, 60)
+      guardar(CLAVE + '.favoritos', favoritos)
+      for (const n of document.querySelectorAll('.fav')) if (n.dataset.id === p.id) { n.classList.toggle('activo', !estaba); n.setAttribute('aria-pressed', String(!estaba)) }
+      toast(estaba ? 'Lo sacaste de tus favoritos' : '❤️ Guardado en tus favoritos')
+    })
+    return b
+  }
+  const misFavoritos = () => favoritos.map((id) => porId[id]).filter(Boolean)
+
   function tarjeta (p) {
     const promo = promoDe[p.id]
     const rank = rankDe[p.id]
@@ -699,16 +852,16 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     const cp = conPromo(p)
     if (promo && !cp) etqs.push(el('span', { clase: 'etq promo' }, promo.etiqueta.length <= 14 ? promo.etiqueta : 'Promo'))
     if (promo && promo.hasta === hoy()) etqs.push(el('span', { clase: 'etq hoy' }, 'Termina hoy'))
-    const llega = p.hay && t().demora && datos.pedidos && (abiertoAhora(t().horario) || { abierto: true }).abierto
     return el('article', { clase: 'prod' + (p.hay ? '' : ' agotado') },
-      el('button', { clase: 'foto', 'aria-label': 'Ver ' + p.nombre, onclick: () => abrirFicha(p) }, foto(p), etqs.length ? el('div', { clase: 'etiquetas' }, etqs) : null),
+      el('div', { clase: 'marco' },
+        el('button', { clase: 'foto', 'aria-label': 'Ver ' + p.nombre, onclick: () => abrirFicha(p) }, foto(p), etqs.length ? el('div', { clase: 'etiquetas' }, etqs) : null),
+        botonFav(p),
+        control(p.id, p.hay, false, true)),
       el('div', { clase: 'info' },
         bloquePrecio(p),
         textoPromo(p),
-        llega ? el('div', { clase: 'llega' }, 'Llega en ~' + t().demora + ' min') : null,
         el('div', { clase: 'nom', title: p.nombre }, titulo(p.nombre)),
-        p.poco ? el('div', { clase: 'poco' }, '¡Últimas unidades!') : null,
-        control(p.id, p.hay)))
+        p.poco ? el('div', { clase: 'poco' }, '¡Últimas unidades!') : null))
   }
   function tarjetaCombo (c, destacado) {
     const lleva = (c.partes || []).map((x) => x.n + ' ' + titulo(x.nombre)).join(' + ')
@@ -770,11 +923,12 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     if (vista.tipo === 'local') return poner(c, pantallaLocal())
     poner(c, pantallaInicio())
     banners()
+    pintarInstalar()
   }
   function ir (v) { vista = v; pintar(); window.scrollTo({ top: 0 }) }
 
   function pantallaInicio () {
-    const partes = []
+    const partes = [nodoSeguimiento()]
     if (datos.mensaje) partes.push(el('div', { clase: 'mensaje' }, datos.mensaje))
     if (!datos.whatsapp && !datos.pedidos) partes.push(el('div', { clase: 'mensaje' }, 'Esta tienda todavía no recibe pedidos online. Podés mirar los precios.'))
     partes.push(el('div', { clase: 'banner', id: 'banner' }))
@@ -784,11 +938,14 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     partes.push(el('nav', { clase: 'cats', 'aria-label': 'Categorías' },
       combos.length ? el('button', { clase: 'cat', onclick: () => document.getElementById('sec-combos').scrollIntoView({ behavior: 'smooth' }) }, el('div', { clase: 'ico' }, '🎁'), el('span', {}, 'Combos')) : null,
       enPromo().length ? el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', promo: true, titulo: 'Ofertas' }) }, el('div', { clase: 'ico' }, '🔥'), el('span', {}, 'Ofertas')) : null,
+      misFavoritos().length ? el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', favs: true, titulo: 'Tus favoritos' }) }, el('div', { clase: 'ico' }, '❤️'), el('span', {}, 'Favoritos')) : null,
       cats.map((k) => el('button', { clase: 'cat', onclick: () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) }) }, el('div', { clase: 'ico' }, estiloCat(k).ico), el('span', {}, titulo(k))))))
     const top = masVendidos()
     if (verLocal) partes.push(el('button', { clase: 'entrar-local', onclick: () => ir({ tipo: 'local' }) },
       el('div', { clase: 'txt' }, el('b', {}, '🚶 Recorré el local'), el('span', {}, 'Caminá por las góndolas y elegí como si estuvieras ahí')),
       el('span', { clase: 'flecha' }, '›')))
+    const favs = misFavoritos()
+    if (favs.length) partes.push(seccion('❤️ Tus favoritos', null, filaH(favs.slice(0, 20)), favs.length > 4 ? () => ir({ tipo: 'lista', favs: true, titulo: 'Tus favoritos' }) : null))
     partes.push(filaMomento())
     // Lo que ya compró en este celular (como "Volvé a comprar" de las tiendas grandes).
     const comprados = conHay(leer(CLAVE + '.comprados', []).map((id) => porId[id]))
@@ -820,8 +977,10 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
       const l = conHay(productos.filter((p) => p.categoria === k)).sort((a, b) => (rankDe[a.id] || 999) - (rankDe[b.id] || 999) || !!b.foto - !!a.foto).slice(0, 14)
       if (l.length >= 3) partes.push(seccion(estiloCat(k).ico + ' ' + titulo(k), null, filaH(l), () => ir({ tipo: 'lista', categoria: k, titulo: titulo(k) })))
     }
+    partes.push(el('div', { clase: 'instalar', id: 'instalar', hidden: true }))
     partes.push(seccion('Todos los productos', productos.length + ' productos', grilla(ordenar(productos, 'relevancia'))))
     partes.push(el('p', { clase: 'aviso' }, 'Precios de lista: pueden cambiar. Las promos se aplican al cobrar. Fotos ilustrativas.'))
+    if (datos.whatsapp) partes.push(el('p', { clase: 'aviso' }, el('a', { href: $('waFlota').href, target: '_blank', rel: 'noopener' }, '💬 ¿Dudas? Escribinos por WhatsApp')))
     return partes
   }
 
@@ -849,6 +1008,7 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     if (vista.top) base = masVendidos()
     else if (vista.nuevos) base = nuevos()
     else if (vista.promo) base = enPromo()
+    else if (vista.favs) base = misFavoritos()
     else base = productos.filter((p) => p.categoria === vista.categoria)
     // Subcategorias como chips (si las hay).
     let subs = []
@@ -898,7 +1058,7 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
         el('div', { clase: 'txt' }, el('span', { clase: 'tag' }, 'Combo'), el('h2', {}, titulo(c.nombre)),
           el('div', { clase: 'grande' }, pesos(c.precio)),
           el('p', {}, c.separado ? 'Ahorrás ' + pesos(c.separado - c.precio) : (c.partes || []).map((x) => x.n + ' ' + titulo(x.nombre)).join(' + '))),
-        ((fc) => fc.classList.contains('placa') ? null : fc)(fotoCombo(c))))
+        ((fc) => fc.classList.contains('placa') ? el('em', { clase: 'grande-ico' }, '🎁') : fc)(fotoCombo(c))))
     }
     for (const pr of promos.slice(0, 3)) {
       const conFoto = (pr.ids || []).map((id) => porId[id]).find((p) => p && p.foto && p.hay)
@@ -975,13 +1135,14 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     const parecidos = otros.length >= 3 ? [] : conHay(productos.filter((x) => x !== p && x.categoria === p.categoria && (!p.subrubro || x.subrubro === p.subrubro))).sort((a, b) => (rankDe[a.id] || 999) - (rankDe[b.id] || 999)).slice(0, 10)
     abrirHoja('Producto',
       el('div', { clase: 'ficha' },
-        el('div', { clase: 'ficha-foto' }, foto(p)),
+        el('div', { clase: 'ficha-foto' }, foto(p), botonFav(p)),
         el('h3', {}, titulo(p.nombre)),
         el('div', { clase: 'meta' }, [p.marca, titulo(p.categoria), p.subrubro && titulo(p.subrubro)].filter(Boolean).join(' · ')),
         rankDe[p.id] && rankDe[p.id] <= 10 ? el('div', { style: 'margin-top:6px' }, el('span', { clase: 'etq top' }, rankDe[p.id] === 1 ? 'N.º 1 más vendido' : 'Top ' + rankDe[p.id] + ' en ventas')) : null,
         bloquePrecio(p),
+        p.hay && t().demora && datos.pedidos && (abiertoAhora(t().horario) || { abierto: true }).abierto ? el('div', { clase: 'llega' }, '⚡ Llega en ~' + t().demora + ' min') : null,
         promo ? el('div', { clase: 'promo-caja' }, '🔥 ' + promo.etiqueta + (promo.horas ? ' · de ' + promo.horas + ' h' : '') + ' · ' + titulo(promo.nombre)) : null,
-        p.poco ? el('div', { clase: 'poco', style: 'color:#b54708;font-weight:700' }, '¡Quedan pocas unidades!') : null,
+        p.poco ? el('div', { clase: 'poco', style: 'font-size:13px;font-weight:700' }, '¡Quedan pocas unidades!') : null,
         ((n) => n && p.hay ? el('button', { clase: 'btn llevar', onclick: () => {
           const ya = cuantos(p.id)
           const obj = Math.min(99, (Math.floor(ya / n.lleva) + 1) * n.lleva)
@@ -1220,6 +1381,129 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     return Object.entries(eleg).filter(([id]) => comboDe('combo:' + id) && cuantos('combo:' + id)).map(([id, l]) => titulo(comboDe('combo:' + id).nombre) + ' con ' + l.join(', ')).join('; ')
   }
 
+  // ---------- Seguimiento del pedido ----------
+  // La caja deja en la nube en que anda cada pedido de la tienda (solo el
+  // numero al azar del pedido y el estado: nada del cliente). Aca se mira cada
+  // 20 segundos mientras hay un pedido en curso.
+  let siguiendo = leer(CLAVE + '.siguiendo', null)
+  let seguirT = null
+  const pasoDe = (est) => ({ presupuesto: 0, pendiente: 0, confirmado: 0, preparando: 1, listo: 2, entregado: 3 })[est]
+  const terminado = (s) => !s || s.estado === 'entregado' || s.estado === 'cancelado'
+  const nombresPasos = (s) => ['Recibido', 'Preparando', s.envio ? 'En camino' : 'Listo', 'Entregado']
+  function hace (ts) {
+    const m = Math.round((Date.now() - ts) / 60000)
+    return m < 2 ? 'recién' : m < 60 ? 'hace ' + m + ' min' : 'hace ' + Math.round(m / 60) + ' h'
+  }
+  function dejarDeSeguir () {
+    siguiendo = null
+    guardar(CLAVE + '.siguiendo', null)
+    clearInterval(seguirT)
+    pintarSeguimiento()
+  }
+  function nodoSeguimiento () {
+    const s = siguiendo
+    if (!s || !s.pid || Date.now() - s.en > 24 * 3600000) return null
+    const n = pasoDe(s.estado)
+    const cancelado = s.estado === 'cancelado'
+    const texto1 = cancelado ? 'El local canceló este pedido. Escribinos y lo vemos.'
+      : n == null ? 'Ya lo mandamos al local. En un ratito lo ven.'
+        : n === 0 ? 'El local ya tiene tu pedido' + (s.para ? ' para las ' + s.para + ' h.' : '. Te escriben para confirmarte el total.')
+          : n === 1 ? 'Lo están preparando.'
+            : n === 2 ? (s.envio ? 'Ya salió para tu casa.' : 'Ya está listo: pasá a buscarlo cuando quieras.')
+              : '¡Entregado! Gracias por tu compra.'
+    return el('section', { clase: 'sigue' + (cancelado ? ' mal' : ''), id: 'seguimiento', 'aria-live': 'polite' },
+      el('div', { clase: 'sigue-cab' }, el('b', {}, '📦 Tu pedido' + (s.total ? ' · ' + pesos(s.total) : '')),
+        terminado(s) ? el('button', { clase: 'cerrar chico', 'aria-label': 'Cerrar', onclick: dejarDeSeguir }, '✕') : el('span', { clase: 'sub' }, hace(s.en))),
+      cancelado ? null : el('ol', { clase: 'pasos' }, nombresPasos(s).map((tx, i) => el('li', { clase: n === 3 || (n != null && i < n) ? 'hecho' : i === n ? 'ahora' : n == null && i === 0 ? 'espera' : '' }, el('i', {}), el('span', {}, tx)))),
+      el('p', {}, texto1),
+      cancelado && datos.whatsapp ? el('a', { clase: 'btn whatsapp', href: 'https://wa.me/' + datos.whatsapp + '?text=' + encodeURIComponent('Hola! Hice un pedido por la tienda online y me figura cancelado'), target: '_blank', rel: 'noopener' }, 'Escribir por WhatsApp') : null)
+  }
+  function pintarSeguimiento () {
+    const viejo = $('seguimiento')
+    const nuevo = vista.tipo === 'inicio' ? nodoSeguimiento() : null
+    if (viejo && nuevo) viejo.replaceWith(nuevo)
+    else if (viejo) viejo.remove()
+    else if (nuevo) $('contenido').prepend(nuevo)
+  }
+  async function mirarPedido () {
+    const s = siguiendo
+    if (!s || !s.pid || terminado(s) || document.hidden) return
+    try {
+      const ej = EN_PRUEBA && params.get('estados')
+      const r = await fetch(ej || urlTienda() + '-pedidos.json?t=' + Math.floor(Date.now() / 10000), { cache: 'no-store' })
+      if (!r.ok) return
+      const d = await r.json()
+      const est = d && d.pedidos && d.pedidos[s.pid]
+      if (!est || est === s.estado || siguiendo !== s) return
+      s.estado = est
+      guardar(CLAVE + '.siguiendo', s)
+      pintarSeguimiento()
+      toast(est === 'cancelado' ? 'El local canceló tu pedido' : '📦 Tu pedido: ' + nombresPasos(s)[pasoDe(est)])
+      if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) navigator.vibrate(120)
+    } catch (e) { /* se prueba de nuevo en la proxima vuelta */ }
+  }
+  function seguir () {
+    clearInterval(seguirT)
+    const s = siguiendo
+    if (!s || !s.pid) return
+    if (Date.now() - s.en > 24 * 3600000) return dejarDeSeguir()
+    if (terminado(s)) return
+    mirarPedido()
+    seguirT = setInterval(() => { if (terminado(siguiendo)) clearInterval(seguirT); else { mirarPedido(); pintarSeguimiento() } }, 20000)
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) mirarPedido() })
+
+  // ---------- Alias para transferir ----------
+  function copiar (texto1, aviso) {
+    const ok = () => toast('✓ ' + aviso)
+    const aMano = () => {
+      const a = el('textarea', { style: 'position:fixed;opacity:0' })
+      a.value = texto1
+      document.body.append(a)
+      a.select()
+      try { document.execCommand('copy'); ok() } catch (e) { toast('No se pudo copiar. El alias es ' + texto1) }
+      a.remove()
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto1).then(ok, aMano)
+    else aMano()
+  }
+  function cajaAlias (texto1) {
+    if (!t().alias) return null
+    return el('div', { clase: 'alias' },
+      el('div', { clase: 'txt' }, el('span', {}, texto1), el('b', {}, t().alias), t().titular ? el('span', {}, 'A nombre de ' + t().titular) : null),
+      el('button', { clase: 'btn', onclick: () => copiar(t().alias, 'Alias copiado') }, 'Copiar'))
+  }
+
+  // ---------- Instalar (el icono en la pantalla de inicio) ----------
+  let instalarEv = null
+  const instalada = () => (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true
+  const esIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  // En el iPhone el icono guarda la direccion de la pagina (con la sucursal);
+  // en el resto, el archivo de la app.
+  if (!esIOS) document.head.append(el('link', { rel: 'manifest', href: 'tienda.webmanifest' }))
+  async function instalar () {
+    if (!instalarEv) return
+    instalarEv.prompt()
+    try { await instalarEv.userChoice } catch (e) { /* lo cerro */ }
+    instalarEv = null
+    pintarInstalar()
+  }
+  function pintarInstalar () {
+    const n = $('instalar')
+    if (!n) return
+    const puede = !instalada() && !leer('tienda.noInstalar', false) && (instalarEv || esIOS)
+    n.hidden = !puede
+    if (!puede) return n.replaceChildren()
+    poner(n,
+      el('div', { clase: 'txt' }, el('b', {}, '📲 Tené la tienda a mano'), el('span', {}, instalarEv ? 'Instalala en tu celular y pedí más rápido la próxima vez.' : 'Tocá el botón Compartir y elegí "Agregar a inicio".')),
+      instalarEv ? el('button', { clase: 'btn azul', onclick: instalar }, 'Instalar') : null,
+      el('button', { clase: 'cerrar chico', 'aria-label': 'No mostrar más', onclick: () => { guardar('tienda.noInstalar', true); pintarInstalar() } }, '✕'))
+  }
+  window.addEventListener('beforeinstallprompt', (ev) => { ev.preventDefault(); instalarEv = ev; pintarInstalar() })
+  window.addEventListener('appinstalled', () => { instalarEv = null; pintarInstalar() })
+  // Lo que trabaja por detras: guarda la pagina y las fotos para que abra rapido.
+  if ('serviceWorker' in navigator && (!EN_PRUEBA || params.get('sw'))) navigator.serviceWorker.register('sw-tienda.js', { scope: 'tienda.html' }).catch(() => {})
+
   // ---------- Pedido ----------
   function abrirCarrito () {
     if (!lineas().length) return toast('Tu pedido está vacío: tocá "+ Agregar" en lo que quieras.')
@@ -1233,6 +1517,22 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     const error = el('div', { clase: 'error' })
     const zona = el('div', {})
     const boton = el('button', { clase: 'btn whatsapp ancho-total' })
+    // "Para mas tarde": la hora elegida ("21:30") o nada si es lo antes posible.
+    let para = ''
+    const horas = horariosTarde()
+    const selHora = el('select', { 'aria-label': 'A qué hora lo querés', style: 'margin-top:8px' }, horas.map((h) => el('option', { value: h }, 'A las ' + h + ' h')))
+    selHora.addEventListener('change', () => { para = selHora.value })
+    const segCuando = el('div', { clase: 'seg' })
+    const pintarCuando = () => {
+      segCuando.replaceChildren(
+        el('button', { clase: para ? '' : 'activo', onclick: () => { para = ''; pintarCuando() } }, '⚡ Lo antes posible'),
+        el('button', { clase: para ? 'activo' : '', onclick: () => { para = selHora.value; pintarCuando() } }, '🕒 Más tarde'))
+      selHora.hidden = !para
+    }
+    pintarCuando()
+    const campoCuando = horas.length ? el('div', { clase: 'campo' }, el('label', {}, '¿Para cuándo?'), segCuando, selHora) : null
+    const campoAlias = cajaAlias('Cuando te confirmemos el total, transferí a:')
+    const ab = abiertoAhora(t().horario)
 
     const pintarZona = () => {
       const l = lineas()
@@ -1297,7 +1597,7 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     const campoDir = el('div', { clase: 'campo' }, el('label', {}, 'Dirección de envío'), direccion)
     const campoVuelto = el('div', { clase: 'campo' }, el('label', {}, '¿Con cuánto pagás? (para llevarte el vuelto)'), vuelto)
     const alEntrega = () => { campoDir.hidden = cliente.entrega !== 'envio'; pintarZona() }
-    const alPago = () => { campoVuelto.hidden = cliente.pago !== 'efectivo' || cliente.entrega !== 'envio' }
+    const alPago = () => { campoVuelto.hidden = cliente.pago !== 'efectivo' || cliente.entrega !== 'envio'; if (campoAlias) campoAlias.hidden = cliente.pago !== 'transferencia' }
 
     const textoWhatsApp = (yaMandado) => {
       const tx = ['Hola! Quiero hacer este pedido' + (datos.sucursal ? ' (' + datos.sucursal + ')' : '') + (yaMandado ? ' (ya lo mandé por la tienda)' : '') + ':', '']
@@ -1306,6 +1606,7 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
       const costo = cliente.entrega === 'envio' ? costoEnvio(sub) : 0
       tx.push('', 'Total aproximado: ' + pesos(sub + costo) + (costo ? ' (con envío)' : ''), 'Nombre: ' + cliente.nombre)
       tx.push(cliente.entrega === 'envio' ? 'Envío a: ' + cliente.direccion : 'Lo retiro en el local')
+      if (para) tx.push('Para las ' + para + ' h')
       tx.push('Pago: ' + ({ efectivo: 'efectivo', transferencia: 'transferencia', mp: 'Mercado Pago' }[cliente.pago] || 'efectivo') + (vuelto.value ? ' (pago con ' + pesos(Number(vuelto.value) * 100) + ')' : ''))
       if (notaCombos()) tx.push('Combos: ' + notaCombos())
       if (nota.value.trim()) tx.push('Nota: ' + nota.value.trim())
@@ -1314,7 +1615,7 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     // Directo a la caja. Devuelve 'ok' o por que no entro.
     const mandarDirecto = async () => {
       let pid = leer(CLAVE + '.enviando', '')
-      const huella = JSON.stringify([lineas().map((x) => [x.k, x.c]), cliente, nota.value.trim(), vuelto.value])
+      const huella = JSON.stringify([lineas().map((x) => [x.k, x.c]), cliente, nota.value.trim(), vuelto.value, para])
       if (!pid || leer(CLAVE + '.huella', '') !== huella) {
         pid = crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16))
         guardar(CLAVE + '.enviando', pid)
@@ -1330,7 +1631,9 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
         direccion: envio ? cliente.direccion : '',
         pago: cliente.pago,
         vuelto: envio && cliente.pago === 'efectivo' && Number(vuelto.value) > 0 ? Math.round(Number(vuelto.value) * 100) : undefined,
-        nota: [nota.value.trim(), notaCombos()].filter(Boolean).join(' · '),
+        // La caja nueva (cap 2) pone la hora en el encargo; a la vieja le va en la nota.
+        para: para && t().cap >= 2 ? para : undefined,
+        nota: [para && !(t().cap >= 2) ? 'PARA LAS ' + para : '', nota.value.trim(), notaCombos()].filter(Boolean).join(' · '),
         envio: envio ? costoEnvio(sub) : 0,
         total: sub + (envio ? costoEnvio(sub) : 0)
       }
@@ -1346,6 +1649,14 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     }
     const listo = () => {
       const porWhatsApp = datos.whatsapp ? textoWhatsApp(true) : ''
+      // Queda en seguimiento: el cliente ve cuando lo preparan y cuando sale.
+      const pid = leer(CLAVE + '.enviando', '')
+      const sub = subtotal()
+      const envio = cliente.entrega === 'envio'
+      if (pid && t().cap >= 2) {
+        siguiendo = { pid, en: Date.now(), envio, para, total: sub + (envio ? costoEnvio(sub) : 0) }
+        guardar(CLAVE + '.siguiendo', siguiendo)
+      }
       guardar(CLAVE + '.ultimo', { items: Object.assign({}, carrito), en: Date.now() })
       anotar('.comprados', Object.keys(carrito).filter((k) => porId[k]), 30)
       carrito = {}
@@ -1353,10 +1664,13 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
       guardar(CLAVE + '.enviando', '')
       guardar(CLAVE + '.elegidos', {})
       pintar()
+      seguir()
       abrirHoja('¡Pedido enviado!',
         el('div', { style: 'text-align:center;font-size:56px;margin:10px 0' }, '🎉'),
         el('h3', { style: 'text-align:center;margin:0 0 8px' }, '¡Listo, ' + cliente.nombre.split(' ')[0] + '! Tu pedido llegó al local'),
-        el('p', { style: 'text-align:center' }, 'Te escribimos al ' + cliente.telefono + ' para confirmarte el total' + (cliente.entrega === 'envio' ? ' y el envío' + (t().demora ? ' (llega en ~' + t().demora + ' min)' : '') + '.' : ' y cuándo pasar a buscarlo.')),
+        el('p', { style: 'text-align:center' }, 'Te escribimos al ' + cliente.telefono + ' para confirmarte el total' + (cliente.entrega === 'envio' ? ' y el envío' + (t().demora ? ' (llega en ~' + t().demora + ' min)' : '') + '.' : ' y cuándo pasar a buscarlo.') + (para ? ' Lo pediste para las ' + para + ' h.' : '')),
+        cliente.pago === 'transferencia' ? cajaAlias('Cuando te confirmemos el total, transferí a:') : null,
+        siguiendo && siguiendo.pid === pid ? el('p', { clase: 'aviso' }, '📦 Seguí tu pedido acá mismo, arriba de todo en la tienda: te mostramos cuando lo preparan y cuando ' + (envio ? 'sale.' : 'está listo.')) : null,
         datos.puntos ? el('p', { clase: 'aviso' }, '⭐ Con tu teléfono sumás puntos cuando lo pagás.') : null,
         porWhatsApp ? el('a', { clase: 'btn whatsapp ancho-total', href: porWhatsApp, style: 'display:block;text-align:center;text-decoration:none;margin-top:12px' }, 'Avisar también por WhatsApp') : null,
         el('button', { clase: 'btn ancho-total', style: 'margin-top:10px', onclick: cerrarHoja }, 'Volver a la tienda'))
@@ -1391,19 +1705,22 @@ body.con-hoja .wa-flota, body.en-local .wa-flota { display: none; }
     boton.textContent = textoBoton
     boton.addEventListener('click', enviar)
 
-    cuerpo.append(
+    poner(cuerpo,
+      ab && !ab.abierto ? el('div', { clase: 'mensaje', style: 'margin:0 0 12px' }, 'El local está cerrado ahora' + (ab.abre != null ? ' (abre a las ' + ab.abre + ')' : '') + '. Podés dejar el pedido igual: lo ven apenas abren.') : null,
       zona,
       el('div', { clase: 'campo' }, el('label', {}, '¿Cómo lo recibís?'), seg([['envio', '🚚 Envío'], ['retiro', '🏪 Retiro en el local']], 'entrega', () => { alEntrega(); alPago() })),
       campoDir,
+      campoCuando,
       el('div', { clase: 'campo' }, el('label', {}, 'Nombre'), nombre),
       datos.pedidos ? el('div', { clase: 'campo' }, el('label', {}, 'Tu WhatsApp (para confirmarte el pedido)'), telefono) : null,
       el('div', { clase: 'campo' }, el('label', {}, '¿Cómo pagás?'), seg([['efectivo', '💵 Efectivo'], ['transferencia', '🏦 Transferencia'], ['mp', '📱 Mercado Pago']], 'pago', alPago)),
       campoVuelto,
+      campoAlias,
       el('div', { clase: 'campo' }, nota),
       error,
       boton,
       el('p', { clase: 'aviso' }, datos.pedidos
-        ? 'El pedido llega directo al local y te escriben para confirmarte el total. Pagás al recibirlo.'
+        ? 'El pedido llega directo al local y te escriben para confirmarte el total.'
         : 'Se abre WhatsApp con el pedido escrito: solo tenés que apretar enviar.'))
     if (!cliente.pago) cliente.pago = 'efectivo'
     abrirHoja('Tu pedido', cuerpo)
