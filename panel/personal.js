@@ -160,7 +160,7 @@ async function hojaCelularEmpleado () {
   const quien = el('select', {}, opciones.map((x, i) => el('option', { valor: String(i) }, x.nombre + (varias ? ' — ' + x.sucursal : ''))))
   const sugerido = (n) => String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '').slice(0, 20)
   const usuario = el('input', { type: 'text', autocapitalize: 'none', autocomplete: 'off', maxlength: '20', placeholder: 'ej: lucia' })
-  const pin = el('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: '8', placeholder: '6 números' })
+  const pin = el('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: '8', placeholder: '4 a 6 números' })
   const pin2 = el('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: '8', placeholder: 'otra vez' })
   const ponerUsuario = () => { usuario.value = sugerido(opciones[Number(quien.value)].nombre) }
   quien.addEventListener('change', ponerUsuario)
@@ -170,14 +170,14 @@ async function hojaCelularEmpleado () {
     cuerpo: el('div', {},
       el('label', { clase: 'campo' }, 'Empleado', quien),
       el('label', { clase: 'campo' }, 'Usuario para entrar', usuario),
-      el('label', { clase: 'campo' }, 'PIN del celular (6 números)', pin),
+      el('label', { clase: 'campo' }, 'PIN del celular (4 a 6 números)', pin),
       el('label', { clase: 'campo' }, 'Repetí el PIN', pin2),
       el('p', { clase: 'sub' }, 'En el celular toca "Soy empleado: entrar con mi usuario y PIN". Puede vender y contar stock. Si ya tenía usuario, se le cambia por este. Las ventas las carga la caja de su sucursal: si está apagada, quedan esperando hasta que se prenda.')),
     botones: [{ texto: 'Dar acceso', primario: true, alTocar: async (cerrar) => {
       const x = opciones[Number(quien.value)]
       const u = usuario.value.trim().toLowerCase()
       if (!/^[a-z0-9]{3,20}$/.test(u)) return toast('El usuario: de 3 a 20 letras o números, sin espacios ni acentos', 'mal')
-      if (!/^\d{6,8}$/.test(pin.value.trim())) return toast('El PIN tiene que ser de 6 números', 'mal')
+      if (!/^\d{4,8}$/.test(pin.value.trim())) return toast('El PIN tiene que ser de 4 a 6 números', 'mal')
       if (pin.value.trim() !== pin2.value.trim()) return toast('Los dos PIN no son iguales', 'mal')
       // La caja que lo hace: la suya si está conectada; si no, cualquiera que sí.
       const conectada = (id) => !atrasoCaja(id)
