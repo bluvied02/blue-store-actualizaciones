@@ -45,7 +45,7 @@ const S = {
 // La version de la app. Al abrirla (o al volver a ella) se fija si hay una
 // nueva publicada y, si la hay, se recarga sola: en el iPhone la app queda
 // abierta en memoria y si no, seguiria la vieja por dias.
-const VERSION_APP = '13.34'
+const VERSION_APP = '13.35'
 const $app = document.getElementById('app')
 const $tooltip = document.getElementById('tooltip')
 
@@ -407,6 +407,7 @@ async function buscarCodigo (codigo, sucursalId) {
 // --- las ordenes (lo que se le pide a la caja) --------------------------------------
 
 const NOMBRE_ORDEN = {
+  empleado_celular: 'Celular de un empleado',
   reporte: 'Reporte',
   cierre_semana_previsualizar: 'Calcular cierre semanal', cierre_semana_mercadopago: 'Mercado Pago', cierre_mes_previsualizar: 'Calcular cierre mensual',
   ventas_dia: 'Ventas de un día',
@@ -442,6 +443,8 @@ const guardarFallidas = () => DB.set('fallidas', S.fallidas)
 const guardarEsperando = () => DB.set('esperando', [...S.esperando.values()])
 function anotarHecha (o, r) {
   const res = r.resultado || {}
+  // Un PIN no queda guardado en el historial del celular.
+  if (o && o.datos && o.datos.pin) o = Object.assign({}, o, { datos: Object.assign({}, o.datos, { pin: null }) })
   S.hechas = [Object.assign({}, o, { estado: r.estado, mensaje: res.mensaje || '', error: res.error || '', terminada: new Date().toISOString() })]
     .concat((S.hechas || []).filter((x) => x.id !== o.id)).slice(0, 150)
   DB.set('hechas', S.hechas)

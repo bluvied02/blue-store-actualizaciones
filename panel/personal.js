@@ -41,7 +41,7 @@ async function secPersonal () {
   const cuerpo = E.vista === 'sueldos' ? await vistaSueldos(E) : E.vista === 'horarios' ? await vistaHorarios() : E.vista === 'hoy' ? await vistaHoy() : await vistaEmpleados(E)
   const sub = E.vista === 'empleados' || E.vista === 'hoy' ? 'Todas las sucursales' : nombreSucursal(S.sucursal) + ' · cambiá la sucursal arriba'
   pintarSeccion('personal',
-    cabecera('Personal', sub, el('button', { clase: 'btn', onclick: () => hojaTurno({ sucursalId: S.sucursal }) }, icono('sumar'), 'Día a mano')),
+    cabecera('Personal', sub, el('button', { clase: 'btn', onclick: () => hojaCelularEmpleado() }, 'Celular'), el('button', { clase: 'btn', onclick: () => hojaTurno({ sucursalId: S.sucursal }) }, icono('sumar'), 'Día a mano')),
     pestanas, cuerpo)
 }
 
@@ -140,6 +140,53 @@ async function vistaEmpleados (E) {
       s.faltanMeses ? el('p', { clase: 'sub ambar' }, 'Hay meses de este período que la caja todavía no subió (se suben los últimos 6).') : null,
       el('div', { clase: 'tarjeta sin-relleno' }, filas.length ? el('div', { clase: 'lista' }, filas.map((f) => item(s, f))) : vacio('No hay empleados con horario ni horas en este período.', 'clientes'))]),
     el('p', { clase: 'sub' }, 'Tocá un empleado para ver día por día: a qué hora entró y salió, las horas, la plata de cada día, sus cajas y lo que vendió. Ahí mismo se corrige y se paga.'))
+}
+
+// --- ACCESO AL CELULAR PARA UN EMPLEADO ----------------------------------------------------
+// Lo mismo que Configuración → Celular en la caja, pero desde acá: sirve
+// aunque la caja de ese empleado no ande (lo hace otra caja que esté conectada).
+
+async function hojaCelularEmpleado () {
+  let emp
+  try { [emp] = await Promise.all([leerDatos('personal_empleados', true), leerResumen(true)]) } catch (err) { return toast('No se pudo leer el personal: ' + (err.message || err), 'mal') }
+  const opciones = []
+  for (const suc of S.sucursales) {
+    const ed = datosDe(emp, suc.id)
+    for (const u of ((ed && ed.lista) || [])) if (u.rol !== 'duenio') opciones.push({ sucursalId: suc.id, sucursal: suc.nombre, usuarioId: u.usuarioId, nombre: u.nombre })
+  }
+  if (!opciones.length) return toast('Ninguna caja subió todavía la lista de personal', 'mal')
+  opciones.sort((a, b) => (a.sucursalId === S.sucursal ? 0 : 1) - (b.sucursalId === S.sucursal ? 0 : 1) || a.sucursal.localeCompare(b.sucursal) || a.nombre.localeCompare(b.nombre))
+  const varias = S.sucursales.length > 1
+  const quien = el('select', {}, opciones.map((x, i) => el('option', { valor: String(i) }, x.nombre + (varias ? ' — ' + x.sucursal : ''))))
+  const sugerido = (n) => String(n || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '').slice(0, 20)
+  const usuario = el('input', { type: 'text', autocapitalize: 'none', autocomplete: 'off', maxlength: '20', placeholder: 'ej: lucia' })
+  const pin = el('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: '8', placeholder: '6 números' })
+  const pin2 = el('input', { type: 'password', inputmode: 'numeric', autocomplete: 'new-password', maxlength: '8', placeholder: 'otra vez' })
+  const ponerUsuario = () => { usuario.value = sugerido(opciones[Number(quien.value)].nombre) }
+  quien.addEventListener('change', ponerUsuario)
+  ponerUsuario()
+  abrirHoja({
+    titulo: 'Darle el celular a un empleado',
+    cuerpo: el('div', {},
+      el('label', { clase: 'campo' }, 'Empleado', quien),
+      el('label', { clase: 'campo' }, 'Usuario para entrar', usuario),
+      el('label', { clase: 'campo' }, 'PIN del celular (6 números)', pin),
+      el('label', { clase: 'campo' }, 'Repetí el PIN', pin2),
+      el('p', { clase: 'sub' }, 'En el celular toca "Soy empleado: entrar con mi usuario y PIN". Puede vender y contar stock. Si ya tenía usuario, se le cambia por este. Las ventas las carga la caja de su sucursal: si está apagada, quedan esperando hasta que se prenda.')),
+    botones: [{ texto: 'Dar acceso', primario: true, alTocar: async (cerrar) => {
+      const x = opciones[Number(quien.value)]
+      const u = usuario.value.trim().toLowerCase()
+      if (!/^[a-z0-9]{3,20}$/.test(u)) return toast('El usuario: de 3 a 20 letras o números, sin espacios ni acentos', 'mal')
+      if (!/^\d{6,8}$/.test(pin.value.trim())) return toast('El PIN tiene que ser de 6 números', 'mal')
+      if (pin.value.trim() !== pin2.value.trim()) return toast('Los dos PIN no son iguales', 'mal')
+      // La caja que lo hace: la suya si está conectada; si no, cualquiera que sí.
+      const conectada = (id) => !atrasoCaja(id)
+      const hace = conectada(x.sucursalId) ? x.sucursalId : (S.sucursales.find((s) => conectada(s.id)) || {}).id
+      if (!hace) return toast('No hay ninguna caja conectada para hacerlo. Probá cuando alguna esté prendida.', 'mal', 8)
+      cerrar()
+      await mandarOrden(hace, 'empleado_celular', { sucursalId: x.sucursalId, usuarioId: x.usuarioId, usuario: u, pin: pin.value.trim() }, { texto: 'Celular de ' + x.nombre })
+    } }]
+  })
 }
 
 function abrirEmpleado (sucursalId, usuarioId) {
